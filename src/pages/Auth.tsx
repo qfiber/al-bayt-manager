@@ -22,10 +22,16 @@ const Auth = () => {
 
   useEffect(() => {
     const fetchLogo = async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('settings')
         .select('logo_url')
-        .maybeSingle();
+        .limit(1)
+        .single();
+      
+      if (error) {
+        console.log('Logo fetch error:', error);
+        return;
+      }
       
       if (data?.logo_url) {
         setLogoUrl(data.logo_url);
@@ -33,6 +39,23 @@ const Auth = () => {
     };
     
     fetchLogo();
+    
+    // Subscribe to settings changes for real-time updates
+    const channel = supabase
+      .channel('settings-changes')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'settings' },
+        (payload) => {
+          if (payload.new && typeof payload.new === 'object' && 'logo_url' in payload.new) {
+            setLogoUrl(payload.new.logo_url as string);
+          }
+        }
+      )
+      .subscribe();
+    
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   useEffect(() => {
