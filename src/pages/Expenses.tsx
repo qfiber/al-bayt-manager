@@ -90,11 +90,19 @@ const Expenses = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Convert dd/mm/yyyy to yyyy-mm-dd for database
+    let dbDate = formData.expense_date;
+    const parts = formData.expense_date.split('/');
+    if (parts.length === 3) {
+      const [day, month, year] = parts;
+      dbDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    }
+    
     const expenseData = {
       building_id: formData.building_id,
       description: formData.description,
       amount: parseFloat(formData.amount),
-      expense_date: formData.expense_date,
+      expense_date: dbDate,
       category: formData.category || null,
     };
 
@@ -144,11 +152,19 @@ const Expenses = () => {
 
   const handleEdit = (expense: Expense) => {
     setEditingExpense(expense);
+    // Convert yyyy-mm-dd from database to dd/mm/yyyy for display
+    let displayDate = expense.expense_date;
+    const parts = expense.expense_date.split('-');
+    if (parts.length === 3) {
+      const [year, month, day] = parts;
+      displayDate = `${day}/${month}/${year}`;
+    }
+    
     setFormData({
       building_id: expense.building_id,
       description: expense.description,
       amount: expense.amount.toString(),
-      expense_date: expense.expense_date,
+      expense_date: displayDate,
       category: expense.category || '',
     });
     setIsDialogOpen(true);
@@ -236,9 +252,15 @@ const Expenses = () => {
                     <Label htmlFor="expense_date">{t('date')}</Label>
                     <Input
                       id="expense_date"
-                      type="date"
+                      type="text"
+                      placeholder="dd/mm/yyyy"
                       value={formData.expense_date}
-                      onChange={(e) => setFormData({ ...formData, expense_date: e.target.value })}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/[^\d/]/g, '');
+                        if (value.length <= 10) {
+                          setFormData({ ...formData, expense_date: value });
+                        }
+                      }}
                       required
                     />
                   </div>

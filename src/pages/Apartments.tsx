@@ -84,16 +84,21 @@ const Apartments = () => {
   const calculateProratedAmount = (occupancyStart: string, monthlyFee: number): number => {
     if (!occupancyStart || !monthlyFee) return monthlyFee;
 
-    const startDate = new Date(occupancyStart);
+    // Convert dd/mm/yyyy to Date object
+    const parts = occupancyStart.split('/');
+    if (parts.length !== 3) return monthlyFee;
+    
+    const [day, month, year] = parts.map(p => parseInt(p, 10));
+    if (isNaN(day) || isNaN(month) || isNaN(year)) return monthlyFee;
+    
+    const startDate = new Date(year, month - 1, day);
     const dayOfMonth = startDate.getDate();
 
     // If occupancy starts on the 1st, use full monthly fee
     if (dayOfMonth === 1) return monthlyFee;
 
     // Calculate prorated amount based on days left in month
-    const year = startDate.getFullYear();
-    const month = startDate.getMonth();
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const daysInMonth = new Date(year, month, 0).getDate();
     const daysRemaining = daysInMonth - dayOfMonth + 1;
 
     const proratedAmount = (monthlyFee / daysInMonth) * daysRemaining;
@@ -147,11 +152,21 @@ const Apartments = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Convert dd/mm/yyyy to yyyy-mm-dd for database
+    let dbDate = null;
+    if (formData.occupancy_start) {
+      const parts = formData.occupancy_start.split('/');
+      if (parts.length === 3) {
+        const [day, month, year] = parts;
+        dbDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+      }
+    }
+    
     const apartmentData = {
       apartment_number: formData.apartment_number,
       building_id: formData.building_id,
       status: formData.status,
-      occupancy_start: formData.occupancy_start || null,
+      occupancy_start: dbDate,
       subscription_amount: parseFloat(formData.subscription_amount) || 0,
       subscription_status: formData.subscription_status,
       credit: 0,
@@ -203,12 +218,22 @@ const Apartments = () => {
 
   const handleEdit = (apartment: Apartment) => {
     setEditingApartment(apartment);
+    // Convert yyyy-mm-dd from database to dd/mm/yyyy for display
+    let displayDate = '';
+    if (apartment.occupancy_start) {
+      const parts = apartment.occupancy_start.split('-');
+      if (parts.length === 3) {
+        const [year, month, day] = parts;
+        displayDate = `${day}/${month}/${year}`;
+      }
+    }
+    
     // Temporarily disable auto-calculation for editing
     const currentFormData = {
       apartment_number: apartment.apartment_number,
       building_id: apartment.building_id,
       status: apartment.status,
-      occupancy_start: apartment.occupancy_start || '',
+      occupancy_start: displayDate,
       subscription_amount: apartment.subscription_amount.toString(),
       subscription_status: apartment.subscription_status,
     };
@@ -300,9 +325,15 @@ const Apartments = () => {
                     <Label htmlFor="occupancy_start">{t('occupancyStart')}</Label>
                     <Input
                       id="occupancy_start"
-                      type="date"
+                      type="text"
+                      placeholder="dd/mm/yyyy"
                       value={formData.occupancy_start}
-                      onChange={(e) => setFormData({ ...formData, occupancy_start: e.target.value })}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/[^\d/]/g, '');
+                        if (value.length <= 10) {
+                          setFormData({ ...formData, occupancy_start: value });
+                        }
+                      }}
                     />
                   </div>
                   <div>
