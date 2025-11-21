@@ -44,11 +44,14 @@ const UserManagement = () => {
   const [apartments, setApartments] = useState<Apartment[]>([]);
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [assigningUser, setAssigningUser] = useState<UserProfile | null>(null);
   const [formData, setFormData] = useState<{ name: string; phone: string; role: 'admin' | 'user' }>({ name: '', phone: '', role: 'user' });
+  const [createFormData, setCreateFormData] = useState({ email: '', password: '', name: '', phone: '', role: 'user' as 'admin' | 'user' });
   const [selectedApartments, setSelectedApartments] = useState<string[]>([]);
+  const [isCreating, setIsCreating] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -185,6 +188,41 @@ const UserManagement = () => {
     resetForm();
   };
 
+  const handleCreateUser = async () => {
+    if (!createFormData.email || !createFormData.password || !createFormData.name) {
+      toast({ title: 'Error', description: 'Email, password, and name are required', variant: 'destructive' });
+      return;
+    }
+
+    setIsCreating(true);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('create-user', {
+        body: {
+          email: createFormData.email,
+          password: createFormData.password,
+          name: createFormData.name,
+          phone: createFormData.phone || null,
+          role: createFormData.role,
+        },
+      });
+
+      if (error) throw error;
+
+      if (data.success) {
+        toast({ title: 'Success', description: 'User created successfully' });
+        fetchUsers();
+        resetCreateForm();
+      } else {
+        throw new Error(data.error || 'Failed to create user');
+      }
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
   const handleSaveApartments = async () => {
     if (!assigningUser) return;
 
@@ -224,6 +262,11 @@ const UserManagement = () => {
     setIsDialogOpen(false);
   };
 
+  const resetCreateForm = () => {
+    setCreateFormData({ email: '', password: '', name: '', phone: '', role: 'user' });
+    setIsCreateDialogOpen(false);
+  };
+
   const getApartmentLabel = (apartmentId: string) => {
     const apartment = apartments.find(a => a.id === apartmentId);
     if (!apartment) return 'Unknown';
@@ -253,9 +296,15 @@ const UserManagement = () => {
             <Users className="w-8 h-8 text-primary" />
             <h1 className="text-3xl font-bold">User Management</h1>
           </div>
-          <Button variant="outline" onClick={() => navigate('/dashboard')}>
-            Back to Dashboard
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={() => setIsCreateDialogOpen(true)}>
+              <UserPlus className="w-4 h-4 mr-2" />
+              Create User
+            </Button>
+            <Button variant="outline" onClick={() => navigate('/dashboard')}>
+              Back to Dashboard
+            </Button>
+          </div>
         </div>
 
         <Card>
@@ -375,6 +424,75 @@ const UserManagement = () => {
                   Save Changes
                 </Button>
                 <Button variant="outline" onClick={resetForm}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Create User Dialog */}
+        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Create New User</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="create_email">Email *</Label>
+                <Input
+                  id="create_email"
+                  type="email"
+                  value={createFormData.email}
+                  onChange={(e) => setCreateFormData({ ...createFormData, email: e.target.value })}
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="create_password">Password *</Label>
+                <Input
+                  id="create_password"
+                  type="password"
+                  value={createFormData.password}
+                  onChange={(e) => setCreateFormData({ ...createFormData, password: e.target.value })}
+                  required
+                  placeholder="Minimum 6 characters"
+                />
+              </div>
+              <div>
+                <Label htmlFor="create_name">Name *</Label>
+                <Input
+                  id="create_name"
+                  value={createFormData.name}
+                  onChange={(e) => setCreateFormData({ ...createFormData, name: e.target.value })}
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="create_phone">Phone</Label>
+                <Input
+                  id="create_phone"
+                  value={createFormData.phone}
+                  onChange={(e) => setCreateFormData({ ...createFormData, phone: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="create_role">Role</Label>
+                <Select value={createFormData.role} onValueChange={(value) => setCreateFormData({ ...createFormData, role: value as 'admin' | 'user' })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="user">User</SelectItem>
+                    <SelectItem value="admin">Admin</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex gap-2">
+                <Button onClick={handleCreateUser} className="flex-1" disabled={isCreating}>
+                  {isCreating ? 'Creating...' : 'Create User'}
+                </Button>
+                <Button variant="outline" onClick={resetCreateForm} disabled={isCreating}>
                   Cancel
                 </Button>
               </div>
