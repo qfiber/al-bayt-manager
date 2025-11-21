@@ -263,8 +263,8 @@ const Settings = () => {
                   onChange={handleLogoChange}
                 />
                 {logoFile.preview && (
-                  <div className="mt-2">
-                    <img src={logoFile.preview} alt={t('logoPreview')} className="w-32 h-32 object-cover rounded" />
+                  <div className="mt-2 border rounded-lg p-4 bg-muted/20 flex items-center justify-center">
+                    <img src={logoFile.preview} alt={t('logoPreview')} className="max-w-xs max-h-32 object-contain" />
                   </div>
                 )}
               </div>

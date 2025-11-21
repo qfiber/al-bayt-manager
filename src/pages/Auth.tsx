@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,10 +14,36 @@ const Auth = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const { signIn, user, loading } = useAuth();
   const { t } = useLanguage();
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  useEffect(() => {
+    const fetchLogo = async () => {
+      const { data } = await supabase
+        .from('settings')
+        .select('*')
+        .maybeSingle();
+      
+      if (data) {
+        // Get the logo from storage if it exists
+        const { data: files } = await supabase.storage
+          .from('logos')
+          .list();
+        
+        if (files && files.length > 0) {
+          const { data: publicUrl } = supabase.storage
+            .from('logos')
+            .getPublicUrl(files[0].name);
+          setLogoUrl(publicUrl.publicUrl);
+        }
+      }
+    };
+    
+    fetchLogo();
+  }, []);
 
   useEffect(() => {
     if (!loading && user) {
@@ -60,9 +87,15 @@ const Auth = () => {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1 text-center">
           <div className="flex justify-center mb-4">
-            <div className="p-3 rounded-lg bg-primary/10">
-              <Building className="w-10 h-10 text-primary" />
-            </div>
+            {logoUrl ? (
+              <div className="max-w-[200px] max-h-[120px] flex items-center justify-center">
+                <img src={logoUrl} alt="Logo" className="max-w-full max-h-full object-contain" />
+              </div>
+            ) : (
+              <div className="p-3 rounded-lg bg-primary/10">
+                <Building className="w-10 h-10 text-primary" />
+              </div>
+            )}
           </div>
           <CardTitle className="text-2xl font-bold">{t('buildingManagementSystem')}</CardTitle>
           <CardDescription>{t('signInToAccount')}</CardDescription>
@@ -100,6 +133,10 @@ const Auth = () => {
           
           <div className="mt-6 text-center text-sm text-muted-foreground">
             <p>{t('needAccountContact')}</p>
+          </div>
+          
+          <div className="mt-4 pt-4 border-t text-center text-xs text-muted-foreground">
+            <p>{t('poweredBy')} <span className="font-medium text-foreground">{t('buildingManagementSystem')}</span></p>
           </div>
         </CardContent>
       </Card>
