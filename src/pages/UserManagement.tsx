@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Users, Pencil, Trash2, UserPlus, Home } from 'lucide-react';
+import { Users, Pencil, Trash2, UserPlus, Home, Key } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 interface UserProfile {
@@ -57,6 +57,10 @@ const UserManagement = () => {
   const [deletingUser, setDeletingUser] = useState<UserProfile | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [apartmentAssignments, setApartmentAssignments] = useState<Map<string, { userId: string; userName: string }>>(new Map());
+  const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
+  const [changingPasswordUser, setChangingPasswordUser] = useState<UserProfile | null>(null);
+  const [passwordFormData, setPasswordFormData] = useState({ adminPassword: '', newPassword: '', confirmPassword: '' });
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -326,6 +330,63 @@ const UserManagement = () => {
     setIsCreateDialogOpen(false);
   };
 
+  const handleChangePassword = (userProfile: UserProfile) => {
+    setChangingPasswordUser(userProfile);
+    setPasswordFormData({ adminPassword: '', newPassword: '', confirmPassword: '' });
+    setIsPasswordDialogOpen(true);
+  };
+
+  const resetPasswordForm = () => {
+    setPasswordFormData({ adminPassword: '', newPassword: '', confirmPassword: '' });
+    setChangingPasswordUser(null);
+    setIsPasswordDialogOpen(false);
+  };
+
+  const handleSavePassword = async () => {
+    if (!changingPasswordUser) return;
+
+    // Validate passwords
+    if (passwordFormData.newPassword !== passwordFormData.confirmPassword) {
+      toast({ title: t('error'), description: t('passwordsDoNotMatch'), variant: 'destructive' });
+      return;
+    }
+
+    if (passwordFormData.newPassword.length < 6) {
+      toast({ title: t('error'), description: t('minimumCharacters'), variant: 'destructive' });
+      return;
+    }
+
+    if (!passwordFormData.adminPassword) {
+      toast({ title: t('error'), description: t('adminPasswordRequired'), variant: 'destructive' });
+      return;
+    }
+
+    setIsChangingPassword(true);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('change-user-password', {
+        body: {
+          targetUserId: changingPasswordUser.id,
+          newPassword: passwordFormData.newPassword,
+          adminPassword: passwordFormData.adminPassword,
+        },
+      });
+
+      if (error) throw error;
+
+      toast({ title: t('success'), description: t('passwordChanged') });
+      resetPasswordForm();
+    } catch (error: any) {
+      toast({ 
+        title: t('error'), 
+        description: error.message || t('failedToChangePassword'), 
+        variant: 'destructive' 
+      });
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
+
   const handleDeleteUser = async () => {
     if (!deletingUser) return;
 
@@ -467,7 +528,7 @@ const UserManagement = () => {
                           <span className="text-muted-foreground text-sm">{t('noApartments')}</span>
                         )}
                       </TableCell>
-                      <TableCell className="text-right">
+                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           <Button
                             size="sm"
@@ -475,6 +536,13 @@ const UserManagement = () => {
                             onClick={() => handleEdit(userProfile)}
                           >
                             <Pencil className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleChangePassword(userProfile)}
+                          >
+                            <Key className="w-4 h-4" />
                           </Button>
                           <Button
                             size="sm"
@@ -682,6 +750,61 @@ const UserManagement = () => {
                     setSelectedApartments([]);
                   }}
                 >
+                  {t('cancel')}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Change Password Dialog */}
+        <Dialog open={isPasswordDialogOpen} onOpenChange={setIsPasswordDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>
+                {changingPasswordUser && t('changePasswordFor').replace('{name}', changingPasswordUser.name)}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="p-3 bg-muted rounded-md text-sm text-muted-foreground">
+                {t('enterAdminPassword')}
+              </div>
+              <div>
+                <Label htmlFor="admin_password">{t('adminPassword')}</Label>
+                <Input
+                  id="admin_password"
+                  type="password"
+                  value={passwordFormData.adminPassword}
+                  onChange={(e) => setPasswordFormData({ ...passwordFormData, adminPassword: e.target.value })}
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="new_password">{t('newPassword')}</Label>
+                <Input
+                  id="new_password"
+                  type="password"
+                  value={passwordFormData.newPassword}
+                  onChange={(e) => setPasswordFormData({ ...passwordFormData, newPassword: e.target.value })}
+                  required
+                  placeholder={t('minimumCharacters')}
+                />
+              </div>
+              <div>
+                <Label htmlFor="confirm_password">{t('confirmPassword')}</Label>
+                <Input
+                  id="confirm_password"
+                  type="password"
+                  value={passwordFormData.confirmPassword}
+                  onChange={(e) => setPasswordFormData({ ...passwordFormData, confirmPassword: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button onClick={handleSavePassword} className="flex-1" disabled={isChangingPassword}>
+                  {isChangingPassword ? t('saving') : t('changePassword')}
+                </Button>
+                <Button variant="outline" onClick={resetPasswordForm} disabled={isChangingPassword}>
                   {t('cancel')}
                 </Button>
               </div>
