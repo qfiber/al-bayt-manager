@@ -24,21 +24,11 @@ const Auth = () => {
     const fetchLogo = async () => {
       const { data } = await supabase
         .from('settings')
-        .select('*')
+        .select('logo_url')
         .maybeSingle();
       
-      if (data) {
-        // Get the logo from storage if it exists
-        const { data: files } = await supabase.storage
-          .from('logos')
-          .list();
-        
-        if (files && files.length > 0) {
-          const { data: publicUrl } = supabase.storage
-            .from('logos')
-            .getPublicUrl(files[0].name);
-          setLogoUrl(publicUrl.publicUrl);
-        }
+      if (data?.logo_url) {
+        setLogoUrl(data.logo_url);
       }
     };
     

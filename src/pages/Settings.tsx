@@ -132,6 +132,10 @@ const Settings = () => {
         system_language: systemLanguage,
       };
 
+      if (logoUrl) {
+        updateData.logo_url = logoUrl;
+      }
+
       const { error } = await supabase
         .from('settings')
         .update(updateData)
