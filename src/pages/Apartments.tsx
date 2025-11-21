@@ -162,14 +162,15 @@ const Apartments = () => {
       }
     }
     
+    const subscriptionAmount = parseFloat(formData.subscription_amount) || 0;
+    
     const apartmentData = {
       apartment_number: formData.apartment_number,
       building_id: formData.building_id,
       status: formData.status,
       occupancy_start: dbDate,
-      subscription_amount: parseFloat(formData.subscription_amount) || 0,
+      subscription_amount: subscriptionAmount,
       subscription_status: formData.subscription_status,
-      credit: 0,
     };
 
     if (editingApartment) {
@@ -186,9 +187,10 @@ const Apartments = () => {
         resetForm();
       }
     } else {
+      // For new apartments, set initial credit as negative of subscription amount
       const { error } = await supabase
         .from('apartments')
-        .insert([apartmentData]);
+        .insert([{ ...apartmentData, credit: -subscriptionAmount }]);
 
       if (error) {
         toast({ title: 'Error', description: error.message, variant: 'destructive' });
