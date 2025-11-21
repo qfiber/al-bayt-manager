@@ -90,16 +90,21 @@ serve(async (req) => {
       }
     }
 
-    // Update the user role if not default 'user'
-    if (role && role !== 'user') {
+    // Insert the user role (should be created by trigger, but ensuring it exists)
+    const { error: roleInsertError } = await supabaseAdmin
+      .from('user_roles')
+      .insert({ user_id: newUser.user.id, role: role || 'user' });
+
+    if (roleInsertError) {
+      console.error('Error inserting role:', roleInsertError);
+      // If insert fails due to already existing, try update
       const { error: roleUpdateError } = await supabaseAdmin
         .from('user_roles')
-        .update({ role })
+        .update({ role: role || 'user' })
         .eq('user_id', newUser.user.id);
 
       if (roleUpdateError) {
         console.error('Error updating role:', roleUpdateError);
-        throw roleUpdateError;
       }
     }
 
