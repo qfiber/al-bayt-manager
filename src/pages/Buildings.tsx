@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Building, Plus, Pencil, Trash2, Upload } from 'lucide-react';
+import Layout from '@/components/Layout';
 
 interface Building {
   id: string;
@@ -170,21 +171,20 @@ const Buildings = () => {
   };
 
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">{t('loading')}</div>;
+    return <Layout><div className="container mx-auto p-6 flex items-center justify-center">{t('loading')}</div></Layout>;
   }
 
   if (!user || !isAdmin) return null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/10">
+    <Layout>
       <div className="container mx-auto p-6">
         <div className="flex justify-between items-center mb-8">
           <div className="flex items-center gap-3">
             <Building className="w-8 h-8 text-primary" />
             <h1 className="text-3xl font-bold">{t('buildings')}</h1>
           </div>
-          <div className="flex gap-2">
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
                 <Button onClick={() => resetForm()}>
                   <Plus className="w-4 h-4 mr-2" />
@@ -239,10 +239,6 @@ const Buildings = () => {
                 </form>
               </DialogContent>
             </Dialog>
-            <Button variant="outline" onClick={() => navigate('/dashboard')}>
-              {t('backToDashboard')}
-            </Button>
-          </div>
         </div>
 
         <Card>
@@ -296,7 +292,7 @@ const Buildings = () => {
           </CardContent>
         </Card>
       </div>
-    </div>
+    </Layout>
   );
 };
 
