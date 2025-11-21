@@ -108,12 +108,12 @@ const Payments = () => {
     const apartment = apartments.find(a => a.id === apartmentId);
     if (!apartment) return;
 
-    const newCredit = apartment.credit + paymentAmount - apartment.subscription_amount;
+    const newCredit = apartment.credit + paymentAmount;
     
     let newStatus = 'due';
     if (newCredit >= 0) {
       newStatus = 'paid';
-    } else if (paymentAmount > 0) {
+    } else if (newCredit < 0 && newCredit > apartment.credit) {
       newStatus = 'partial';
     }
 
