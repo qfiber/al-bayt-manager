@@ -16,7 +16,7 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     
-    // Create Supabase client with service role key for admin operations
+    // Create Supabase admin client with service role key
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
 
     // Get the authorization header from the request
@@ -25,28 +25,31 @@ serve(async (req) => {
       throw new Error('No authorization header');
     }
 
-    // Verify the user is authenticated and is an admin
-    const supabaseClient = createClient(
-      supabaseUrl,
-      Deno.env.get('SUPABASE_ANON_KEY')!,
-      { global: { headers: { Authorization: authHeader } } }
-    );
+    // Extract the JWT token
+    const token = authHeader.replace('Bearer ', '');
 
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+    // Verify the user's JWT token using admin client
+    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
     if (userError || !user) {
-      throw new Error('Unauthorized');
+      console.error('Auth error:', userError);
+      throw new Error('Unauthorized - invalid token');
     }
 
-    // Check if user is admin
-    const { data: roleData, error: roleError } = await supabaseClient
+    console.log('Authenticated user:', user.id);
+
+    // Check if user is admin using service role (bypasses RLS)
+    const { data: roleData, error: roleError } = await supabaseAdmin
       .from('user_roles')
       .select('role')
       .eq('user_id', user.id)
       .single();
 
     if (roleError || roleData?.role !== 'admin') {
-      throw new Error('User is not an admin');
+      console.error('Not an admin:', { userId: user.id, role: roleData?.role, error: roleError });
+      throw new Error('Unauthorized - user is not an admin');
     }
+
+    console.log('User is admin, proceeding with user creation');
 
     // Parse request body
     const { email, password, name, phone, role } = await req.json();
