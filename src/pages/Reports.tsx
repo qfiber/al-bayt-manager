@@ -95,35 +95,72 @@ const Reports = () => {
   };
 
   const exportToPDF = () => {
-    const doc = new jsPDF();
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
+
+    // Note: For proper Arabic rendering, we use reversed text and RTL alignment
+    const reverseArabic = (text: string) => text.split('').reverse().join('');
     
+    // Title
     doc.setFontSize(18);
-    doc.text('Financial Report', 14, 22);
+    doc.text(reverseArabic('التقرير المالي'), doc.internal.pageSize.width - 14, 22, { align: 'right' });
     doc.setFontSize(11);
-    doc.text(`Generated: ${new Date().toLocaleDateString()}`, 14, 30);
+    doc.text(`${reverseArabic('تاريخ الإنشاء')}: ${new Date().toLocaleDateString('ar-SA')}`, doc.internal.pageSize.width - 14, 30, { align: 'right' });
     
     // Summary section
     doc.setFontSize(14);
-    doc.text('Summary', 14, 45);
+    doc.text(reverseArabic('الملخص'), doc.internal.pageSize.width - 14, 45, { align: 'right' });
+    
     autoTable(doc, {
       startY: 50,
-      head: [['Metric', 'Amount (₪)']],
+      head: [[reverseArabic('المبلغ (₪)'), reverseArabic('المؤشر')]],
       body: [
-        ['Total Revenue', `₪${totalRevenue.toFixed(2)}`],
-        ['Total Expenses', `₪${totalExpenses.toFixed(2)}`],
-        ['Net Income', `₪${(totalRevenue - totalExpenses).toFixed(2)}`],
+        [`₪${totalRevenue.toFixed(0)}`, reverseArabic('إجمالي الإيرادات')],
+        [`₪${totalExpenses.toFixed(0)}`, reverseArabic('إجمالي المصروفات')],
+        [`₪${(totalRevenue - totalExpenses).toFixed(0)}`, reverseArabic('صافي الدخل')],
       ],
+      styles: {
+        halign: 'right',
+        fontSize: 10,
+      },
+      headStyles: {
+        fillColor: [41, 128, 185],
+        textColor: 255,
+        halign: 'right',
+      },
+      columnStyles: {
+        0: { halign: 'right' },
+        1: { halign: 'right' }
+      },
+      margin: { top: 50, right: 14, left: 14 },
     });
     
     // Expenses by category
     if (expensesByCategory.length > 0) {
       doc.addPage();
       doc.setFontSize(14);
-      doc.text('Expenses by Category', 14, 22);
+      doc.text(reverseArabic('المصروفات حسب الفئة'), doc.internal.pageSize.width - 14, 22, { align: 'right' });
       autoTable(doc, {
         startY: 28,
-        head: [['Category', 'Amount (₪)']],
-        body: expensesByCategory.map(exp => [exp.category, `₪${exp.amount.toFixed(2)}`]),
+        head: [[reverseArabic('المبلغ (₪)'), reverseArabic('الفئة')]],
+        body: expensesByCategory.map(exp => [`₪${exp.amount.toFixed(0)}`, reverseArabic(exp.category)]),
+        styles: {
+          halign: 'right',
+          fontSize: 10,
+        },
+        headStyles: {
+          fillColor: [41, 128, 185],
+          textColor: 255,
+          halign: 'right',
+        },
+        columnStyles: {
+          0: { halign: 'right' },
+          1: { halign: 'right' }
+        },
+        margin: { right: 14, left: 14 },
       });
     }
     
@@ -131,20 +168,37 @@ const Reports = () => {
     if (buildingStats.length > 0) {
       doc.addPage();
       doc.setFontSize(14);
-      doc.text('Building Occupancy', 14, 22);
+      doc.text(reverseArabic('إشغال المباني'), doc.internal.pageSize.width - 14, 22, { align: 'right' });
       autoTable(doc, {
         startY: 28,
-        head: [['Building', 'Total', 'Occupied', 'Vacant']],
+        head: [[reverseArabic('شاغر'), reverseArabic('مشغول'), reverseArabic('المجموع'), reverseArabic('المبنى')]],
         body: buildingStats.map(b => [
-          b.buildingName,
-          b.totalApartments.toString(),
-          b.occupied.toString(),
           b.vacant.toString(),
+          b.occupied.toString(),
+          b.totalApartments.toString(),
+          reverseArabic(b.buildingName),
         ]),
+        styles: {
+          halign: 'right',
+          fontSize: 10,
+        },
+        headStyles: {
+          fillColor: [41, 128, 185],
+          textColor: 255,
+          halign: 'right',
+        },
+        columnStyles: {
+          0: { halign: 'right' },
+          1: { halign: 'right' },
+          2: { halign: 'right' },
+          3: { halign: 'right' }
+        },
+        margin: { right: 14, left: 14 },
       });
     }
     
-    doc.save('financial-report.pdf');
+    doc.save('التقرير-المالي.pdf');
+    toast({ title: 'نجح', description: 'تم تصدير التقرير بنجاح' });
   };
 
   const fetchExpensesByCategory = async () => {
