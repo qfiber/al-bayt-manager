@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import { Home } from 'lucide-react';
+import { formatDate } from '@/lib/utils';
 
 interface Apartment {
   id: string;
@@ -160,7 +161,7 @@ const MyApartments = () => {
                     </div>
                     <div className="space-y-1">
                       <p className="text-sm text-muted-foreground">Occupancy Start</p>
-                      <p className="font-medium">{apartment.occupancy_start || 'Not set'}</p>
+                      <p className="font-medium">{apartment.occupancy_start ? formatDate(apartment.occupancy_start) : 'Not set'}</p>
                     </div>
                     <div className="space-y-1">
                       <p className="text-sm text-muted-foreground">Monthly Subscription</p>
