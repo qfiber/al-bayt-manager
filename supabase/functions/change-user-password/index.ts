@@ -73,6 +73,16 @@ serve(async (req) => {
       );
     }
 
+    // Validate password strength (14+ chars, uppercase, lowercase, number, special char)
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{14,}$/;
+    if (!passwordRegex.test(newPassword)) {
+      console.error('Password does not meet security requirements');
+      return new Response(
+        JSON.stringify({ error: 'Password must be at least 14 characters and contain uppercase, lowercase, number, and special character' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     console.log('Changing password for user:', targetUserId);
 
     // Verify admin's password

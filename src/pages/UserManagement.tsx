@@ -351,8 +351,10 @@ const UserManagement = () => {
       return;
     }
 
-    if (passwordFormData.newPassword.length < 6) {
-      toast({ title: t('error'), description: t('minimumCharacters'), variant: 'destructive' });
+    // Validate password strength (14+ chars, uppercase, lowercase, number, special char)
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{14,}$/;
+    if (!passwordRegex.test(passwordFormData.newPassword)) {
+      toast({ title: t('error'), description: t('passwordTooWeak'), variant: 'destructive' });
       return;
     }
 
