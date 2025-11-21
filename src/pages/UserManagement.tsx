@@ -404,15 +404,15 @@ const UserManagement = () => {
         <div className="flex justify-between items-center mb-8">
           <div className="flex items-center gap-3">
             <Users className="w-8 h-8 text-primary" />
-            <h1 className="text-3xl font-bold">User Management</h1>
+            <h1 className="text-3xl font-bold">{t('userManagement')}</h1>
           </div>
           <div className="flex gap-2">
             <Button onClick={() => setIsCreateDialogOpen(true)}>
               <UserPlus className="w-4 h-4 mr-2" />
-              Create User
+              {t('createUser')}
             </Button>
             <Button variant="outline" onClick={() => navigate('/dashboard')}>
-              Back to Dashboard
+              {t('backToDashboard')}
             </Button>
           </div>
         </div>

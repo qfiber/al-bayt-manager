@@ -33,7 +33,7 @@ const Dashboard = () => {
     { title: t('payments'), icon: DollarSign, path: '/payments', color: 'bg-yellow-500' },
     { title: t('expenses'), icon: FileText, path: '/expenses', color: 'bg-red-500' },
     { title: t('reports'), icon: FileText, path: '/reports', color: 'bg-purple-500' },
-    { title: 'Users', icon: Settings, path: '/users', color: 'bg-indigo-500' },
+    { title: t('users'), icon: Settings, path: '/users', color: 'bg-indigo-500' },
     { title: t('settings'), icon: Settings, path: '/settings', color: 'bg-gray-500' },
   ];
 
@@ -51,7 +51,7 @@ const Dashboard = () => {
           <div>
             <h1 className="text-3xl font-bold">{t('dashboard')}</h1>
             <p className="text-muted-foreground mt-2">
-              Welcome back, {user.email}
+              {t('welcomeBack')}, {user.email}
             </p>
           </div>
           <Button onClick={signOut} variant="outline">
@@ -76,7 +76,7 @@ const Dashboard = () => {
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground">
-                  Click to manage {card.title.toLowerCase()}
+                  {t('clickToManage')} {card.title.toLowerCase()}
                 </p>
               </CardContent>
             </Card>
@@ -84,7 +84,7 @@ const Dashboard = () => {
         </div>
 
         <footer className="mt-12 text-center text-sm text-muted-foreground">
-          {t('poweredBy')} Building Management System
+          {t('poweredBy')} {t('buildingManagementSystem')}
         </footer>
       </div>
     </div>

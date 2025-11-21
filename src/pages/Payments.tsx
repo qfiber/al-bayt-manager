@@ -172,7 +172,7 @@ const Payments = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this payment?')) return;
+    if (!confirm(t('deletePaymentConfirm'))) return;
 
     const { error } = await supabase
       .from('payments')
@@ -209,9 +209,9 @@ const Payments = () => {
 
   const getApartmentInfo = (apartmentId: string) => {
     const apartment = apartments.find(a => a.id === apartmentId);
-    if (!apartment) return 'Unknown';
+    if (!apartment) return t('unknown');
     const building = buildings.find(b => b.id === apartment.building_id);
-    return `${building?.name || 'Unknown'} - Apt ${apartment.apartment_number}`;
+    return `${building?.name || t('unknown')} - ${t('apt')} ${apartment.apartment_number}`;
   };
 
   if (loading) {
@@ -233,19 +233,19 @@ const Payments = () => {
               <DialogTrigger asChild>
                 <Button onClick={() => resetForm()}>
                   <Plus className="w-4 h-4 mr-2" />
-                  Add Payment
+                  {t('addPayment')}
                 </Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>{editingPayment ? 'Edit Payment' : 'Add Payment'}</DialogTitle>
+                  <DialogTitle>{editingPayment ? t('editPayment') : t('addPayment')}</DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div>
-                    <Label htmlFor="apartment_id">Apartment</Label>
+                    <Label htmlFor="apartment_id">{t('apartment')}</Label>
                     <Select value={formData.apartment_id} onValueChange={(value) => setFormData({ ...formData, apartment_id: value })}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select an apartment" />
+                        <SelectValue placeholder={t('selectApartmentPlaceholder')} />
                       </SelectTrigger>
                       <SelectContent>
                         {apartments.map((apartment) => (
@@ -257,7 +257,7 @@ const Payments = () => {
                     </Select>
                   </div>
                   <div>
-                    <Label htmlFor="amount">Amount (₪)</Label>
+                    <Label htmlFor="amount">{t('amountLabel')}</Label>
                     <Input
                       id="amount"
                       type="number"
@@ -268,7 +268,7 @@ const Payments = () => {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="month">Month (MM/YYYY)</Label>
+                    <Label htmlFor="month">{t('monthFormat')}</Label>
                     <Input
                       id="month"
                       type="text"
@@ -280,40 +280,40 @@ const Payments = () => {
                   </div>
                   <div className="flex gap-2">
                     <Button type="submit" className="flex-1">
-                      {editingPayment ? 'Update' : 'Create'}
+                      {editingPayment ? t('update') : t('create')}
                     </Button>
                     <Button type="button" variant="outline" onClick={resetForm}>
-                      Cancel
+                      {t('cancel')}
                     </Button>
                   </div>
                 </form>
               </DialogContent>
             </Dialog>
             <Button variant="outline" onClick={() => navigate('/dashboard')}>
-              Back to Dashboard
+              {t('backToDashboard')}
             </Button>
           </div>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>All Payments</CardTitle>
+            <CardTitle>{t('allPayments')}</CardTitle>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Apartment</TableHead>
-                  <TableHead>Amount (₪)</TableHead>
-                  <TableHead>Month</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead>{t('apartment')}</TableHead>
+                  <TableHead>{t('amountLabel')}</TableHead>
+                  <TableHead>{t('month')}</TableHead>
+                  <TableHead className="text-right">{t('actions')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {payments.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={4} className="text-center text-muted-foreground">
-                      No payments found. Create your first payment!
+                      {t('noPaymentsFound')}
                     </TableCell>
                   </TableRow>
                 ) : (

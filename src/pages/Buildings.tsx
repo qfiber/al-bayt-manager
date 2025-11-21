@@ -137,7 +137,7 @@ const Buildings = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this building?')) return;
+    if (!confirm(t('deleteBuildingConfirm'))) return;
 
     const { error } = await supabase
       .from('buildings')
@@ -188,16 +188,16 @@ const Buildings = () => {
               <DialogTrigger asChild>
                 <Button onClick={() => resetForm()}>
                   <Plus className="w-4 h-4 mr-2" />
-                  Add Building
+                  {t('addBuilding')}
                 </Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>{editingBuilding ? 'Edit Building' : 'Add Building'}</DialogTitle>
+                  <DialogTitle>{editingBuilding ? t('editBuilding') : t('addBuilding')}</DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div>
-                    <Label htmlFor="name">Building Name</Label>
+                    <Label htmlFor="name">{t('buildingName')}</Label>
                     <Input
                       id="name"
                       value={formData.name}
@@ -206,7 +206,7 @@ const Buildings = () => {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="address">Address</Label>
+                    <Label htmlFor="address">{t('address')}</Label>
                     <Input
                       id="address"
                       value={formData.address}
@@ -215,7 +215,7 @@ const Buildings = () => {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="logo">Logo (optional)</Label>
+                    <Label htmlFor="logo">{t('logoOptional')}</Label>
                     <Input
                       id="logo"
                       type="file"
@@ -224,46 +224,46 @@ const Buildings = () => {
                     />
                     {logoPreview && (
                       <div className="mt-2">
-                        <img src={logoPreview} alt="Logo preview" className="w-20 h-20 object-cover rounded" />
+                        <img src={logoPreview} alt={t('logoPreview')} className="w-20 h-20 object-cover rounded" />
                       </div>
                     )}
                   </div>
                   <div className="flex gap-2">
                     <Button type="submit" className="flex-1">
-                      {editingBuilding ? 'Update' : 'Create'}
+                      {editingBuilding ? t('update') : t('create')}
                     </Button>
                     <Button type="button" variant="outline" onClick={resetForm}>
-                      Cancel
+                      {t('cancel')}
                     </Button>
                   </div>
                 </form>
               </DialogContent>
             </Dialog>
             <Button variant="outline" onClick={() => navigate('/dashboard')}>
-              Back to Dashboard
+              {t('backToDashboard')}
             </Button>
           </div>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>All Buildings</CardTitle>
+            <CardTitle>{t('allBuildings')}</CardTitle>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Address</TableHead>
-                  <TableHead>Logo</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead>{t('nameLabel')}</TableHead>
+                  <TableHead>{t('address')}</TableHead>
+                  <TableHead>{t('logo')}</TableHead>
+                  <TableHead className="text-right">{t('actions')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {buildings.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={4} className="text-center text-muted-foreground">
-                      No buildings found. Create your first building!
+                      {t('noBuildingsFound')}
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -275,7 +275,7 @@ const Buildings = () => {
                         {building.logo_url ? (
                           <img src={building.logo_url} alt={building.name} className="w-10 h-10 object-cover rounded" />
                         ) : (
-                          <span className="text-muted-foreground">No logo</span>
+                          <span className="text-muted-foreground">{t('noLogo')}</span>
                         )}
                       </TableCell>
                       <TableCell className="text-right">
