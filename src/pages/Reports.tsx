@@ -6,14 +6,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
-import { FileText, DollarSign, TrendingUp, Home, Building } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
+import { FileText, DollarSign, TrendingUp, Download } from 'lucide-react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 interface PaymentStats {
   total: number;
   paid: number;
-  unpaid: number;
-  overdue: number;
 }
 
 interface ExpenseByCategory {
@@ -40,7 +40,7 @@ const Reports = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const [paymentStats, setPaymentStats] = useState<PaymentStats>({ total: 0, paid: 0, unpaid: 0, overdue: 0 });
+  const [paymentStats, setPaymentStats] = useState<PaymentStats>({ total: 0, paid: 0 });
   const [expensesByCategory, setExpensesByCategory] = useState<ExpenseByCategory[]>([]);
   const [buildingStats, setBuildingStats] = useState<BuildingStats[]>([]);
   const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([]);
@@ -77,23 +77,74 @@ const Reports = () => {
   const fetchPaymentStats = async () => {
     const { data: payments, error } = await supabase
       .from('payments')
-      .select('amount, status');
+      .select('amount');
 
     if (error) throw error;
 
     const stats = payments?.reduce(
       (acc, payment) => {
         acc.total += payment.amount;
-        if (payment.status === 'paid') acc.paid += payment.amount;
-        else if (payment.status === 'unpaid') acc.unpaid += payment.amount;
-        else if (payment.status === 'overdue') acc.overdue += payment.amount;
+        acc.paid += payment.amount;
         return acc;
       },
-      { total: 0, paid: 0, unpaid: 0, overdue: 0 }
-    ) || { total: 0, paid: 0, unpaid: 0, overdue: 0 };
+      { total: 0, paid: 0 }
+    ) || { total: 0, paid: 0 };
 
     setPaymentStats(stats);
     setTotalRevenue(stats.paid);
+  };
+
+  const exportToPDF = () => {
+    const doc = new jsPDF();
+    
+    doc.setFontSize(18);
+    doc.text('Financial Report', 14, 22);
+    doc.setFontSize(11);
+    doc.text(`Generated: ${new Date().toLocaleDateString()}`, 14, 30);
+    
+    // Summary section
+    doc.setFontSize(14);
+    doc.text('Summary', 14, 45);
+    autoTable(doc, {
+      startY: 50,
+      head: [['Metric', 'Amount (₪)']],
+      body: [
+        ['Total Revenue', `₪${totalRevenue.toFixed(2)}`],
+        ['Total Expenses', `₪${totalExpenses.toFixed(2)}`],
+        ['Net Income', `₪${(totalRevenue - totalExpenses).toFixed(2)}`],
+      ],
+    });
+    
+    // Expenses by category
+    if (expensesByCategory.length > 0) {
+      doc.addPage();
+      doc.setFontSize(14);
+      doc.text('Expenses by Category', 14, 22);
+      autoTable(doc, {
+        startY: 28,
+        head: [['Category', 'Amount (₪)']],
+        body: expensesByCategory.map(exp => [exp.category, `₪${exp.amount.toFixed(2)}`]),
+      });
+    }
+    
+    // Building occupancy
+    if (buildingStats.length > 0) {
+      doc.addPage();
+      doc.setFontSize(14);
+      doc.text('Building Occupancy', 14, 22);
+      autoTable(doc, {
+        startY: 28,
+        head: [['Building', 'Total', 'Occupied', 'Vacant']],
+        body: buildingStats.map(b => [
+          b.buildingName,
+          b.totalApartments.toString(),
+          b.occupied.toString(),
+          b.vacant.toString(),
+        ]),
+      });
+    }
+    
+    doc.save('financial-report.pdf');
   };
 
   const fetchExpensesByCategory = async () => {
@@ -154,8 +205,7 @@ const Reports = () => {
   const fetchMonthlyTrends = async () => {
     const { data: payments, error: paymentError } = await supabase
       .from('payments')
-      .select('month, amount, status')
-      .eq('status', 'paid')
+      .select('month, amount')
       .order('month', { ascending: true })
       .limit(6);
 
@@ -170,7 +220,7 @@ const Reports = () => {
     const monthMap = new Map<string, { payments: number; expenses: number }>();
 
     payments?.forEach(payment => {
-      const month = new Date(payment.month).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+      const month = payment.month;
       const existing = monthMap.get(month) || { payments: 0, expenses: 0 };
       monthMap.set(month, { ...existing, payments: existing.payments + payment.amount });
     });
@@ -197,11 +247,6 @@ const Reports = () => {
   if (!user) return null;
 
   const netIncome = totalRevenue - totalExpenses;
-  const paymentStatusData = [
-    { name: 'Paid', value: paymentStats.paid },
-    { name: 'Unpaid', value: paymentStats.unpaid },
-    { name: 'Overdue', value: paymentStats.overdue },
-  ].filter(item => item.value > 0);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/10">
@@ -211,21 +256,27 @@ const Reports = () => {
             <FileText className="w-8 h-8 text-primary" />
             <h1 className="text-3xl font-bold">{t('reports')}</h1>
           </div>
-          <Button variant="outline" onClick={() => navigate('/dashboard')}>
-            Back to Dashboard
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={exportToPDF}>
+              <Download className="w-4 h-4 mr-2" />
+              Export to PDF
+            </Button>
+            <Button variant="outline" onClick={() => navigate('/dashboard')}>
+              Back to Dashboard
+            </Button>
+          </div>
         </div>
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${totalRevenue.toFixed(2)}</div>
-              <p className="text-xs text-muted-foreground">From paid invoices</p>
+              <div className="text-2xl font-bold">₪{totalRevenue.toFixed(2)}</div>
+              <p className="text-xs text-muted-foreground">From all payments</p>
             </CardContent>
           </Card>
 
@@ -235,7 +286,7 @@ const Reports = () => {
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${totalExpenses.toFixed(2)}</div>
+              <div className="text-2xl font-bold">₪{totalExpenses.toFixed(2)}</div>
               <p className="text-xs text-muted-foreground">All categories</p>
             </CardContent>
           </Card>
@@ -247,60 +298,15 @@ const Reports = () => {
             </CardHeader>
             <CardContent>
               <div className={`text-2xl font-bold ${netIncome >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                ${netIncome.toFixed(2)}
+                ₪{netIncome.toFixed(2)}
               </div>
               <p className="text-xs text-muted-foreground">Revenue - Expenses</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Pending Payments</CardTitle>
-              <FileText className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">${(paymentStats.unpaid + paymentStats.overdue).toFixed(2)}</div>
-              <p className="text-xs text-muted-foreground">Unpaid & Overdue</p>
             </CardContent>
           </Card>
         </div>
 
         {/* Charts Section */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          {/* Payment Status Chart */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Payment Status Distribution</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {paymentStatusData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie
-                      data={paymentStatusData}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                      outerRadius={80}
-                      fill="hsl(var(--primary))"
-                      dataKey="value"
-                    >
-                      {paymentStatusData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(value: number) => `$${value.toFixed(2)}`} />
-                  </PieChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                  No payment data available
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
           {/* Expenses by Category */}
           <Card>
             <CardHeader>
@@ -313,13 +319,39 @@ const Reports = () => {
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="category" />
                     <YAxis />
-                    <Tooltip formatter={(value: number) => `$${value.toFixed(2)}`} />
+                    <Tooltip formatter={(value: number) => `₪${value.toFixed(2)}`} />
                     <Bar dataKey="amount" fill="hsl(var(--primary))" />
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
                 <div className="h-[300px] flex items-center justify-center text-muted-foreground">
                   No expense data available
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Building Occupancy Stats */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Building Occupancy</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {buildingStats.length > 0 ? (
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={buildingStats}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="buildingName" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="occupied" fill="hsl(var(--primary))" name="Occupied" />
+                    <Bar dataKey="vacant" fill="hsl(var(--muted))" name="Vacant" />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                  No building data available
                 </div>
               )}
             </CardContent>
@@ -338,7 +370,7 @@ const Reports = () => {
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="month" />
                   <YAxis />
-                  <Tooltip formatter={(value: number) => `$${value.toFixed(2)}`} />
+                  <Tooltip formatter={(value: number) => `₪${value.toFixed(2)}`} />
                   <Legend />
                   <Line type="monotone" dataKey="payments" stroke="hsl(var(--primary))" name="Revenue" strokeWidth={2} />
                   <Line type="monotone" dataKey="expenses" stroke="hsl(var(--destructive))" name="Expenses" strokeWidth={2} />
@@ -347,32 +379,6 @@ const Reports = () => {
             ) : (
               <div className="h-[300px] flex items-center justify-center text-muted-foreground">
                 No trend data available
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Building Occupancy Stats */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Building Occupancy</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {buildingStats.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={buildingStats}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="buildingName" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Bar dataKey="occupied" fill="hsl(var(--primary))" name="Occupied" />
-                  <Bar dataKey="vacant" fill="hsl(var(--muted))" name="Vacant" />
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                No building data available
               </div>
             )}
           </CardContent>
