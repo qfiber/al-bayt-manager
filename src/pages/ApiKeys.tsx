@@ -262,14 +262,14 @@ export default function ApiKeys() {
           </Button>
         </CardHeader>
         <CardContent>
-          <Table>
+          <Table dir="rtl">
             <TableHeader>
               <TableRow>
-                <TableHead>{language === 'ar' ? 'الاسم' : 'Name'}</TableHead>
-                <TableHead>{language === 'ar' ? 'الحالة' : 'Status'}</TableHead>
-                <TableHead>{language === 'ar' ? 'آخر استخدام' : 'Last Used'}</TableHead>
-                <TableHead>{language === 'ar' ? 'تاريخ الإنشاء' : 'Created'}</TableHead>
-                <TableHead>{language === 'ar' ? 'الإجراءات' : 'Actions'}</TableHead>
+                <TableHead className="text-right">{language === 'ar' ? 'الاسم' : 'Name'}</TableHead>
+                <TableHead className="text-right">{language === 'ar' ? 'الحالة' : 'Status'}</TableHead>
+                <TableHead className="text-right">{language === 'ar' ? 'آخر استخدام' : 'Last Used'}</TableHead>
+                <TableHead className="text-right">{language === 'ar' ? 'تاريخ الإنشاء' : 'Created'}</TableHead>
+                <TableHead className="text-right">{language === 'ar' ? 'الإجراءات' : 'Actions'}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -282,24 +282,24 @@ export default function ApiKeys() {
               ) : (
                 apiKeys.map((key) => (
                   <TableRow key={key.id}>
-                    <TableCell className="font-medium">{key.name}</TableCell>
-                    <TableCell>
+                    <TableCell className="font-medium text-right">{key.name}</TableCell>
+                    <TableCell className="text-right">
                       <Badge variant={key.is_active ? "default" : "secondary"}>
                         {key.is_active 
                           ? (language === 'ar' ? 'نشط' : 'Active')
                           : (language === 'ar' ? 'معطل' : 'Disabled')}
                       </Badge>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="text-right">
                       {key.last_used_at 
-                        ? new Date(key.last_used_at).toLocaleString(language === 'ar' ? 'ar-SA' : 'en-US')
+                        ? new Date(key.last_used_at).toLocaleString('en-US')
                         : (language === 'ar' ? 'لم يستخدم' : 'Never')}
                     </TableCell>
-                    <TableCell>
-                      {new Date(key.created_at).toLocaleString(language === 'ar' ? 'ar-SA' : 'en-US')}
+                    <TableCell className="text-right">
+                      {new Date(key.created_at).toLocaleString('en-US')}
                     </TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
+                    <TableCell className="text-right">
+                      <div className="flex gap-2 justify-end">
                         <Button
                           size="sm"
                           variant="outline"
