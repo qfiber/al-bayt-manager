@@ -161,27 +161,36 @@ const UserManagement = () => {
     setAssigningUser(userProfile);
     setSelectedApartments(userProfile.apartments || []);
     
-    // Fetch all apartment assignments to check which apartments are taken
-    const { data: allAssignments, error } = await supabase
+    // Fetch all apartment assignments
+    const { data: allAssignments, error: assignmentsError } = await supabase
       .from('user_apartments')
-      .select(`
-        apartment_id,
-        user_id,
-        profiles!inner(name)
-      `);
+      .select('apartment_id, user_id');
 
-    if (error) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    if (assignmentsError) {
+      toast({ title: 'Error', description: assignmentsError.message, variant: 'destructive' });
+      return;
+    }
+
+    // Fetch all profiles
+    const { data: allProfiles, error: profilesError } = await supabase
+      .from('profiles')
+      .select('id, name');
+
+    if (profilesError) {
+      toast({ title: 'Error', description: profilesError.message, variant: 'destructive' });
       return;
     }
 
     // Create a map of apartment_id -> { userId, userName }
     const assignmentMap = new Map<string, { userId: string; userName: string }>();
-    allAssignments?.forEach((assignment: any) => {
-      assignmentMap.set(assignment.apartment_id, {
-        userId: assignment.user_id,
-        userName: assignment.profiles.name,
-      });
+    allAssignments?.forEach((assignment) => {
+      const profile = allProfiles?.find(p => p.id === assignment.user_id);
+      if (profile) {
+        assignmentMap.set(assignment.apartment_id, {
+          userId: assignment.user_id,
+          userName: profile.name,
+        });
+      }
     });
     
     setApartmentAssignments(assignmentMap);
