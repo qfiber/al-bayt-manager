@@ -126,7 +126,7 @@ const Expenses = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this expense?')) return;
+    if (!confirm(t('deleteExpenseConfirm'))) return;
 
     const { error } = await supabase
       .from('expenses')
@@ -166,7 +166,7 @@ const Expenses = () => {
   };
 
   const getBuildingName = (buildingId: string) => {
-    return buildings.find(b => b.id === buildingId)?.name || 'Unknown';
+    return buildings.find(b => b.id === buildingId)?.name || t('unknown');
   };
 
   if (loading) {
@@ -188,19 +188,19 @@ const Expenses = () => {
               <DialogTrigger asChild>
                 <Button onClick={() => resetForm()}>
                   <Plus className="w-4 h-4 mr-2" />
-                  Add Expense
+                  {t('addExpense')}
                 </Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>{editingExpense ? 'Edit Expense' : 'Add Expense'}</DialogTitle>
+                  <DialogTitle>{editingExpense ? t('editExpense') : t('addExpense')}</DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div>
-                    <Label htmlFor="building_id">Building</Label>
+                    <Label htmlFor="building_id">{t('building')}</Label>
                     <Select value={formData.building_id} onValueChange={(value) => setFormData({ ...formData, building_id: value })}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select a building" />
+                        <SelectValue placeholder={t('selectBuilding')} />
                       </SelectTrigger>
                       <SelectContent>
                         {buildings.map((building) => (
@@ -212,7 +212,7 @@ const Expenses = () => {
                     </Select>
                   </div>
                   <div>
-                    <Label htmlFor="description">Description</Label>
+                    <Label htmlFor="description">{t('description')}</Label>
                     <Textarea
                       id="description"
                       value={formData.description}
@@ -221,7 +221,7 @@ const Expenses = () => {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="amount">Amount</Label>
+                    <Label htmlFor="amount">{t('amount')}</Label>
                     <Input
                       id="amount"
                       type="number"
@@ -232,7 +232,7 @@ const Expenses = () => {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="expense_date">Date</Label>
+                    <Label htmlFor="expense_date">{t('date')}</Label>
                     <Input
                       id="expense_date"
                       type="date"
@@ -242,52 +242,52 @@ const Expenses = () => {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="category">Category (optional)</Label>
+                    <Label htmlFor="category">{t('categoryOptional')}</Label>
                     <Input
                       id="category"
                       value={formData.category}
                       onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                      placeholder="e.g., Maintenance, Utilities, Repairs"
+                      placeholder={t('categoryPlaceholder')}
                     />
                   </div>
                   <div className="flex gap-2">
                     <Button type="submit" className="flex-1">
-                      {editingExpense ? 'Update' : 'Create'}
+                      {editingExpense ? t('update') : t('create')}
                     </Button>
                     <Button type="button" variant="outline" onClick={resetForm}>
-                      Cancel
+                      {t('cancel')}
                     </Button>
                   </div>
                 </form>
               </DialogContent>
             </Dialog>
             <Button variant="outline" onClick={() => navigate('/dashboard')}>
-              Back to Dashboard
+              {t('backToDashboard')}
             </Button>
           </div>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>All Expenses</CardTitle>
+            <CardTitle>{t('allExpenses')}</CardTitle>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Building</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead>{t('building')}</TableHead>
+                  <TableHead>{t('description')}</TableHead>
+                  <TableHead>{t('category')}</TableHead>
+                  <TableHead>{t('amount')}</TableHead>
+                  <TableHead>{t('date')}</TableHead>
+                  <TableHead className="text-right">{t('actions')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {expenses.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center text-muted-foreground">
-                      No expenses found. Create your first expense!
+                      {t('noExpensesFound')}
                     </TableCell>
                   </TableRow>
                 ) : (

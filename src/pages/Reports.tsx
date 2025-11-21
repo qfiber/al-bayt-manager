@@ -203,7 +203,7 @@ const Reports = () => {
             <h1 className="text-3xl font-bold">{t('reports')}</h1>
           </div>
           <Button variant="outline" onClick={() => navigate('/dashboard')}>
-            Back to Dashboard
+            {t('backToDashboard')}
           </Button>
         </div>
 
@@ -211,36 +211,36 @@ const Reports = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+              <CardTitle className="text-sm font-medium">{t('totalRevenue')}</CardTitle>
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">₪{totalRevenue.toFixed(2)}</div>
-              <p className="text-xs text-muted-foreground">From all payments</p>
+              <p className="text-xs text-muted-foreground">{t('fromAllPayments')}</p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
+              <CardTitle className="text-sm font-medium">{t('totalExpenses')}</CardTitle>
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">₪{totalExpenses.toFixed(2)}</div>
-              <p className="text-xs text-muted-foreground">All categories</p>
+              <p className="text-xs text-muted-foreground">{t('allCategories')}</p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Net Income</CardTitle>
+              <CardTitle className="text-sm font-medium">{t('netIncome')}</CardTitle>
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className={`text-2xl font-bold ${netIncome >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                 ₪{netIncome.toFixed(2)}
               </div>
-              <p className="text-xs text-muted-foreground">Revenue - Expenses</p>
+              <p className="text-xs text-muted-foreground">{t('revenueMinusExpenses')}</p>
             </CardContent>
           </Card>
         </div>
@@ -250,7 +250,7 @@ const Reports = () => {
           {/* Expenses by Category */}
           <Card>
             <CardHeader>
-              <CardTitle>Expenses by Category</CardTitle>
+              <CardTitle>{t('expensesByCategory')}</CardTitle>
             </CardHeader>
             <CardContent>
               {expensesByCategory.length > 0 ? (
@@ -265,7 +265,7 @@ const Reports = () => {
                 </ResponsiveContainer>
               ) : (
                 <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                  No expense data available
+                  {t('noExpenseData')}
                 </div>
               )}
             </CardContent>
@@ -274,7 +274,7 @@ const Reports = () => {
           {/* Building Occupancy Stats */}
           <Card>
             <CardHeader>
-              <CardTitle>Building Occupancy</CardTitle>
+              <CardTitle>{t('buildingOccupancy')}</CardTitle>
             </CardHeader>
             <CardContent>
               {buildingStats.length > 0 ? (
@@ -285,13 +285,13 @@ const Reports = () => {
                     <YAxis />
                     <Tooltip />
                     <Legend />
-                    <Bar dataKey="occupied" fill="hsl(var(--primary))" name="Occupied" />
-                    <Bar dataKey="vacant" fill="hsl(var(--muted))" name="Vacant" />
+                    <Bar dataKey="occupied" fill="hsl(var(--primary))" name={t('occupied')} />
+                    <Bar dataKey="vacant" fill="hsl(var(--muted))" name={t('vacant')} />
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
                 <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                  No building data available
+                  {t('noBuildingData')}
                 </div>
               )}
             </CardContent>
@@ -301,7 +301,7 @@ const Reports = () => {
         {/* Monthly Trends */}
         <Card className="mb-8">
           <CardHeader>
-            <CardTitle>Monthly Revenue vs Expenses</CardTitle>
+            <CardTitle>{t('monthlyRevenueVsExpenses')}</CardTitle>
           </CardHeader>
           <CardContent>
             {monthlyData.length > 0 ? (
@@ -312,13 +312,13 @@ const Reports = () => {
                   <YAxis />
                   <Tooltip formatter={(value: number) => `₪${value.toFixed(2)}`} />
                   <Legend />
-                  <Line type="monotone" dataKey="payments" stroke="hsl(var(--primary))" name="Revenue" strokeWidth={2} />
-                  <Line type="monotone" dataKey="expenses" stroke="hsl(var(--destructive))" name="Expenses" strokeWidth={2} />
+                  <Line type="monotone" dataKey="payments" stroke="hsl(var(--primary))" name={t('revenue')} strokeWidth={2} />
+                  <Line type="monotone" dataKey="expenses" stroke="hsl(var(--destructive))" name={t('expenses')} strokeWidth={2} />
                 </LineChart>
               </ResponsiveContainer>
             ) : (
               <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                No trend data available
+                {t('noTrendData')}
               </div>
             )}
           </CardContent>

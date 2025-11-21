@@ -186,7 +186,7 @@ const Apartments = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this apartment?')) return;
+    if (!confirm(t('deleteApartmentConfirm'))) return;
 
     const { error } = await supabase
       .from('apartments')

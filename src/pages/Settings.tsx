@@ -170,7 +170,7 @@ const Settings = () => {
             <h1 className="text-3xl font-bold">{t('settings')}</h1>
           </div>
           <Button variant="outline" onClick={() => navigate('/dashboard')}>
-            Back to Dashboard
+            {t('backToDashboard')}
           </Button>
         </div>
 
@@ -180,10 +180,10 @@ const Settings = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <DollarSign className="w-5 h-5" />
-                Financial Settings
+                {t('financialSettings')}
               </CardTitle>
               <CardDescription>
-                Configure default fees and pricing for the system
+                {t('financialSettingsDesc')}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">

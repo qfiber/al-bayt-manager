@@ -64,8 +64,8 @@ const Auth = () => {
               <Building className="w-10 h-10 text-primary" />
             </div>
           </div>
-          <CardTitle className="text-2xl font-bold">Building Management System</CardTitle>
-          <CardDescription>Sign in to your account</CardDescription>
+          <CardTitle className="text-2xl font-bold">{t('buildingManagementSystem')}</CardTitle>
+          <CardDescription>{t('signInToAccount')}</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSignIn} className="space-y-4">
@@ -94,12 +94,12 @@ const Auth = () => {
               />
             </div>
             <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? 'Signing in...' : 'Sign In'}
+              {isLoading ? t('signingIn') : t('signInButton')}
             </Button>
           </form>
           
           <div className="mt-6 text-center text-sm text-muted-foreground">
-            <p>Need an account? Contact your administrator.</p>
+            <p>{t('needAccountContact')}</p>
           </div>
         </CardContent>
       </Card>
