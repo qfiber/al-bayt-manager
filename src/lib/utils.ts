@@ -28,3 +28,36 @@ export function formatDateTime(date: Date | string): string {
   const minutes = String(d.getMinutes()).padStart(2, '0');
   return `${day}/${month}/${year} ${hours}:${minutes}`;
 }
+
+/**
+ * Convert dd/mm/yyyy to yyyy-mm-dd for HTML date inputs
+ */
+export function toInputDate(dateStr: string): string {
+  if (!dateStr) return '';
+  
+  // If already in yyyy-mm-dd format, return as is
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+  
+  // Convert dd/mm/yyyy to yyyy-mm-dd
+  const parts = dateStr.split('/');
+  if (parts.length === 3) {
+    const [day, month, year] = parts;
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  }
+  return '';
+}
+
+/**
+ * Convert yyyy-mm-dd from HTML date input to dd/mm/yyyy
+ */
+export function fromInputDate(dateStr: string): string {
+  if (!dateStr) return '';
+  
+  // Convert yyyy-mm-dd to dd/mm/yyyy
+  const parts = dateStr.split('-');
+  if (parts.length === 3) {
+    const [year, month, day] = parts;
+    return `${day}/${month}/${year}`;
+  }
+  return dateStr;
+}
