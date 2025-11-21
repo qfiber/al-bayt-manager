@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { ArrowLeft, Key, Copy, Trash2, Plus } from "lucide-react";
+import { Key, Copy, Trash2, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 interface ApiKey {
@@ -196,13 +196,13 @@ export default function ApiKeys() {
 
   return (
     <div className="container mx-auto p-6 space-y-6" dir={language === 'ar' ? 'rtl' : 'ltr'}>
-      <div className="flex items-center gap-4">
-        <Button variant="outline" onClick={() => navigate('/dashboard')}>
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
+      <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">
           {language === 'ar' ? 'مفاتيح API' : 'API Keys'}
         </h1>
+        <Button variant="outline" onClick={() => navigate('/dashboard')}>
+          {language === 'ar' ? 'العودة إلى لوحة التحكم' : 'Back to Dashboard'}
+        </Button>
       </div>
 
       <Card>
@@ -217,27 +217,31 @@ export default function ApiKeys() {
         <CardContent className="space-y-4">
           <div>
             <Label>{language === 'ar' ? 'عنوان API الأساسي' : 'Base API URL'}</Label>
-            <div className="flex gap-2 mt-2">
-              <Input value={apiBaseUrl} readOnly className="font-mono text-sm" />
+            <div className="flex gap-2 mt-2" dir="ltr">
+              <Input value={apiBaseUrl} readOnly className="font-mono text-sm text-left" />
               <Button size="sm" variant="outline" onClick={() => copyToClipboard(apiBaseUrl)}>
                 <Copy className="h-4 w-4" />
               </Button>
             </div>
           </div>
-          <div className="bg-muted p-4 rounded-lg space-y-2 text-sm">
-            <p className="font-semibold">{language === 'ar' ? 'نقاط النهاية المتاحة:' : 'Available Endpoints:'}</p>
-            <ul className="list-disc list-inside space-y-1 font-mono">
-              <li>/apartments</li>
-              <li>/buildings</li>
-              <li>/expenses</li>
-              <li>/payments</li>
-              <li>/users</li>
-              <li>/user-apartments</li>
-            </ul>
-            <p className="mt-4">
-              <strong>{language === 'ar' ? 'مثال على استخدام curl:' : 'Example curl usage:'}</strong>
+          <div className="space-y-2">
+            <p className="font-semibold text-sm">{language === 'ar' ? 'نقاط النهاية المتاحة:' : 'Available Endpoints:'}</p>
+            <div className="bg-muted p-4 rounded-lg" dir="ltr">
+              <ul className="list-disc list-inside space-y-1 font-mono text-sm text-left">
+                <li>/apartments</li>
+                <li>/buildings</li>
+                <li>/expenses</li>
+                <li>/payments</li>
+                <li>/users</li>
+                <li>/user-apartments</li>
+              </ul>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <p className="font-semibold text-sm">
+              {language === 'ar' ? 'مثال على استخدام curl:' : 'Example curl usage:'}
             </p>
-            <code className="block bg-background p-2 rounded mt-2">
+            <code className="block bg-muted p-4 rounded text-sm font-mono text-left" dir="ltr">
               curl -H "x-api-key: YOUR_API_KEY" {apiBaseUrl}/apartments
             </code>
           </div>
@@ -246,7 +250,7 @@ export default function ApiKeys() {
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <div>
+          <div className="space-y-1.5">
             <CardTitle>{language === 'ar' ? 'مفاتيح API' : 'API Keys'}</CardTitle>
             <CardDescription>
               {language === 'ar' ? 'إدارة مفاتيح الوصول للقراءة فقط' : 'Manage read-only access keys'}
