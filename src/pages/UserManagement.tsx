@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { Users, Pencil, Trash2, UserPlus, Home } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 interface UserProfile {
   id: string;
@@ -52,6 +53,9 @@ const UserManagement = () => {
   const [createFormData, setCreateFormData] = useState({ email: '', password: '', name: '', phone: '', role: 'user' as 'admin' | 'user' });
   const [selectedApartments, setSelectedApartments] = useState<string[]>([]);
   const [isCreating, setIsCreating] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [deletingUser, setDeletingUser] = useState<UserProfile | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -267,6 +271,46 @@ const UserManagement = () => {
     setIsCreateDialogOpen(false);
   };
 
+  const handleDeleteUser = async () => {
+    if (!deletingUser) return;
+
+    // Prevent deleting yourself
+    if (deletingUser.id === user?.id) {
+      toast({ title: 'Error', description: 'You cannot delete your own account', variant: 'destructive' });
+      return;
+    }
+
+    setIsDeleting(true);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('delete-user', {
+        body: {
+          userId: deletingUser.id,
+        },
+      });
+
+      if (error) throw error;
+
+      if (data.success) {
+        toast({ title: 'Success', description: 'User deleted successfully' });
+        fetchUsers();
+        setIsDeleteDialogOpen(false);
+        setDeletingUser(null);
+      } else {
+        throw new Error(data.error || 'Failed to delete user');
+      }
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const confirmDeleteUser = (userProfile: UserProfile) => {
+    setDeletingUser(userProfile);
+    setIsDeleteDialogOpen(true);
+  };
+
   const getApartmentLabel = (apartmentId: string) => {
     const apartment = apartments.find(a => a.id === apartmentId);
     if (!apartment) return 'Unknown';
@@ -372,6 +416,14 @@ const UserManagement = () => {
                             onClick={() => handleAssignApartments(userProfile)}
                           >
                             <Home className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => confirmDeleteUser(userProfile)}
+                            disabled={userProfile.id === user?.id}
+                          >
+                            <Trash2 className="w-4 h-4" />
                           </Button>
                         </div>
                       </TableCell>
@@ -556,6 +608,28 @@ const UserManagement = () => {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Delete User Confirmation Dialog */}
+        <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will permanently delete the user <strong>{deletingUser?.name}</strong> and all associated data. This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setDeletingUser(null)}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteUser}
+                disabled={isDeleting}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {isDeleting ? 'Deleting...' : 'Delete User'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   );
