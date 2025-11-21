@@ -122,7 +122,7 @@ Deno.serve(async (req) => {
       case 'user-apartments': {
         const { data, error } = await supabase
           .from('user_apartments')
-          .select('*, apartments(*, buildings(*)), profiles:user_id(*)');
+          .select('*, apartments(*, buildings(*))');
         
         if (error) throw error;
         return new Response(JSON.stringify({ data }), {
