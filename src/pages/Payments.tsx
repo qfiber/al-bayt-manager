@@ -303,9 +303,9 @@ const Payments = () => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>{t('apartment')}</TableHead>
-                  <TableHead>{t('amountLabel')}</TableHead>
-                  <TableHead>{t('month')}</TableHead>
+                  <TableHead className="text-right">{t('apartment')}</TableHead>
+                  <TableHead className="text-right">{t('amountLabel')}</TableHead>
+                  <TableHead className="text-right">{t('month')}</TableHead>
                   <TableHead className="text-right">{t('actions')}</TableHead>
                 </TableRow>
               </TableHeader>
@@ -319,9 +319,9 @@ const Payments = () => {
                 ) : (
                   payments.map((payment) => (
                     <TableRow key={payment.id}>
-                      <TableCell className="font-medium">{getApartmentInfo(payment.apartment_id)}</TableCell>
-                      <TableCell>₪{payment.amount.toFixed(2)}</TableCell>
-                      <TableCell>{payment.month}</TableCell>
+                      <TableCell className="font-medium text-right">{getApartmentInfo(payment.apartment_id)}</TableCell>
+                      <TableCell className="text-right">₪{payment.amount.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">{payment.month}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           <Button size="sm" variant="outline" onClick={() => handleEdit(payment)}>
