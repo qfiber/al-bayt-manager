@@ -97,7 +97,16 @@ const Apartments = () => {
     const daysRemaining = daysInMonth - dayOfMonth + 1;
 
     const proratedAmount = (monthlyFee / daysInMonth) * daysRemaining;
-    return Math.round(proratedAmount * 100) / 100; // Round to 2 decimal places
+    
+    // Custom rounding: 0.01-0.5 rounds down, 0.51+ rounds up
+    const wholePart = Math.floor(proratedAmount);
+    const fractionalPart = proratedAmount - wholePart;
+    
+    if (fractionalPart >= 0.51) {
+      return wholePart + 1;
+    } else {
+      return wholePart;
+    }
   };
 
   useEffect(() => {
