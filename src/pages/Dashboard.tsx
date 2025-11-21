@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Building, Home, DollarSign, FileText, Settings } from 'lucide-react';
+import { Building, Home, DollarSign, FileText, Settings, Key } from 'lucide-react';
 
 const Dashboard = () => {
   const { user, isAdmin, loading, signOut } = useAuth();
@@ -35,6 +35,7 @@ const Dashboard = () => {
     { title: t('reports'), icon: FileText, path: '/reports', color: 'bg-purple-500' },
     { title: t('users'), icon: Settings, path: '/users', color: 'bg-indigo-500' },
     { title: t('settings'), icon: Settings, path: '/settings', color: 'bg-gray-500' },
+    { title: 'API Keys', icon: Key, path: '/api-keys', color: 'bg-orange-500' },
   ];
 
   const userCards = [
