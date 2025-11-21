@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { FileText, Plus, Pencil, Trash2 } from 'lucide-react';
+import { formatDate } from '@/lib/utils';
 
 interface Expense {
   id: string;
@@ -297,7 +298,7 @@ const Expenses = () => {
                       <TableCell className="text-right">{expense.description}</TableCell>
                       <TableCell className="text-right">{expense.category || '-'}</TableCell>
                       <TableCell className="text-right">₪{expense.amount.toFixed(2)}</TableCell>
-                      <TableCell className="text-right">{expense.expense_date}</TableCell>
+                      <TableCell className="text-right">{formatDate(expense.expense_date)}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           <Button size="sm" variant="outline" onClick={() => handleEdit(expense)}>

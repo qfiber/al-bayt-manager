@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Key, Copy, Trash2, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { formatDateTime } from "@/lib/utils";
 
 interface ApiKey {
   id: string;
@@ -292,11 +293,11 @@ export default function ApiKeys() {
                     </TableCell>
                     <TableCell className="text-right">
                       {key.last_used_at 
-                        ? new Date(key.last_used_at).toLocaleString('en-US')
+                        ? formatDateTime(key.last_used_at)
                         : (language === 'ar' ? 'لم يستخدم' : 'Never')}
                     </TableCell>
                     <TableCell className="text-right">
-                      {new Date(key.created_at).toLocaleString('en-US')}
+                      {formatDateTime(key.created_at)}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex gap-2 justify-end">
