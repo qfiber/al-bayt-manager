@@ -19,30 +19,36 @@ export type Database = {
           apartment_number: string
           building_id: string
           created_at: string | null
+          credit: number
           id: string
-          occupancy_end: string | null
           occupancy_start: string | null
           status: string
+          subscription_amount: number
+          subscription_status: string
           updated_at: string | null
         }
         Insert: {
           apartment_number: string
           building_id: string
           created_at?: string | null
+          credit?: number
           id?: string
-          occupancy_end?: string | null
           occupancy_start?: string | null
           status?: string
+          subscription_amount?: number
+          subscription_status?: string
           updated_at?: string | null
         }
         Update: {
           apartment_number?: string
           building_id?: string
           created_at?: string | null
+          credit?: number
           id?: string
-          occupancy_end?: string | null
           occupancy_start?: string | null
           status?: string
+          subscription_amount?: number
+          subscription_status?: string
           updated_at?: string | null
         }
         Relationships: [
@@ -130,7 +136,6 @@ export type Database = {
           created_at: string | null
           id: string
           month: string
-          status: string
           updated_at: string | null
         }
         Insert: {
@@ -139,7 +144,6 @@ export type Database = {
           created_at?: string | null
           id?: string
           month: string
-          status?: string
           updated_at?: string | null
         }
         Update: {
@@ -148,7 +152,6 @@ export type Database = {
           created_at?: string | null
           id?: string
           month?: string
-          status?: string
           updated_at?: string | null
         }
         Relationships: [

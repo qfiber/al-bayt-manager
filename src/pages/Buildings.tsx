@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Building, Plus, Pencil, Trash2 } from 'lucide-react';
+import { Building, Plus, Pencil, Trash2, Upload } from 'lucide-react';
 
 interface Building {
   id: string;
@@ -28,7 +28,9 @@ const Buildings = () => {
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingBuilding, setEditingBuilding] = useState<Building | null>(null);
-  const [formData, setFormData] = useState({ name: '', address: '', logo_url: '' });
+  const [formData, setFormData] = useState({ name: '', address: '' });
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -57,34 +59,80 @@ const Buildings = () => {
     }
   };
 
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setLogoFile(file);
+      setLogoPreview(URL.createObjectURL(file));
+    }
+  };
+
+  const uploadLogo = async (): Promise<string | null> => {
+    if (!logoFile || !user) return null;
+
+    const fileExt = logoFile.name.split('.').pop();
+    const fileName = `${Date.now()}.${fileExt}`;
+    const filePath = `${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('logos')
+      .upload(filePath, logoFile);
+
+    if (uploadError) {
+      throw uploadError;
+    }
+
+    const { data } = supabase.storage
+      .from('logos')
+      .getPublicUrl(filePath);
+
+    return data.publicUrl;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (editingBuilding) {
-      const { error } = await supabase
-        .from('buildings')
-        .update({ name: formData.name, address: formData.address, logo_url: formData.logo_url || null })
-        .eq('id', editingBuilding.id);
+    try {
+      let logoUrl = null;
+      if (logoFile) {
+        logoUrl = await uploadLogo();
+      }
 
-      if (error) {
-        toast({ title: 'Error', description: error.message, variant: 'destructive' });
-      } else {
+      if (editingBuilding) {
+        const updateData: any = { 
+          name: formData.name, 
+          address: formData.address
+        };
+        if (logoUrl) {
+          updateData.logo_url = logoUrl;
+        }
+
+        const { error } = await supabase
+          .from('buildings')
+          .update(updateData)
+          .eq('id', editingBuilding.id);
+
+        if (error) throw error;
         toast({ title: 'Success', description: 'Building updated successfully' });
-        fetchBuildings();
-        resetForm();
-      }
-    } else {
-      const { error } = await supabase
-        .from('buildings')
-        .insert([{ name: formData.name, address: formData.address, logo_url: formData.logo_url || null }]);
-
-      if (error) {
-        toast({ title: 'Error', description: error.message, variant: 'destructive' });
       } else {
+        const insertData: any = { 
+          name: formData.name, 
+          address: formData.address,
+          logo_url: logoUrl
+        };
+
+        const { error } = await supabase
+          .from('buildings')
+          .insert([insertData]);
+
+        if (error) throw error;
         toast({ title: 'Success', description: 'Building created successfully' });
-        fetchBuildings();
-        resetForm();
       }
+
+      fetchBuildings();
+      resetForm();
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
     }
   };
 
@@ -106,12 +154,17 @@ const Buildings = () => {
 
   const handleEdit = (building: Building) => {
     setEditingBuilding(building);
-    setFormData({ name: building.name, address: building.address, logo_url: building.logo_url || '' });
+    setFormData({ name: building.name, address: building.address });
+    if (building.logo_url) {
+      setLogoPreview(building.logo_url);
+    }
     setIsDialogOpen(true);
   };
 
   const resetForm = () => {
-    setFormData({ name: '', address: '', logo_url: '' });
+    setFormData({ name: '', address: '' });
+    setLogoFile(null);
+    setLogoPreview(null);
     setEditingBuilding(null);
     setIsDialogOpen(false);
   };
@@ -162,12 +215,18 @@ const Buildings = () => {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="logo_url">Logo URL (optional)</Label>
+                    <Label htmlFor="logo">Logo (optional)</Label>
                     <Input
-                      id="logo_url"
-                      value={formData.logo_url}
-                      onChange={(e) => setFormData({ ...formData, logo_url: e.target.value })}
+                      id="logo"
+                      type="file"
+                      accept="image/*"
+                      onChange={handleLogoChange}
                     />
+                    {logoPreview && (
+                      <div className="mt-2">
+                        <img src={logoPreview} alt="Logo preview" className="w-20 h-20 object-cover rounded" />
+                      </div>
+                    )}
                   </div>
                   <div className="flex gap-2">
                     <Button type="submit" className="flex-1">

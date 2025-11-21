@@ -9,12 +9,17 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Settings as SettingsIcon, Save, DollarSign, Globe } from 'lucide-react';
+import { Settings as SettingsIcon, Save, DollarSign, Globe, Upload } from 'lucide-react';
 
 interface SettingsData {
   id: string;
   monthly_fee: number;
   system_language: string;
+}
+
+interface LogoFile {
+  file: File | null;
+  preview: string | null;
 }
 
 const Settings = () => {
@@ -27,6 +32,7 @@ const Settings = () => {
   const [monthlyFee, setMonthlyFee] = useState('');
   const [systemLanguage, setSystemLanguage] = useState('ar');
   const [isSaving, setIsSaving] = useState(false);
+  const [logoFile, setLogoFile] = useState<LogoFile>({ file: null, preview: null });
 
   useEffect(() => {
     if (!loading && !user) {
@@ -75,6 +81,38 @@ const Settings = () => {
     }
   };
 
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setLogoFile({
+        file,
+        preview: URL.createObjectURL(file),
+      });
+    }
+  };
+
+  const uploadLogo = async (): Promise<string | null> => {
+    if (!logoFile.file || !user) return null;
+
+    const fileExt = logoFile.file.name.split('.').pop();
+    const fileName = `${user.id}-${Date.now()}.${fileExt}`;
+    const filePath = `${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('logos')
+      .upload(filePath, logoFile.file);
+
+    if (uploadError) {
+      throw uploadError;
+    }
+
+    const { data } = supabase.storage
+      .from('logos')
+      .getPublicUrl(filePath);
+
+    return data.publicUrl;
+  };
+
   const handleSave = async () => {
     if (!settings) {
       toast({ title: 'Error', description: 'Settings not loaded', variant: 'destructive' });
@@ -83,19 +121,24 @@ const Settings = () => {
 
     setIsSaving(true);
 
-    const { error } = await supabase
-      .from('settings')
-      .update({
+    try {
+      let logoUrl = null;
+      if (logoFile.file) {
+        logoUrl = await uploadLogo();
+      }
+
+      const updateData: any = {
         monthly_fee: parseFloat(monthlyFee),
         system_language: systemLanguage,
-      })
-      .eq('id', settings.id);
+      };
 
-    setIsSaving(false);
+      const { error } = await supabase
+        .from('settings')
+        .update(updateData)
+        .eq('id', settings.id);
 
-    if (error) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    } else {
+      if (error) throw error;
+
       toast({ title: 'Success', description: 'Settings updated successfully' });
       
       // Update the app language if it changed
@@ -104,6 +147,11 @@ const Settings = () => {
       }
       
       fetchSettings();
+      setLogoFile({ file: null, preview: null });
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -144,7 +192,7 @@ const Settings = () => {
                 <div className="flex gap-2">
                   <div className="relative flex-1">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                      $
+                      ₪
                     </span>
                     <Input
                       id="monthly_fee"
@@ -190,6 +238,35 @@ const Settings = () => {
                 <p className="text-sm text-muted-foreground">
                   This will be the default language for all users. Users can still change their preference.
                 </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Logo Upload */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Upload className="w-5 h-5" />
+                System Logo
+              </CardTitle>
+              <CardDescription>
+                Upload a logo for the system (optional)
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="logo">Upload Logo</Label>
+                <Input
+                  id="logo"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleLogoChange}
+                />
+                {logoFile.preview && (
+                  <div className="mt-2">
+                    <img src={logoFile.preview} alt="Logo preview" className="w-32 h-32 object-cover rounded" />
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

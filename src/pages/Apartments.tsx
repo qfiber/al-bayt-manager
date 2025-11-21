@@ -19,7 +19,9 @@ interface Apartment {
   building_id: string;
   status: string;
   occupancy_start: string | null;
-  occupancy_end: string | null;
+  subscription_amount: number;
+  subscription_status: string;
+  credit: number;
 }
 
 interface Building {
@@ -41,7 +43,8 @@ const Apartments = () => {
     building_id: '',
     status: 'vacant',
     occupancy_start: '',
-    occupancy_end: '',
+    subscription_amount: '',
+    subscription_status: 'due',
   });
 
   useEffect(() => {
@@ -93,7 +96,9 @@ const Apartments = () => {
       building_id: formData.building_id,
       status: formData.status,
       occupancy_start: formData.occupancy_start || null,
-      occupancy_end: formData.occupancy_end || null,
+      subscription_amount: parseFloat(formData.subscription_amount) || 0,
+      subscription_status: formData.subscription_status,
+      credit: 0,
     };
 
     if (editingApartment) {
@@ -147,7 +152,8 @@ const Apartments = () => {
       building_id: apartment.building_id,
       status: apartment.status,
       occupancy_start: apartment.occupancy_start || '',
-      occupancy_end: apartment.occupancy_end || '',
+      subscription_amount: apartment.subscription_amount.toString(),
+      subscription_status: apartment.subscription_status,
     });
     setIsDialogOpen(true);
   };
@@ -158,7 +164,8 @@ const Apartments = () => {
       building_id: '',
       status: 'vacant',
       occupancy_start: '',
-      occupancy_end: '',
+      subscription_amount: '',
+      subscription_status: 'due',
     });
     setEditingApartment(null);
     setIsDialogOpen(false);
@@ -241,13 +248,28 @@ const Apartments = () => {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="occupancy_end">Occupancy End</Label>
+                    <Label htmlFor="subscription_amount">Monthly Subscription (₪)</Label>
                     <Input
-                      id="occupancy_end"
-                      type="date"
-                      value={formData.occupancy_end}
-                      onChange={(e) => setFormData({ ...formData, occupancy_end: e.target.value })}
+                      id="subscription_amount"
+                      type="number"
+                      step="0.01"
+                      value={formData.subscription_amount}
+                      onChange={(e) => setFormData({ ...formData, subscription_amount: e.target.value })}
+                      required
                     />
+                  </div>
+                  <div>
+                    <Label htmlFor="subscription_status">Subscription Status</Label>
+                    <Select value={formData.subscription_status} onValueChange={(value) => setFormData({ ...formData, subscription_status: value })}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="due">Due</SelectItem>
+                        <SelectItem value="paid">Paid</SelectItem>
+                        <SelectItem value="partial">Partial</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="flex gap-2">
                     <Button type="submit" className="flex-1">
@@ -277,15 +299,16 @@ const Apartments = () => {
                   <TableHead>Apartment #</TableHead>
                   <TableHead>Building</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Occupancy Start</TableHead>
-                  <TableHead>Occupancy End</TableHead>
+                  <TableHead>Subscription (₪)</TableHead>
+                  <TableHead>Subscription Status</TableHead>
+                  <TableHead>Credit (₪)</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {apartments.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground">
+                    <TableCell colSpan={7} className="text-center text-muted-foreground">
                       No apartments found. Create your first apartment!
                     </TableCell>
                   </TableRow>
@@ -299,8 +322,19 @@ const Apartments = () => {
                           {apartment.status}
                         </span>
                       </TableCell>
-                      <TableCell>{apartment.occupancy_start || '-'}</TableCell>
-                      <TableCell>{apartment.occupancy_end || '-'}</TableCell>
+                      <TableCell>₪{apartment.subscription_amount.toFixed(2)}</TableCell>
+                      <TableCell>
+                        <span className={`px-2 py-1 rounded text-xs ${
+                          apartment.subscription_status === 'paid' ? 'bg-green-100 text-green-800' : 
+                          apartment.subscription_status === 'partial' ? 'bg-yellow-100 text-yellow-800' : 
+                          'bg-red-100 text-red-800'
+                        }`}>
+                          {apartment.subscription_status}
+                        </span>
+                      </TableCell>
+                      <TableCell className={apartment.credit > 0 ? 'text-green-600 font-semibold' : apartment.credit < 0 ? 'text-red-600 font-semibold' : ''}>
+                        ₪{apartment.credit.toFixed(2)}
+                      </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           <Button size="sm" variant="outline" onClick={() => handleEdit(apartment)}>

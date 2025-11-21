@@ -11,20 +11,21 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { DollarSign, Plus, Pencil, Trash2 } from 'lucide-react';
+import { CreditCard, Plus, Pencil, Trash2 } from 'lucide-react';
 
 interface Payment {
   id: string;
   apartment_id: string;
   amount: number;
   month: string;
-  status: string;
 }
 
 interface Apartment {
   id: string;
   apartment_number: string;
   building_id: string;
+  subscription_amount: number;
+  credit: number;
 }
 
 interface Building {
@@ -46,7 +47,6 @@ const Payments = () => {
     apartment_id: '',
     amount: '',
     month: '',
-    status: 'unpaid',
   });
 
   useEffect(() => {
@@ -81,7 +81,7 @@ const Payments = () => {
   const fetchApartments = async () => {
     const { data, error } = await supabase
       .from('apartments')
-      .select('id, apartment_number, building_id')
+      .select('*')
       .order('apartment_number');
 
     if (error) {
@@ -104,6 +104,34 @@ const Payments = () => {
     }
   };
 
+  const updateApartmentCredit = async (apartmentId: string, paymentAmount: number) => {
+    const apartment = apartments.find(a => a.id === apartmentId);
+    if (!apartment) return;
+
+    const newCredit = apartment.credit + paymentAmount - apartment.subscription_amount;
+    
+    let newStatus = 'due';
+    if (newCredit >= 0) {
+      newStatus = 'paid';
+    } else if (paymentAmount > 0) {
+      newStatus = 'partial';
+    }
+
+    const { error } = await supabase
+      .from('apartments')
+      .update({ 
+        credit: newCredit,
+        subscription_status: newStatus
+      })
+      .eq('id', apartmentId);
+
+    if (error) {
+      toast({ title: 'Error', description: 'Failed to update apartment credit', variant: 'destructive' });
+    } else {
+      fetchApartments();
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -111,7 +139,6 @@ const Payments = () => {
       apartment_id: formData.apartment_id,
       amount: parseFloat(formData.amount),
       month: formData.month,
-      status: formData.status,
     };
 
     if (editingPayment) {
@@ -124,6 +151,7 @@ const Payments = () => {
         toast({ title: 'Error', description: error.message, variant: 'destructive' });
       } else {
         toast({ title: 'Success', description: 'Payment updated successfully' });
+        await updateApartmentCredit(formData.apartment_id, parseFloat(formData.amount));
         fetchPayments();
         resetForm();
       }
@@ -136,6 +164,7 @@ const Payments = () => {
         toast({ title: 'Error', description: error.message, variant: 'destructive' });
       } else {
         toast({ title: 'Success', description: 'Payment created successfully' });
+        await updateApartmentCredit(formData.apartment_id, parseFloat(formData.amount));
         fetchPayments();
         resetForm();
       }
@@ -164,7 +193,6 @@ const Payments = () => {
       apartment_id: payment.apartment_id,
       amount: payment.amount.toString(),
       month: payment.month,
-      status: payment.status,
     });
     setIsDialogOpen(true);
   };
@@ -174,7 +202,6 @@ const Payments = () => {
       apartment_id: '',
       amount: '',
       month: '',
-      status: 'unpaid',
     });
     setEditingPayment(null);
     setIsDialogOpen(false);
@@ -184,7 +211,7 @@ const Payments = () => {
     const apartment = apartments.find(a => a.id === apartmentId);
     if (!apartment) return 'Unknown';
     const building = buildings.find(b => b.id === apartment.building_id);
-    return `${apartment.apartment_number} - ${building?.name || 'Unknown'}`;
+    return `${building?.name || 'Unknown'} - Apt ${apartment.apartment_number}`;
   };
 
   if (loading) {
@@ -198,7 +225,7 @@ const Payments = () => {
       <div className="container mx-auto p-6">
         <div className="flex justify-between items-center mb-8">
           <div className="flex items-center gap-3">
-            <DollarSign className="w-8 h-8 text-primary" />
+            <CreditCard className="w-8 h-8 text-primary" />
             <h1 className="text-3xl font-bold">{t('payments')}</h1>
           </div>
           <div className="flex gap-2">
@@ -230,7 +257,7 @@ const Payments = () => {
                     </Select>
                   </div>
                   <div>
-                    <Label htmlFor="amount">Amount</Label>
+                    <Label htmlFor="amount">Amount (₪)</Label>
                     <Input
                       id="amount"
                       type="number"
@@ -241,27 +268,15 @@ const Payments = () => {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="month">Month</Label>
+                    <Label htmlFor="month">Month (MM/YYYY)</Label>
                     <Input
                       id="month"
-                      type="date"
+                      type="text"
+                      placeholder="01/2025"
                       value={formData.month}
                       onChange={(e) => setFormData({ ...formData, month: e.target.value })}
                       required
                     />
-                  </div>
-                  <div>
-                    <Label htmlFor="status">Status</Label>
-                    <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="unpaid">Unpaid</SelectItem>
-                        <SelectItem value="paid">Paid</SelectItem>
-                        <SelectItem value="overdue">Overdue</SelectItem>
-                      </SelectContent>
-                    </Select>
                   </div>
                   <div className="flex gap-2">
                     <Button type="submit" className="flex-1">
@@ -289,16 +304,15 @@ const Payments = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead>Apartment</TableHead>
-                  <TableHead>Amount</TableHead>
+                  <TableHead>Amount (₪)</TableHead>
                   <TableHead>Month</TableHead>
-                  <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {payments.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground">
+                    <TableCell colSpan={4} className="text-center text-muted-foreground">
                       No payments found. Create your first payment!
                     </TableCell>
                   </TableRow>
@@ -306,17 +320,8 @@ const Payments = () => {
                   payments.map((payment) => (
                     <TableRow key={payment.id}>
                       <TableCell className="font-medium">{getApartmentInfo(payment.apartment_id)}</TableCell>
-                      <TableCell>${payment.amount.toFixed(2)}</TableCell>
+                      <TableCell>₪{payment.amount.toFixed(2)}</TableCell>
                       <TableCell>{payment.month}</TableCell>
-                      <TableCell>
-                        <span className={`px-2 py-1 rounded text-xs ${
-                          payment.status === 'paid' ? 'bg-green-100 text-green-800' : 
-                          payment.status === 'overdue' ? 'bg-red-100 text-red-800' : 
-                          'bg-yellow-100 text-yellow-800'
-                        }`}>
-                          {payment.status}
-                        </span>
-                      </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           <Button size="sm" variant="outline" onClick={() => handleEdit(payment)}>
