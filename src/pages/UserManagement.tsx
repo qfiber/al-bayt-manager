@@ -419,52 +419,52 @@ const UserManagement = () => {
 
         <Card>
           <CardHeader>
-            <CardTitle>All Users</CardTitle>
+            <CardTitle>{t('allUsers')}</CardTitle>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Phone</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Assigned Apartments</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead className="text-right">{t('nameLabel')}</TableHead>
+                  <TableHead className="text-right">{t('phoneLabel')}</TableHead>
+                  <TableHead className="text-right">{t('role')}</TableHead>
+                  <TableHead className="text-right">{t('assignedApartments')}</TableHead>
+                  <TableHead className="text-right">{t('actions')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {users.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={5} className="text-center text-muted-foreground">
-                      No users found
+                      {t('noUsersFound')}
                     </TableCell>
                   </TableRow>
                 ) : (
                   users.map((userProfile) => (
                     <TableRow key={userProfile.id}>
-                      <TableCell className="font-medium">{userProfile.name}</TableCell>
-                      <TableCell>{userProfile.phone || '-'}</TableCell>
-                      <TableCell>
+                      <TableCell className="font-medium text-right">{userProfile.name}</TableCell>
+                      <TableCell className="text-right">{userProfile.phone || '-'}</TableCell>
+                      <TableCell className="text-right">
                         <Badge variant={userProfile.role === 'admin' ? 'default' : 'secondary'}>
-                          {userProfile.role}
+                          {t(userProfile.role as 'admin' | 'user')}
                         </Badge>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="text-right">
                         {userProfile.apartments && userProfile.apartments.length > 0 ? (
-                          <div className="flex flex-wrap gap-1">
+                          <div className="flex flex-wrap gap-1 justify-end">
                             {userProfile.apartments.slice(0, 2).map(aptId => (
                               <Badge key={aptId} variant="outline" className="text-xs">
-                                {apartments.find(a => a.id === aptId)?.apartment_number || 'Unknown'}
+                                {apartments.find(a => a.id === aptId)?.apartment_number || t('unknown')}
                               </Badge>
                             ))}
                             {userProfile.apartments.length > 2 && (
                               <Badge variant="outline" className="text-xs">
-                                +{userProfile.apartments.length - 2} more
+                                {t('moreApartments').replace('{count}', String(userProfile.apartments.length - 2))}
                               </Badge>
                             )}
                           </div>
                         ) : (
-                          <span className="text-muted-foreground text-sm">No apartments</span>
+                          <span className="text-muted-foreground text-sm">{t('noApartments')}</span>
                         )}
                       </TableCell>
                       <TableCell className="text-right">
@@ -505,11 +505,11 @@ const UserManagement = () => {
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Edit User</DialogTitle>
+              <DialogTitle>{t('editUser')}</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
               <div>
-                <Label htmlFor="name">Name</Label>
+                <Label htmlFor="name">{t('nameLabel')}</Label>
                 <Input
                   id="name"
                   value={formData.name}
@@ -518,7 +518,7 @@ const UserManagement = () => {
                 />
               </div>
               <div>
-                <Label htmlFor="phone">Phone</Label>
+                <Label htmlFor="phone">{t('phoneLabel')}</Label>
                 <Input
                   id="phone"
                   value={formData.phone}
@@ -526,23 +526,23 @@ const UserManagement = () => {
                 />
               </div>
               <div>
-                <Label htmlFor="role">Role</Label>
+                <Label htmlFor="role">{t('role')}</Label>
                 <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value as 'admin' | 'user' })}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="user">User</SelectItem>
-                    <SelectItem value="admin">Admin</SelectItem>
+                    <SelectItem value="user">{t('user')}</SelectItem>
+                    <SelectItem value="admin">{t('admin')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="flex gap-2">
                 <Button onClick={handleSaveUser} className="flex-1">
-                  Save Changes
+                  {t('saveChanges')}
                 </Button>
                 <Button variant="outline" onClick={resetForm}>
-                  Cancel
+                  {t('cancel')}
                 </Button>
               </div>
             </div>
@@ -553,11 +553,11 @@ const UserManagement = () => {
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Create New User</DialogTitle>
+              <DialogTitle>{t('createNewUser')}</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
               <div>
-                <Label htmlFor="create_email">Email *</Label>
+                <Label htmlFor="create_email">{t('emailLabel')}</Label>
                 <Input
                   id="create_email"
                   type="email"
@@ -567,18 +567,18 @@ const UserManagement = () => {
                 />
               </div>
               <div>
-                <Label htmlFor="create_password">Password *</Label>
+                <Label htmlFor="create_password">{t('passwordLabel')}</Label>
                 <Input
                   id="create_password"
                   type="password"
                   value={createFormData.password}
                   onChange={(e) => setCreateFormData({ ...createFormData, password: e.target.value })}
                   required
-                  placeholder="Minimum 6 characters"
+                  placeholder={t('minimumCharacters')}
                 />
               </div>
               <div>
-                <Label htmlFor="create_name">Name *</Label>
+                <Label htmlFor="create_name">{t('nameLabel')} *</Label>
                 <Input
                   id="create_name"
                   value={createFormData.name}
@@ -587,7 +587,7 @@ const UserManagement = () => {
                 />
               </div>
               <div>
-                <Label htmlFor="create_phone">Phone</Label>
+                <Label htmlFor="create_phone">{t('phoneLabel')}</Label>
                 <Input
                   id="create_phone"
                   value={createFormData.phone}
@@ -595,23 +595,23 @@ const UserManagement = () => {
                 />
               </div>
               <div>
-                <Label htmlFor="create_role">Role</Label>
+                <Label htmlFor="create_role">{t('role')}</Label>
                 <Select value={createFormData.role} onValueChange={(value) => setCreateFormData({ ...createFormData, role: value as 'admin' | 'user' })}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="user">User</SelectItem>
-                    <SelectItem value="admin">Admin</SelectItem>
+                    <SelectItem value="user">{t('user')}</SelectItem>
+                    <SelectItem value="admin">{t('admin')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="flex gap-2">
                 <Button onClick={handleCreateUser} className="flex-1" disabled={isCreating}>
-                  {isCreating ? 'Creating...' : 'Create User'}
+                  {isCreating ? t('creating') : t('createUser')}
                 </Button>
                 <Button variant="outline" onClick={resetCreateForm} disabled={isCreating}>
-                  Cancel
+                  {t('cancel')}
                 </Button>
               </div>
             </div>
@@ -623,7 +623,7 @@ const UserManagement = () => {
           <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
-                Assign Apartments - {assigningUser?.name}
+                {t('assignApartmentsTitle')} - {assigningUser?.name}
               </DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
@@ -672,7 +672,7 @@ const UserManagement = () => {
               </div>
               <div className="flex gap-2">
                 <Button onClick={handleSaveApartments} className="flex-1">
-                  Save Assignments
+                  {t('saveAssignments')}
                 </Button>
                 <Button
                   variant="outline"
@@ -682,7 +682,7 @@ const UserManagement = () => {
                     setSelectedApartments([]);
                   }}
                 >
-                  Cancel
+                  {t('cancel')}
                 </Button>
               </div>
             </div>
@@ -693,19 +693,19 @@ const UserManagement = () => {
         <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+              <AlertDialogTitle>{t('areYouSure')}</AlertDialogTitle>
               <AlertDialogDescription>
-                This will permanently delete the user <strong>{deletingUser?.name}</strong> and all associated data. This action cannot be undone.
+                {t('thisWillPermanentlyDelete')} <strong>{deletingUser?.name}</strong> {t('andAllAssociatedData')}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => setDeletingUser(null)}>Cancel</AlertDialogCancel>
+              <AlertDialogCancel onClick={() => setDeletingUser(null)}>{t('cancel')}</AlertDialogCancel>
               <AlertDialogAction
                 onClick={handleDeleteUser}
                 disabled={isDeleting}
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               >
-                {isDeleting ? 'Deleting...' : 'Delete User'}
+                {isDeleting ? t('deleting') : t('deleteUser')}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

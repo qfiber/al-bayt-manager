@@ -188,7 +188,7 @@ const Settings = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="monthly_fee">Default Monthly Fee</Label>
+                <Label htmlFor="monthly_fee">{t('defaultMonthlyFee')}</Label>
                 <div className="flex gap-2">
                   <div className="relative flex-1">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
@@ -206,7 +206,7 @@ const Settings = () => {
                   </div>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  This is the default monthly fee for all apartments. You can override this for individual payments.
+                  {t('defaultMonthlyFeeDesc')}
                 </p>
               </div>
             </CardContent>
@@ -217,26 +217,26 @@ const Settings = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Globe className="w-5 h-5" />
-                Language & Localization
+                {t('languageLocalization')}
               </CardTitle>
               <CardDescription>
-                Configure the default language for the system
+                {t('languageLocalizationDesc')}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="system_language">System Language</Label>
+                <Label htmlFor="system_language">{t('systemLanguage')}</Label>
                 <Select value={systemLanguage} onValueChange={setSystemLanguage}>
                   <SelectTrigger id="system_language">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="ar">العربية (Arabic)</SelectItem>
-                    <SelectItem value="en">English</SelectItem>
+                    <SelectItem value="ar">{t('arabic')} (العربية)</SelectItem>
+                    <SelectItem value="en">{t('english')} (English)</SelectItem>
                   </SelectContent>
                 </Select>
                 <p className="text-sm text-muted-foreground">
-                  This will be the default language for all users. Users can still change their preference.
+                  {t('systemLanguageDesc')}
                 </p>
               </div>
             </CardContent>
@@ -247,15 +247,15 @@ const Settings = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Upload className="w-5 h-5" />
-                System Logo
+                {t('systemLogo')}
               </CardTitle>
               <CardDescription>
-                Upload a logo for the system (optional)
+                {t('systemLogoDesc')}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="logo">Upload Logo</Label>
+                <Label htmlFor="logo">{t('uploadLogo')}</Label>
                 <Input
                   id="logo"
                   type="file"
@@ -264,7 +264,7 @@ const Settings = () => {
                 />
                 {logoFile.preview && (
                   <div className="mt-2">
-                    <img src={logoFile.preview} alt="Logo preview" className="w-32 h-32 object-cover rounded" />
+                    <img src={logoFile.preview} alt={t('logoPreview')} className="w-32 h-32 object-cover rounded" />
                   </div>
                 )}
               </div>
@@ -274,20 +274,20 @@ const Settings = () => {
           {/* System Information */}
           <Card>
             <CardHeader>
-              <CardTitle>System Information</CardTitle>
+              <CardTitle>{t('systemInformation')}</CardTitle>
               <CardDescription>
-                General information about your system
+                {t('systemInfoDesc')}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-muted-foreground">Settings ID</Label>
-                  <p className="text-sm font-mono mt-1">{settings?.id || 'Loading...'}</p>
+                  <Label className="text-muted-foreground">{t('settingsId')}</Label>
+                  <p className="text-sm font-mono mt-1">{settings?.id || t('loading')}</p>
                 </div>
                 <div>
-                  <Label className="text-muted-foreground">Current Language</Label>
-                  <p className="text-sm mt-1">{language === 'ar' ? 'العربية' : 'English'}</p>
+                  <Label className="text-muted-foreground">{t('currentLanguage')}</Label>
+                  <p className="text-sm mt-1">{language === 'ar' ? t('arabic') : t('english')}</p>
                 </div>
               </div>
             </CardContent>
@@ -305,11 +305,11 @@ const Settings = () => {
               }}
               disabled={isSaving}
             >
-              Reset Changes
+              {t('resetChanges')}
             </Button>
             <Button onClick={handleSave} disabled={isSaving}>
               <Save className="w-4 h-4 mr-2" />
-              {isSaving ? 'Saving...' : 'Save Settings'}
+              {isSaving ? t('saving') : t('saveSettings')}
             </Button>
           </div>
         </div>

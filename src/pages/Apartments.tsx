@@ -230,7 +230,7 @@ const Apartments = () => {
   };
 
   const getBuildingName = (buildingId: string) => {
-    return buildings.find(b => b.id === buildingId)?.name || 'Unknown';
+    return buildings.find(b => b.id === buildingId)?.name || t('unknown');
   };
 
   if (loading) {
@@ -252,16 +252,16 @@ const Apartments = () => {
               <DialogTrigger asChild>
                 <Button onClick={() => resetForm()}>
                   <Plus className="w-4 h-4 mr-2" />
-                  Add Apartment
+                  {t('addApartment')}
                 </Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>{editingApartment ? 'Edit Apartment' : 'Add Apartment'}</DialogTitle>
+                  <DialogTitle>{editingApartment ? t('editApartment') : t('addApartment')}</DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div>
-                    <Label htmlFor="apartment_number">Apartment Number</Label>
+                    <Label htmlFor="apartment_number">{t('apartmentNumber')}</Label>
                     <Input
                       id="apartment_number"
                       value={formData.apartment_number}
@@ -270,10 +270,10 @@ const Apartments = () => {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="building_id">Building</Label>
+                    <Label htmlFor="building_id">{t('building')}</Label>
                     <Select value={formData.building_id} onValueChange={(value) => setFormData({ ...formData, building_id: value })}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select a building" />
+                        <SelectValue placeholder={t('selectBuilding')} />
                       </SelectTrigger>
                       <SelectContent>
                         {buildings.map((building) => (
@@ -285,19 +285,19 @@ const Apartments = () => {
                     </Select>
                   </div>
                   <div>
-                    <Label htmlFor="status">Status</Label>
+                    <Label htmlFor="status">{t('status')}</Label>
                     <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="vacant">Vacant</SelectItem>
-                        <SelectItem value="occupied">Occupied</SelectItem>
+                        <SelectItem value="vacant">{t('vacant')}</SelectItem>
+                        <SelectItem value="occupied">{t('occupied')}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <div>
-                    <Label htmlFor="occupancy_start">Occupancy Start</Label>
+                    <Label htmlFor="occupancy_start">{t('occupancyStart')}</Label>
                     <Input
                       id="occupancy_start"
                       type="date"
@@ -306,7 +306,7 @@ const Apartments = () => {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="subscription_amount">Monthly Subscription (₪)</Label>
+                    <Label htmlFor="subscription_amount">{t('monthlySubscription')}</Label>
                     <Input
                       id="subscription_amount"
                       type="number"
@@ -318,85 +318,85 @@ const Apartments = () => {
                     />
                     {!editingApartment && (
                       <p className="text-xs text-muted-foreground mt-1">
-                        Auto-calculated from occupancy date and default monthly fee (₪{settings?.monthly_fee || 0})
+                        {t('autoCalculated').replace('{fee}', String(settings?.monthly_fee || 0))}
                       </p>
                     )}
                   </div>
                   <div>
-                    <Label htmlFor="subscription_status">Subscription Status</Label>
+                    <Label htmlFor="subscription_status">{t('subscriptionStatus')}</Label>
                     <Select value={formData.subscription_status} onValueChange={(value) => setFormData({ ...formData, subscription_status: value })}>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="due">Due</SelectItem>
-                        <SelectItem value="paid">Paid</SelectItem>
-                        <SelectItem value="partial">Partial</SelectItem>
+                        <SelectItem value="due">{t('due')}</SelectItem>
+                        <SelectItem value="paid">{t('paid')}</SelectItem>
+                        <SelectItem value="partial">{t('partial')}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="flex gap-2">
                     <Button type="submit" className="flex-1">
-                      {editingApartment ? 'Update' : 'Create'}
+                      {editingApartment ? t('update') : t('create')}
                     </Button>
                     <Button type="button" variant="outline" onClick={resetForm}>
-                      Cancel
+                      {t('cancel')}
                     </Button>
                   </div>
                 </form>
               </DialogContent>
             </Dialog>
             <Button variant="outline" onClick={() => navigate('/dashboard')}>
-              Back to Dashboard
+              {t('backToDashboard')}
             </Button>
           </div>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>All Apartments</CardTitle>
+            <CardTitle>{t('allApartments')}</CardTitle>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Apartment #</TableHead>
-                  <TableHead>Building</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Subscription (₪)</TableHead>
-                  <TableHead>Subscription Status</TableHead>
-                  <TableHead>Credit (₪)</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead className="text-right">{t('apartmentHash')}</TableHead>
+                  <TableHead className="text-right">{t('building')}</TableHead>
+                  <TableHead className="text-right">{t('status')}</TableHead>
+                  <TableHead className="text-right">{t('monthlySubscription')}</TableHead>
+                  <TableHead className="text-right">{t('subscriptionStatus')}</TableHead>
+                  <TableHead className="text-right">{t('credit')}</TableHead>
+                  <TableHead className="text-right">{t('actions')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {apartments.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center text-muted-foreground">
-                      No apartments found. Create your first apartment!
+                      {t('noApartmentsFound')}
                     </TableCell>
                   </TableRow>
                 ) : (
                   apartments.map((apartment) => (
                     <TableRow key={apartment.id}>
-                      <TableCell className="font-medium">{apartment.apartment_number}</TableCell>
-                      <TableCell>{getBuildingName(apartment.building_id)}</TableCell>
-                      <TableCell>
+                      <TableCell className="font-medium text-right">{apartment.apartment_number}</TableCell>
+                      <TableCell className="text-right">{getBuildingName(apartment.building_id)}</TableCell>
+                      <TableCell className="text-right">
                         <span className={`px-2 py-1 rounded text-xs ${apartment.status === 'vacant' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                          {apartment.status}
+                          {t(apartment.status as 'vacant' | 'occupied')}
                         </span>
                       </TableCell>
-                      <TableCell>₪{apartment.subscription_amount.toFixed(2)}</TableCell>
-                      <TableCell>
+                      <TableCell className="text-right">₪{apartment.subscription_amount.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">
                         <span className={`px-2 py-1 rounded text-xs ${
                           apartment.subscription_status === 'paid' ? 'bg-green-100 text-green-800' : 
                           apartment.subscription_status === 'partial' ? 'bg-yellow-100 text-yellow-800' : 
                           'bg-red-100 text-red-800'
                         }`}>
-                          {apartment.subscription_status}
+                          {t(apartment.subscription_status as 'paid' | 'due' | 'partial')}
                         </span>
                       </TableCell>
-                      <TableCell className={apartment.credit > 0 ? 'text-green-600 font-semibold' : apartment.credit < 0 ? 'text-red-600 font-semibold' : ''}>
+                      <TableCell className={`text-right ${apartment.credit > 0 ? 'text-green-600 font-semibold' : apartment.credit < 0 ? 'text-red-600 font-semibold' : ''}`}>
                         ₪{apartment.credit.toFixed(2)}
                       </TableCell>
                       <TableCell className="text-right">

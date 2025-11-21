@@ -275,11 +275,11 @@ const Expenses = () => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>{t('building')}</TableHead>
-                  <TableHead>{t('description')}</TableHead>
-                  <TableHead>{t('category')}</TableHead>
-                  <TableHead>{t('amount')}</TableHead>
-                  <TableHead>{t('date')}</TableHead>
+                  <TableHead className="text-right">{t('building')}</TableHead>
+                  <TableHead className="text-right">{t('description')}</TableHead>
+                  <TableHead className="text-right">{t('category')}</TableHead>
+                  <TableHead className="text-right">{t('amount')}</TableHead>
+                  <TableHead className="text-right">{t('date')}</TableHead>
                   <TableHead className="text-right">{t('actions')}</TableHead>
                 </TableRow>
               </TableHeader>
@@ -293,11 +293,11 @@ const Expenses = () => {
                 ) : (
                   expenses.map((expense) => (
                     <TableRow key={expense.id}>
-                      <TableCell className="font-medium">{getBuildingName(expense.building_id)}</TableCell>
-                      <TableCell>{expense.description}</TableCell>
-                      <TableCell>{expense.category || '-'}</TableCell>
-                      <TableCell>${expense.amount.toFixed(2)}</TableCell>
-                      <TableCell>{expense.expense_date}</TableCell>
+                      <TableCell className="font-medium text-right">{getBuildingName(expense.building_id)}</TableCell>
+                      <TableCell className="text-right">{expense.description}</TableCell>
+                      <TableCell className="text-right">{expense.category || '-'}</TableCell>
+                      <TableCell className="text-right">₪{expense.amount.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">{expense.expense_date}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           <Button size="sm" variant="outline" onClick={() => handleEdit(expense)}>

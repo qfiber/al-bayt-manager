@@ -253,9 +253,9 @@ const Buildings = () => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>{t('nameLabel')}</TableHead>
-                  <TableHead>{t('address')}</TableHead>
-                  <TableHead>{t('logo')}</TableHead>
+                  <TableHead className="text-right">{t('nameLabel')}</TableHead>
+                  <TableHead className="text-right">{t('address')}</TableHead>
+                  <TableHead className="text-right">{t('logo')}</TableHead>
                   <TableHead className="text-right">{t('actions')}</TableHead>
                 </TableRow>
               </TableHeader>
@@ -269,9 +269,9 @@ const Buildings = () => {
                 ) : (
                   buildings.map((building) => (
                     <TableRow key={building.id}>
-                      <TableCell className="font-medium">{building.name}</TableCell>
-                      <TableCell>{building.address}</TableCell>
-                      <TableCell>
+                      <TableCell className="font-medium text-right">{building.name}</TableCell>
+                      <TableCell className="text-right">{building.address}</TableCell>
+                      <TableCell className="text-right">
                         {building.logo_url ? (
                           <img src={building.logo_url} alt={building.name} className="w-10 h-10 object-cover rounded" />
                         ) : (
