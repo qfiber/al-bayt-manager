@@ -78,16 +78,18 @@ serve(async (req) => {
 
     console.log('User created in auth:', newUser.user.id);
 
-    // Update the profile with phone if provided
-    if (phone) {
-      const { error: profileError } = await supabaseAdmin
-        .from('profiles')
-        .update({ phone })
-        .eq('id', newUser.user.id);
+    // Create the profile explicitly (trigger may not fire for admin-created users)
+    const { error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .insert({ 
+        id: newUser.user.id,
+        name,
+        phone: phone || null
+      });
 
-      if (profileError) {
-        console.error('Error updating profile:', profileError);
-      }
+    if (profileError) {
+      console.error('Error creating profile:', profileError);
+      throw profileError;
     }
 
     // Insert the user role (should be created by trigger, but ensuring it exists)
