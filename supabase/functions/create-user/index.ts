@@ -78,37 +78,40 @@ serve(async (req) => {
 
     console.log('User created in auth:', newUser.user.id);
 
-    // Create the profile explicitly (trigger may not fire for admin-created users)
+    // Upsert the profile (trigger may have already created it)
     const { error: profileError } = await supabaseAdmin
       .from('profiles')
-      .insert({ 
+      .upsert({ 
         id: newUser.user.id,
         name,
         phone: phone || null
+      }, {
+        onConflict: 'id'
       });
 
     if (profileError) {
-      console.error('Error creating profile:', profileError);
+      console.error('Error upserting profile:', profileError);
       throw profileError;
     }
 
-    // Insert the user role (should be created by trigger, but ensuring it exists)
-    const { error: roleInsertError } = await supabaseAdmin
+    console.log('Profile created/updated');
+
+    // Upsert the user role (trigger may have already created it)
+    const { error: roleUpsertError } = await supabaseAdmin
       .from('user_roles')
-      .insert({ user_id: newUser.user.id, role: role || 'user' });
+      .upsert({ 
+        user_id: newUser.user.id, 
+        role: role || 'user' 
+      }, {
+        onConflict: 'user_id,role',
+        ignoreDuplicates: false
+      });
 
-    if (roleInsertError) {
-      console.error('Error inserting role:', roleInsertError);
-      // If insert fails due to already existing, try update
-      const { error: roleUpdateError } = await supabaseAdmin
-        .from('user_roles')
-        .update({ role: role || 'user' })
-        .eq('user_id', newUser.user.id);
-
-      if (roleUpdateError) {
-        console.error('Error updating role:', roleUpdateError);
-      }
+    if (roleUpsertError) {
+      console.error('Error upserting role:', roleUpsertError);
     }
+
+    console.log('User role set');
 
     console.log('User creation complete:', newUser.user.id);
 
