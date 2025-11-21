@@ -174,6 +174,10 @@ const Payments = () => {
   const handleDelete = async (id: string) => {
     if (!confirm(t('deletePaymentConfirm'))) return;
 
+    // Get payment details before deletion
+    const payment = payments.find(p => p.id === id);
+    if (!payment) return;
+
     const { error } = await supabase
       .from('payments')
       .delete()
@@ -182,8 +186,37 @@ const Payments = () => {
     if (error) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
     } else {
+      // Recalculate apartment credit and status after deletion
+      const { data: remainingPayments } = await supabase
+        .from('payments')
+        .select('amount')
+        .eq('apartment_id', payment.apartment_id);
+
+      const totalPaid = remainingPayments?.reduce((sum, p) => sum + p.amount, 0) || 0;
+      const apartment = apartments.find(a => a.id === payment.apartment_id);
+      
+      if (apartment) {
+        const newCredit = totalPaid - apartment.subscription_amount;
+        let newStatus = 'due';
+        
+        if (newCredit >= 0) {
+          newStatus = 'paid';
+        } else if (totalPaid > 0) {
+          newStatus = 'partial';
+        }
+
+        await supabase
+          .from('apartments')
+          .update({ 
+            credit: newCredit,
+            subscription_status: newStatus
+          })
+          .eq('id', payment.apartment_id);
+      }
+
       toast({ title: 'Success', description: 'Payment deleted successfully' });
       fetchPayments();
+      fetchApartments();
     }
   };
 
