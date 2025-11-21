@@ -56,6 +56,7 @@ const UserManagement = () => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [deletingUser, setDeletingUser] = useState<UserProfile | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [apartmentAssignments, setApartmentAssignments] = useState<Map<string, { userId: string; userName: string }>>(new Map());
 
   useEffect(() => {
     if (!loading && !user) {
@@ -156,9 +157,34 @@ const UserManagement = () => {
     setIsDialogOpen(true);
   };
 
-  const handleAssignApartments = (userProfile: UserProfile) => {
+  const handleAssignApartments = async (userProfile: UserProfile) => {
     setAssigningUser(userProfile);
     setSelectedApartments(userProfile.apartments || []);
+    
+    // Fetch all apartment assignments to check which apartments are taken
+    const { data: allAssignments, error } = await supabase
+      .from('user_apartments')
+      .select(`
+        apartment_id,
+        user_id,
+        profiles!inner(name)
+      `);
+
+    if (error) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      return;
+    }
+
+    // Create a map of apartment_id -> { userId, userName }
+    const assignmentMap = new Map<string, { userId: string; userName: string }>();
+    allAssignments?.forEach((assignment: any) => {
+      assignmentMap.set(assignment.apartment_id, {
+        userId: assignment.user_id,
+        userName: assignment.profiles.name,
+      });
+    });
+    
+    setApartmentAssignments(assignmentMap);
     setIsAssignDialogOpen(true);
   };
 
@@ -230,7 +256,26 @@ const UserManagement = () => {
   const handleSaveApartments = async () => {
     if (!assigningUser) return;
 
-    // Delete existing assignments
+    // Check for conflicts with other users
+    const conflicts: string[] = [];
+    selectedApartments.forEach(aptId => {
+      const assignment = apartmentAssignments.get(aptId);
+      if (assignment && assignment.userId !== assigningUser.id) {
+        const apt = apartments.find(a => a.id === aptId);
+        conflicts.push(`Apartment ${apt?.apartment_number} is assigned to ${assignment.userName}`);
+      }
+    });
+
+    if (conflicts.length > 0) {
+      toast({ 
+        title: 'Cannot assign apartments', 
+        description: conflicts.join(', '), 
+        variant: 'destructive' 
+      });
+      return;
+    }
+
+    // Delete existing assignments for this user
     await supabase
       .from('user_apartments')
       .delete()
@@ -258,6 +303,7 @@ const UserManagement = () => {
     setIsAssignDialogOpen(false);
     setAssigningUser(null);
     setSelectedApartments([]);
+    setApartmentAssignments(new Map());
   };
 
   const resetForm = () => {
@@ -319,6 +365,17 @@ const UserManagement = () => {
   };
 
   const toggleApartmentSelection = (apartmentId: string) => {
+    // Check if apartment is assigned to another user
+    const assignment = apartmentAssignments.get(apartmentId);
+    if (assignment && assignment.userId !== assigningUser?.id) {
+      toast({ 
+        title: 'Apartment unavailable', 
+        description: `This apartment is assigned to ${assignment.userName}`, 
+        variant: 'destructive' 
+      });
+      return;
+    }
+
     setSelectedApartments(prev =>
       prev.includes(apartmentId)
         ? prev.filter(id => id !== apartmentId)
@@ -570,21 +627,35 @@ const UserManagement = () => {
                     <div key={building.id} className="space-y-2">
                       <h3 className="font-semibold text-sm">{building.name}</h3>
                       <div className="grid grid-cols-3 gap-2 pl-4">
-                        {buildingApartments.map(apartment => (
-                          <div
-                            key={apartment.id}
-                            onClick={() => toggleApartmentSelection(apartment.id)}
-                            className={`
-                              cursor-pointer p-2 rounded border text-sm text-center transition-colors
-                              ${selectedApartments.includes(apartment.id)
-                                ? 'bg-primary text-primary-foreground border-primary'
-                                : 'bg-background hover:bg-accent border-border'
-                              }
-                            `}
-                          >
-                            {apartment.apartment_number}
-                          </div>
-                        ))}
+                        {buildingApartments.map(apartment => {
+                          const assignment = apartmentAssignments.get(apartment.id);
+                          const isAssignedToOther = assignment && assignment.userId !== assigningUser?.id;
+                          const isSelected = selectedApartments.includes(apartment.id);
+                          
+                          return (
+                            <div
+                              key={apartment.id}
+                              onClick={() => !isAssignedToOther && toggleApartmentSelection(apartment.id)}
+                              className={`
+                                p-2 rounded border text-sm text-center transition-colors
+                                ${isAssignedToOther 
+                                  ? 'bg-muted text-muted-foreground border-border cursor-not-allowed opacity-50' 
+                                  : 'cursor-pointer'
+                                }
+                                ${isSelected && !isAssignedToOther
+                                  ? 'bg-primary text-primary-foreground border-primary'
+                                  : !isAssignedToOther && 'bg-background hover:bg-accent border-border'
+                                }
+                              `}
+                              title={isAssignedToOther ? `Assigned to ${assignment.userName}` : ''}
+                            >
+                              <div>{apartment.apartment_number}</div>
+                              {isAssignedToOther && (
+                                <div className="text-xs mt-1">({assignment.userName})</div>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   );
