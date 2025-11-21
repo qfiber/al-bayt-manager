@@ -232,7 +232,7 @@ export type Database = {
           {
             foreignKeyName: "user_apartments_apartment_id_fkey"
             columns: ["apartment_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "apartments"
             referencedColumns: ["id"]
           },
