@@ -33,6 +33,7 @@ const Dashboard = () => {
     { title: t('payments'), icon: DollarSign, path: '/payments', color: 'bg-yellow-500' },
     { title: t('expenses'), icon: FileText, path: '/expenses', color: 'bg-red-500' },
     { title: t('reports'), icon: FileText, path: '/reports', color: 'bg-purple-500' },
+    { title: 'Users', icon: Settings, path: '/users', color: 'bg-indigo-500' },
     { title: t('settings'), icon: Settings, path: '/settings', color: 'bg-gray-500' },
   ];
 
