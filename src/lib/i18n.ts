@@ -171,6 +171,16 @@ export const translations = {
     areYouSure: 'هل أنت متأكد؟',
     thisWillPermanentlyDelete: 'سيؤدي هذا إلى حذف المستخدم نهائياً',
     andAllAssociatedData: 'وجميع البيانات المرتبطة. لا يمكن التراجع عن هذا الإجراء.',
+    changePassword: 'تغيير كلمة المرور',
+    adminPassword: 'كلمة مرور المسؤول *',
+    newPassword: 'كلمة المرور الجديدة *',
+    confirmPassword: 'تأكيد كلمة المرور *',
+    passwordsDoNotMatch: 'كلمات المرور غير متطابقة',
+    adminPasswordRequired: 'كلمة مرور المسؤول مطلوبة',
+    passwordChanged: 'تم تغيير كلمة المرور بنجاح',
+    failedToChangePassword: 'فشل في تغيير كلمة المرور',
+    changePasswordFor: 'تغيير كلمة المرور لـ {name}',
+    enterAdminPassword: 'أدخل كلمة مرور المسؤول للتحقق',
     
     // Common
     add: 'إضافة',
@@ -368,6 +378,16 @@ export const translations = {
     areYouSure: 'Are you sure?',
     thisWillPermanentlyDelete: 'This will permanently delete the user',
     andAllAssociatedData: 'and all associated data. This action cannot be undone.',
+    changePassword: 'Change Password',
+    adminPassword: 'Admin Password *',
+    newPassword: 'New Password *',
+    confirmPassword: 'Confirm Password *',
+    passwordsDoNotMatch: 'Passwords do not match',
+    adminPasswordRequired: 'Admin password is required',
+    passwordChanged: 'Password changed successfully',
+    failedToChangePassword: 'Failed to change password',
+    changePasswordFor: 'Change Password for {name}',
+    enterAdminPassword: 'Enter your admin password to verify',
     
     // Common
     add: 'Add',
