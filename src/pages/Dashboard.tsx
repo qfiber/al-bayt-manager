@@ -1,14 +1,31 @@
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Building, Home, DollarSign, FileText, Settings } from 'lucide-react';
-import Layout from '@/components/Layout';
 
 const Dashboard = () => {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, loading, signOut } = useAuth();
   const { t } = useLanguage();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!loading && !user) {
+      navigate('/auth');
+    }
+  }, [user, loading, navigate]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-lg">{t('loading')}</div>
+      </div>
+    );
+  }
+
+  if (!user) return null;
 
   const adminCards = [
     { title: t('buildings'), icon: Building, path: '/buildings', color: 'bg-blue-500' },
@@ -28,13 +45,18 @@ const Dashboard = () => {
   const cards = isAdmin ? adminCards : userCards;
 
   return (
-    <Layout>
+    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/10">
       <div className="container mx-auto p-6">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold">{t('dashboard')}</h1>
-          <p className="text-muted-foreground mt-2">
-            {t('welcomeBack')}, {user?.email}
-          </p>
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <h1 className="text-3xl font-bold">{t('dashboard')}</h1>
+            <p className="text-muted-foreground mt-2">
+              {t('welcomeBack')}, {user.email}
+            </p>
+          </div>
+          <Button onClick={signOut} variant="outline">
+            {t('logout')}
+          </Button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -65,7 +87,7 @@ const Dashboard = () => {
           {t('poweredBy')} {t('buildingManagementSystem')}
         </footer>
       </div>
-    </Layout>
+    </div>
   );
 };
 

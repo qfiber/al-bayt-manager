@@ -12,7 +12,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { CreditCard, Plus, Pencil, Trash2 } from 'lucide-react';
-import Layout from '@/components/Layout';
 
 interface Payment {
   id: string;
