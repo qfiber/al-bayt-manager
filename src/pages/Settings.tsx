@@ -15,6 +15,7 @@ interface SettingsData {
   id: string;
   monthly_fee: number;
   system_language: string;
+  logo_url: string | null;
 }
 
 interface LogoFile {
@@ -269,6 +270,14 @@ const Settings = () => {
                 {logoFile.preview && (
                   <div className="mt-2 border rounded-lg p-4 bg-muted/20 flex items-center justify-center">
                     <img src={logoFile.preview} alt={t('logoPreview')} className="max-w-xs max-h-32 object-contain" />
+                  </div>
+                )}
+                {!logoFile.preview && settings?.logo_url && (
+                  <div className="mt-2">
+                    <Label className="text-muted-foreground">{t('currentLogo')}</Label>
+                    <div className="mt-2 border rounded-lg p-4 bg-muted/20 flex items-center justify-center">
+                      <img src={settings.logo_url} alt={t('currentLogo')} className="max-w-xs max-h-32 object-contain" />
+                    </div>
                   </div>
                 )}
               </div>
