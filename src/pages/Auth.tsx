@@ -25,8 +25,7 @@ const Auth = () => {
       const { data, error } = await supabase
         .from('settings')
         .select('logo_url')
-        .limit(1)
-        .single();
+        .maybeSingle();
       
       if (error) {
         console.log('Logo fetch error:', error);
