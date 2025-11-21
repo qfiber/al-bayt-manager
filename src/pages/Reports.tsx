@@ -94,110 +94,98 @@ const Reports = () => {
   };
 
   const exportToPDF = () => {
-    const doc = new jsPDF({
-      orientation: 'portrait',
-      unit: 'mm',
-      format: 'a4'
+    const element = document.createElement('div');
+    element.style.fontFamily = 'Rubik, Arial, sans-serif';
+    element.style.direction = 'rtl';
+    element.style.padding = '20px';
+    element.style.backgroundColor = '#ffffff';
+    
+    element.innerHTML = `
+      <div style="text-align: right; direction: rtl; font-family: Rubik, Arial, sans-serif;">
+        <h1 style="color: #2c3e50; margin-bottom: 10px;">التقرير المالي</h1>
+        <p style="color: #7f8c8d; margin-bottom: 30px;">تاريخ الإنشاء: ${new Date().toLocaleDateString('ar-SA')}</p>
+        
+        <h2 style="color: #34495e; margin-top: 30px; margin-bottom: 15px;">الملخص</h2>
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px; direction: rtl;">
+          <thead>
+            <tr style="background-color: #3498db; color: white;">
+              <th style="padding: 12px; text-align: right; border: 1px solid #ddd;">المبلغ (₪)</th>
+              <th style="padding: 12px; text-align: right; border: 1px solid #ddd;">المؤشر</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="padding: 10px; text-align: right; border: 1px solid #ddd;">₪${totalRevenue.toFixed(0)}</td>
+              <td style="padding: 10px; text-align: right; border: 1px solid #ddd;">إجمالي الإيرادات</td>
+            </tr>
+            <tr style="background-color: #f8f9fa;">
+              <td style="padding: 10px; text-align: right; border: 1px solid #ddd;">₪${totalExpenses.toFixed(0)}</td>
+              <td style="padding: 10px; text-align: right; border: 1px solid #ddd;">إجمالي المصروفات</td>
+            </tr>
+            <tr>
+              <td style="padding: 10px; text-align: right; border: 1px solid #ddd; font-weight: bold;">₪${(totalRevenue - totalExpenses).toFixed(0)}</td>
+              <td style="padding: 10px; text-align: right; border: 1px solid #ddd; font-weight: bold;">صافي الدخل</td>
+            </tr>
+          </tbody>
+        </table>
+        
+        ${expensesByCategory.length > 0 ? `
+          <h2 style="color: #34495e; margin-top: 40px; margin-bottom: 15px;">المصروفات حسب الفئة</h2>
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px; direction: rtl;">
+            <thead>
+              <tr style="background-color: #3498db; color: white;">
+                <th style="padding: 12px; text-align: right; border: 1px solid #ddd;">المبلغ (₪)</th>
+                <th style="padding: 12px; text-align: right; border: 1px solid #ddd;">الفئة</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${expensesByCategory.map((exp, idx) => `
+                <tr${idx % 2 === 1 ? ' style="background-color: #f8f9fa;"' : ''}>
+                  <td style="padding: 10px; text-align: right; border: 1px solid #ddd;">₪${exp.amount.toFixed(0)}</td>
+                  <td style="padding: 10px; text-align: right; border: 1px solid #ddd;">${exp.category}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        ` : ''}
+        
+        ${buildingStats.length > 0 ? `
+          <h2 style="color: #34495e; margin-top: 40px; margin-bottom: 15px;">إشغال المباني</h2>
+          <table style="width: 100%; border-collapse: collapse; direction: rtl;">
+            <thead>
+              <tr style="background-color: #3498db; color: white;">
+                <th style="padding: 12px; text-align: right; border: 1px solid #ddd;">شاغر</th>
+                <th style="padding: 12px; text-align: right; border: 1px solid #ddd;">مشغول</th>
+                <th style="padding: 12px; text-align: right; border: 1px solid #ddd;">المجموع</th>
+                <th style="padding: 12px; text-align: right; border: 1px solid #ddd;">المبنى</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${buildingStats.map((b, idx) => `
+                <tr${idx % 2 === 1 ? ' style="background-color: #f8f9fa;"' : ''}>
+                  <td style="padding: 10px; text-align: right; border: 1px solid #ddd;">${b.vacant}</td>
+                  <td style="padding: 10px; text-align: right; border: 1px solid #ddd;">${b.occupied}</td>
+                  <td style="padding: 10px; text-align: right; border: 1px solid #ddd;">${b.totalApartments}</td>
+                  <td style="padding: 10px; text-align: right; border: 1px solid #ddd;">${b.buildingName}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        ` : ''}
+      </div>
+    `;
+    
+    const opt = {
+      margin: 15,
+      filename: 'التقرير-المالي.pdf',
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+    
+    html2pdf().set(opt).from(element).save().then(() => {
+      toast({ title: 'نجح', description: 'تم تصدير التقرير بنجاح' });
     });
-
-    // Note: For proper Arabic rendering, we use reversed text and RTL alignment
-    const reverseArabic = (text: string) => text.split('').reverse().join('');
-    
-    // Title
-    doc.setFontSize(18);
-    doc.text(reverseArabic('التقرير المالي'), doc.internal.pageSize.width - 14, 22, { align: 'right' });
-    doc.setFontSize(11);
-    doc.text(`${reverseArabic('تاريخ الإنشاء')}: ${new Date().toLocaleDateString('ar-SA')}`, doc.internal.pageSize.width - 14, 30, { align: 'right' });
-    
-    // Summary section
-    doc.setFontSize(14);
-    doc.text(reverseArabic('الملخص'), doc.internal.pageSize.width - 14, 45, { align: 'right' });
-    
-    autoTable(doc, {
-      startY: 50,
-      head: [[reverseArabic('المبلغ (₪)'), reverseArabic('المؤشر')]],
-      body: [
-        [`₪${totalRevenue.toFixed(0)}`, reverseArabic('إجمالي الإيرادات')],
-        [`₪${totalExpenses.toFixed(0)}`, reverseArabic('إجمالي المصروفات')],
-        [`₪${(totalRevenue - totalExpenses).toFixed(0)}`, reverseArabic('صافي الدخل')],
-      ],
-      styles: {
-        halign: 'right',
-        fontSize: 10,
-      },
-      headStyles: {
-        fillColor: [41, 128, 185],
-        textColor: 255,
-        halign: 'right',
-      },
-      columnStyles: {
-        0: { halign: 'right' },
-        1: { halign: 'right' }
-      },
-      margin: { top: 50, right: 14, left: 14 },
-    });
-    
-    // Expenses by category
-    if (expensesByCategory.length > 0) {
-      doc.addPage();
-      doc.setFontSize(14);
-      doc.text(reverseArabic('المصروفات حسب الفئة'), doc.internal.pageSize.width - 14, 22, { align: 'right' });
-      autoTable(doc, {
-        startY: 28,
-        head: [[reverseArabic('المبلغ (₪)'), reverseArabic('الفئة')]],
-        body: expensesByCategory.map(exp => [`₪${exp.amount.toFixed(0)}`, reverseArabic(exp.category)]),
-        styles: {
-          halign: 'right',
-          fontSize: 10,
-        },
-        headStyles: {
-          fillColor: [41, 128, 185],
-          textColor: 255,
-          halign: 'right',
-        },
-        columnStyles: {
-          0: { halign: 'right' },
-          1: { halign: 'right' }
-        },
-        margin: { right: 14, left: 14 },
-      });
-    }
-    
-    // Building occupancy
-    if (buildingStats.length > 0) {
-      doc.addPage();
-      doc.setFontSize(14);
-      doc.text(reverseArabic('إشغال المباني'), doc.internal.pageSize.width - 14, 22, { align: 'right' });
-      autoTable(doc, {
-        startY: 28,
-        head: [[reverseArabic('شاغر'), reverseArabic('مشغول'), reverseArabic('المجموع'), reverseArabic('المبنى')]],
-        body: buildingStats.map(b => [
-          b.vacant.toString(),
-          b.occupied.toString(),
-          b.totalApartments.toString(),
-          reverseArabic(b.buildingName),
-        ]),
-        styles: {
-          halign: 'right',
-          fontSize: 10,
-        },
-        headStyles: {
-          fillColor: [41, 128, 185],
-          textColor: 255,
-          halign: 'right',
-        },
-        columnStyles: {
-          0: { halign: 'right' },
-          1: { halign: 'right' },
-          2: { halign: 'right' },
-          3: { halign: 'right' }
-        },
-        margin: { right: 14, left: 14 },
-      });
-    }
-    
-    doc.save('التقرير-المالي.pdf');
-    toast({ title: 'نجح', description: 'تم تصدير التقرير بنجاح' });
   };
 
   const fetchExpensesByCategory = async () => {
