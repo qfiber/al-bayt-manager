@@ -7,9 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
-import { FileText, DollarSign, TrendingUp, Download } from 'lucide-react';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import { FileText, DollarSign, TrendingUp } from 'lucide-react';
 
 interface PaymentStats {
   total: number;
@@ -94,112 +92,6 @@ const Reports = () => {
     setTotalRevenue(stats.paid);
   };
 
-  const exportToPDF = () => {
-    const doc = new jsPDF({
-      orientation: 'portrait',
-      unit: 'mm',
-      format: 'a4'
-    });
-
-    // Note: For proper Arabic rendering, we use reversed text and RTL alignment
-    const reverseArabic = (text: string) => text.split('').reverse().join('');
-    
-    // Title
-    doc.setFontSize(18);
-    doc.text(reverseArabic('التقرير المالي'), doc.internal.pageSize.width - 14, 22, { align: 'right' });
-    doc.setFontSize(11);
-    doc.text(`${reverseArabic('تاريخ الإنشاء')}: ${new Date().toLocaleDateString('ar-SA')}`, doc.internal.pageSize.width - 14, 30, { align: 'right' });
-    
-    // Summary section
-    doc.setFontSize(14);
-    doc.text(reverseArabic('الملخص'), doc.internal.pageSize.width - 14, 45, { align: 'right' });
-    
-    autoTable(doc, {
-      startY: 50,
-      head: [[reverseArabic('المبلغ (₪)'), reverseArabic('المؤشر')]],
-      body: [
-        [`₪${totalRevenue.toFixed(0)}`, reverseArabic('إجمالي الإيرادات')],
-        [`₪${totalExpenses.toFixed(0)}`, reverseArabic('إجمالي المصروفات')],
-        [`₪${(totalRevenue - totalExpenses).toFixed(0)}`, reverseArabic('صافي الدخل')],
-      ],
-      styles: {
-        halign: 'right',
-        fontSize: 10,
-      },
-      headStyles: {
-        fillColor: [41, 128, 185],
-        textColor: 255,
-        halign: 'right',
-      },
-      columnStyles: {
-        0: { halign: 'right' },
-        1: { halign: 'right' }
-      },
-      margin: { top: 50, right: 14, left: 14 },
-    });
-    
-    // Expenses by category
-    if (expensesByCategory.length > 0) {
-      doc.addPage();
-      doc.setFontSize(14);
-      doc.text(reverseArabic('المصروفات حسب الفئة'), doc.internal.pageSize.width - 14, 22, { align: 'right' });
-      autoTable(doc, {
-        startY: 28,
-        head: [[reverseArabic('المبلغ (₪)'), reverseArabic('الفئة')]],
-        body: expensesByCategory.map(exp => [`₪${exp.amount.toFixed(0)}`, reverseArabic(exp.category)]),
-        styles: {
-          halign: 'right',
-          fontSize: 10,
-        },
-        headStyles: {
-          fillColor: [41, 128, 185],
-          textColor: 255,
-          halign: 'right',
-        },
-        columnStyles: {
-          0: { halign: 'right' },
-          1: { halign: 'right' }
-        },
-        margin: { right: 14, left: 14 },
-      });
-    }
-    
-    // Building occupancy
-    if (buildingStats.length > 0) {
-      doc.addPage();
-      doc.setFontSize(14);
-      doc.text(reverseArabic('إشغال المباني'), doc.internal.pageSize.width - 14, 22, { align: 'right' });
-      autoTable(doc, {
-        startY: 28,
-        head: [[reverseArabic('شاغر'), reverseArabic('مشغول'), reverseArabic('المجموع'), reverseArabic('المبنى')]],
-        body: buildingStats.map(b => [
-          b.vacant.toString(),
-          b.occupied.toString(),
-          b.totalApartments.toString(),
-          reverseArabic(b.buildingName),
-        ]),
-        styles: {
-          halign: 'right',
-          fontSize: 10,
-        },
-        headStyles: {
-          fillColor: [41, 128, 185],
-          textColor: 255,
-          halign: 'right',
-        },
-        columnStyles: {
-          0: { halign: 'right' },
-          1: { halign: 'right' },
-          2: { halign: 'right' },
-          3: { halign: 'right' }
-        },
-        margin: { right: 14, left: 14 },
-      });
-    }
-    
-    doc.save('التقرير-المالي.pdf');
-    toast({ title: 'نجح', description: 'تم تصدير التقرير بنجاح' });
-  };
 
   const fetchExpensesByCategory = async () => {
     const { data: expenses, error } = await supabase
@@ -310,15 +202,9 @@ const Reports = () => {
             <FileText className="w-8 h-8 text-primary" />
             <h1 className="text-3xl font-bold">{t('reports')}</h1>
           </div>
-          <div className="flex gap-2">
-            <Button onClick={exportToPDF}>
-              <Download className="w-4 h-4 mr-2" />
-              Export to PDF
-            </Button>
-            <Button variant="outline" onClick={() => navigate('/dashboard')}>
-              Back to Dashboard
-            </Button>
-          </div>
+          <Button variant="outline" onClick={() => navigate('/dashboard')}>
+            Back to Dashboard
+          </Button>
         </div>
 
         {/* Summary Cards */}
