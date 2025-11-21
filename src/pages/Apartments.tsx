@@ -29,6 +29,10 @@ interface Building {
   name: string;
 }
 
+interface Settings {
+  monthly_fee: number;
+}
+
 const Apartments = () => {
   const { user, isAdmin, loading } = useAuth();
   const { t } = useLanguage();
@@ -36,6 +40,7 @@ const Apartments = () => {
   const { toast } = useToast();
   const [apartments, setApartments] = useState<Apartment[]>([]);
   const [buildings, setBuildings] = useState<Building[]>([]);
+  const [settings, setSettings] = useState<Settings | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingApartment, setEditingApartment] = useState<Apartment | null>(null);
   const [formData, setFormData] = useState({
@@ -57,10 +62,52 @@ const Apartments = () => {
 
   useEffect(() => {
     if (user && isAdmin) {
+      fetchSettings();
       fetchBuildings();
       fetchApartments();
     }
   }, [user, isAdmin]);
+
+  const fetchSettings = async () => {
+    const { data, error } = await supabase
+      .from('settings')
+      .select('monthly_fee')
+      .maybeSingle();
+
+    if (error) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } else if (data) {
+      setSettings(data);
+    }
+  };
+
+  const calculateProratedAmount = (occupancyStart: string, monthlyFee: number): number => {
+    if (!occupancyStart || !monthlyFee) return monthlyFee;
+
+    const startDate = new Date(occupancyStart);
+    const dayOfMonth = startDate.getDate();
+
+    // If occupancy starts on the 1st, use full monthly fee
+    if (dayOfMonth === 1) return monthlyFee;
+
+    // Calculate prorated amount based on days left in month
+    const year = startDate.getFullYear();
+    const month = startDate.getMonth();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const daysRemaining = daysInMonth - dayOfMonth + 1;
+
+    const proratedAmount = (monthlyFee / daysInMonth) * daysRemaining;
+    return Math.round(proratedAmount * 100) / 100; // Round to 2 decimal places
+  };
+
+  useEffect(() => {
+    if (formData.occupancy_start && settings?.monthly_fee) {
+      const calculatedAmount = calculateProratedAmount(formData.occupancy_start, settings.monthly_fee);
+      setFormData(prev => ({ ...prev, subscription_amount: calculatedAmount.toString() }));
+    } else if (settings?.monthly_fee && !formData.occupancy_start) {
+      setFormData(prev => ({ ...prev, subscription_amount: settings.monthly_fee.toString() }));
+    }
+  }, [formData.occupancy_start, settings?.monthly_fee]);
 
   const fetchBuildings = async () => {
     const { data, error } = await supabase
@@ -147,14 +194,16 @@ const Apartments = () => {
 
   const handleEdit = (apartment: Apartment) => {
     setEditingApartment(apartment);
-    setFormData({
+    // Temporarily disable auto-calculation for editing
+    const currentFormData = {
       apartment_number: apartment.apartment_number,
       building_id: apartment.building_id,
       status: apartment.status,
       occupancy_start: apartment.occupancy_start || '',
       subscription_amount: apartment.subscription_amount.toString(),
       subscription_status: apartment.subscription_status,
-    });
+    };
+    setFormData(currentFormData);
     setIsDialogOpen(true);
   };
 
@@ -256,7 +305,13 @@ const Apartments = () => {
                       value={formData.subscription_amount}
                       onChange={(e) => setFormData({ ...formData, subscription_amount: e.target.value })}
                       required
+                      disabled={!editingApartment}
                     />
+                    {!editingApartment && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Auto-calculated from occupancy date and default monthly fee (₪{settings?.monthly_fee || 0})
+                      </p>
+                    )}
                   </div>
                   <div>
                     <Label htmlFor="subscription_status">Subscription Status</Label>
