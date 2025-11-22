@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Settings as SettingsIcon, Save, DollarSign, Globe, Upload } from 'lucide-react';
+import { Settings as SettingsIcon, Save, DollarSign, Globe, Upload, Shield } from 'lucide-react';
 
 interface SettingsData {
   id: string;
@@ -34,6 +34,8 @@ const Settings = () => {
   const [systemLanguage, setSystemLanguage] = useState('ar');
   const [isSaving, setIsSaving] = useState(false);
   const [logoFile, setLogoFile] = useState<LogoFile>({ file: null, preview: null });
+  const [has2FA, setHas2FA] = useState(false);
+  const [checking2FA, setChecking2FA] = useState(true);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -48,6 +50,28 @@ const Settings = () => {
       fetchSettings();
     }
   }, [user, isAdmin]);
+
+  useEffect(() => {
+    if (user) {
+      check2FAStatus();
+    }
+  }, [user]);
+
+  const check2FAStatus = async () => {
+    try {
+      const { data: factors } = await supabase.auth.mfa.listFactors();
+      if (factors && factors.totp && factors.totp.length > 0) {
+        setHas2FA(true);
+      } else {
+        setHas2FA(false);
+      }
+    } catch (error) {
+      console.error('Error checking 2FA status:', error);
+      setHas2FA(false);
+    } finally {
+      setChecking2FA(false);
+    }
+  };
 
   const fetchSettings = async () => {
     const { data, error } = await supabase
@@ -280,6 +304,43 @@ const Settings = () => {
                     </div>
                   </div>
                 )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Security Settings */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Shield className="w-5 h-5" />
+                Security
+              </CardTitle>
+              <CardDescription>
+                Manage your account security settings
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between p-4 border rounded-lg">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <Label className="text-base font-semibold">Two-Factor Authentication</Label>
+                    {!checking2FA && (
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${has2FA ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-200' : 'bg-muted text-muted-foreground'}`}>
+                        {has2FA ? 'Enabled' : 'Disabled'}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Add an extra layer of security to your account with authenticator app verification
+                  </p>
+                </div>
+                <Button 
+                  variant="outline" 
+                  onClick={() => navigate('/setup-2fa')}
+                  disabled={checking2FA}
+                >
+                  {checking2FA ? 'Loading...' : 'Manage'}
+                </Button>
               </div>
             </CardContent>
           </Card>
