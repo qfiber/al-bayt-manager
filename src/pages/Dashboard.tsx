@@ -55,7 +55,7 @@ const Dashboard = () => {
     { title: t('reports'), icon: FileText, path: '/reports', color: 'bg-purple-500' },
     { title: t('users'), icon: Settings, path: '/users', color: 'bg-indigo-500' },
     { title: t('settings'), icon: Settings, path: '/settings', color: 'bg-gray-500' },
-    { title: 'API Keys', icon: Key, path: '/api-keys', color: 'bg-orange-500' },
+    { title: t('apiKeys'), icon: Key, path: '/api-keys', color: 'bg-orange-500' },
   ];
 
   const userCards = [

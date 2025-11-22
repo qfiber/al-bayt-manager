@@ -183,6 +183,19 @@ export const translations = {
     changePasswordFor: 'تغيير كلمة المرور لـ {name}',
     enterAdminPassword: 'أدخل كلمة مرور المسؤول للتحقق',
     
+    // API Keys
+    apiKeys: 'مفاتيح API',
+    
+    // Security Settings
+    security: 'الأمان',
+    securitySettings: 'إعدادات الأمان',
+    manageSecuritySettings: 'إدارة إعدادات أمان حسابك',
+    twoFactorAuthentication: 'المصادقة الثنائية',
+    enabled: 'مفعل',
+    disabled: 'معطل',
+    manage: 'إدارة',
+    addExtraSecurityWithAuthApp: 'أضف طبقة أمان إضافية لحسابك من خلال التحقق من تطبيق المصادقة',
+    
     // Two-Factor Authentication
     twoFactorAuth: 'المصادقة الثنائية',
     twoFactorAuthCode: 'رمز المصادقة الثنائية',
@@ -447,6 +460,19 @@ export const translations = {
     failedToChangePassword: 'Failed to change password',
     changePasswordFor: 'Change Password for {name}',
     enterAdminPassword: 'Enter your admin password to verify',
+    
+    // API Keys
+    apiKeys: 'API Keys',
+    
+    // Security Settings
+    security: 'Security',
+    securitySettings: 'Security Settings',
+    manageSecuritySettings: 'Manage your account security settings',
+    twoFactorAuthentication: 'Two-Factor Authentication',
+    enabled: 'Enabled',
+    disabled: 'Disabled',
+    manage: 'Manage',
+    addExtraSecurityWithAuthApp: 'Add an extra layer of security to your account with authenticator app verification',
     
     // Two-Factor Authentication
     twoFactorAuth: 'Two-Factor Authentication',
