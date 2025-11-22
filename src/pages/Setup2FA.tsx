@@ -16,6 +16,7 @@ const Setup2FA = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [factorId, setFactorId] = useState<string>('');
   const [has2FA, setHas2FA] = useState(false);
+  const [showDisableVerification, setShowDisableVerification] = useState(false);
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -111,7 +112,8 @@ const Setup2FA = () => {
     setIsLoading(false);
   };
 
-  const handleDisable2FA = async () => {
+  const handleDisable2FA = async (e: React.FormEvent) => {
+    e.preventDefault();
     setIsLoading(true);
     try {
       const { data: factors } = await supabase.auth.mfa.listFactors();
@@ -121,6 +123,30 @@ const Setup2FA = () => {
         throw new Error('No 2FA factor found');
       }
 
+      // First, verify with 2FA to get AAL2
+      const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({
+        factorId: totpFactor.id,
+      });
+
+      if (challengeError) throw challengeError;
+
+      const { error: verifyError } = await supabase.auth.mfa.verify({
+        factorId: totpFactor.id,
+        challengeId: challengeData.id,
+        code: verificationCode,
+      });
+
+      if (verifyError) {
+        toast({
+          title: 'Error',
+          description: 'Invalid verification code',
+          variant: 'destructive',
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      // Now unenroll with AAL2 authentication
       const { error } = await supabase.auth.mfa.unenroll({
         factorId: totpFactor.id,
       });
@@ -132,6 +158,8 @@ const Setup2FA = () => {
         description: '2FA disabled successfully',
       });
       setHas2FA(false);
+      setShowDisableVerification(false);
+      setVerificationCode('');
       navigate('/settings');
     } catch (error) {
       console.error('Disable 2FA error:', error);
@@ -172,21 +200,66 @@ const Setup2FA = () => {
                   Two-factor authentication is currently enabled for your account.
                 </p>
               </div>
-              <Button 
-                variant="destructive"
-                className="w-full" 
-                onClick={handleDisable2FA}
-                disabled={isLoading}
-              >
-                {isLoading ? 'Disabling...' : 'Disable 2FA'}
-              </Button>
-              <Button 
-                variant="outline"
-                className="w-full" 
-                onClick={() => navigate('/settings')}
-              >
-                Back to Settings
-              </Button>
+              
+              {showDisableVerification ? (
+                <form onSubmit={handleDisable2FA} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="disable-code">Verification Code</Label>
+                    <Input
+                      id="disable-code"
+                      type="text"
+                      placeholder="000000"
+                      value={verificationCode}
+                      onChange={(e) => setVerificationCode(e.target.value)}
+                      required
+                      disabled={isLoading}
+                      maxLength={6}
+                      pattern="[0-9]{6}"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Enter the 6-digit code from your authenticator app to confirm
+                    </p>
+                  </div>
+                  <Button 
+                    type="submit"
+                    variant="destructive"
+                    className="w-full"
+                    disabled={isLoading}
+                  >
+                    {isLoading ? 'Disabling...' : 'Confirm Disable 2FA'}
+                  </Button>
+                  <Button 
+                    type="button"
+                    variant="outline"
+                    className="w-full" 
+                    onClick={() => {
+                      setShowDisableVerification(false);
+                      setVerificationCode('');
+                    }}
+                    disabled={isLoading}
+                  >
+                    Cancel
+                  </Button>
+                </form>
+              ) : (
+                <>
+                  <Button 
+                    variant="destructive"
+                    className="w-full" 
+                    onClick={() => setShowDisableVerification(true)}
+                    disabled={isLoading}
+                  >
+                    Disable 2FA
+                  </Button>
+                  <Button 
+                    variant="outline"
+                    className="w-full" 
+                    onClick={() => navigate('/settings')}
+                  >
+                    Back to Settings
+                  </Button>
+                </>
+              )}
             </div>
           ) : qrCode ? (
             <form onSubmit={handleVerify} className="space-y-4">
