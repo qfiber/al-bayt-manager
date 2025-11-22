@@ -627,17 +627,18 @@ const UserManagement = () => {
             </DialogHeader>
             <div className="space-y-4">
               <div>
-                <Label htmlFor="create_email">{t('emailLabel')}</Label>
+                <Label htmlFor="create_email">{t('emailLabel')} *</Label>
                 <Input
                   id="create_email"
                   type="email"
+                  placeholder="user@example.com"
                   value={createFormData.email}
                   onChange={(e) => setCreateFormData({ ...createFormData, email: e.target.value })}
                   required
                 />
               </div>
               <div>
-                <Label htmlFor="create_password">{t('passwordLabel')}</Label>
+                <Label htmlFor="create_password">{t('passwordLabel')} *</Label>
                 <Input
                   id="create_password"
                   type="password"
