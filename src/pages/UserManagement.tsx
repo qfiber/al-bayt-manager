@@ -49,8 +49,8 @@ const UserManagement = () => {
   const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [assigningUser, setAssigningUser] = useState<UserProfile | null>(null);
-  const [formData, setFormData] = useState<{ name: string; phone: string; role: 'admin' | 'user' }>({ name: '', phone: '', role: 'user' });
-  const [createFormData, setCreateFormData] = useState({ email: '', password: '', name: '', phone: '', role: 'user' as 'admin' | 'user' });
+  const [formData, setFormData] = useState<{ name: string; phone: string; role: 'admin' | 'moderator' | 'user' }>({ name: '', phone: '', role: 'user' });
+  const [createFormData, setCreateFormData] = useState({ email: '', password: '', name: '', phone: '', role: 'user' as 'admin' | 'moderator' | 'user' });
   const [selectedApartments, setSelectedApartments] = useState<string[]>([]);
   const [isCreating, setIsCreating] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -617,12 +617,13 @@ const UserManagement = () => {
               </div>
               <div>
                 <Label htmlFor="role">{t('role')}</Label>
-                <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value as 'admin' | 'user' })}>
+                <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value as 'admin' | 'moderator' | 'user' })}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="user">{t('user')}</SelectItem>
+                    <SelectItem value="moderator">Moderator</SelectItem>
                     <SelectItem value="admin">{t('admin')}</SelectItem>
                   </SelectContent>
                 </Select>
@@ -687,12 +688,13 @@ const UserManagement = () => {
               </div>
               <div>
                 <Label htmlFor="create_role">{t('role')}</Label>
-                <Select value={createFormData.role} onValueChange={(value) => setCreateFormData({ ...createFormData, role: value as 'admin' | 'user' })}>
+                <Select value={createFormData.role} onValueChange={(value) => setCreateFormData({ ...createFormData, role: value as 'admin' | 'moderator' | 'user' })}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="user">{t('user')}</SelectItem>
+                    <SelectItem value="moderator">Moderator</SelectItem>
                     <SelectItem value="admin">{t('admin')}</SelectItem>
                   </SelectContent>
                 </Select>

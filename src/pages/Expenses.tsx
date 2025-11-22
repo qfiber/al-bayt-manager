@@ -30,7 +30,7 @@ interface Building {
 }
 
 const Expenses = () => {
-  const { user, isAdmin, loading } = useAuth();
+  const { user, isAdmin, isModerator, loading } = useAuth();
   const { t } = useLanguage();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -49,17 +49,17 @@ const Expenses = () => {
   useEffect(() => {
     if (!loading && !user) {
       navigate('/auth');
-    } else if (!loading && !isAdmin) {
+    } else if (!loading && !isAdmin && !isModerator) {
       navigate('/dashboard');
     }
-  }, [user, isAdmin, loading, navigate]);
+  }, [user, isAdmin, isModerator, loading, navigate]);
 
   useEffect(() => {
-    if (user && isAdmin) {
+    if (user && (isAdmin || isModerator)) {
       fetchBuildings();
       fetchExpenses();
     }
-  }, [user, isAdmin]);
+  }, [user, isAdmin, isModerator]);
 
   const fetchBuildings = async () => {
     const { data, error } = await supabase
@@ -190,7 +190,7 @@ const Expenses = () => {
     return <div className="min-h-screen flex items-center justify-center">{t('loading')}</div>;
   }
 
-  if (!user || !isAdmin) return null;
+  if (!user || (!isAdmin && !isModerator)) return null;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/10">
@@ -326,9 +326,11 @@ const Expenses = () => {
                           <Button size="sm" variant="outline" onClick={() => handleEdit(expense)}>
                             <Pencil className="w-4 h-4" />
                           </Button>
-                          <Button size="sm" variant="destructive" onClick={() => handleDelete(expense.id)}>
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
+                          {isAdmin && (
+                            <Button size="sm" variant="destructive" onClick={() => handleDelete(expense.id)}>
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>

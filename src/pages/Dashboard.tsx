@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Building, Home, DollarSign, FileText, Settings, Key } from 'lucide-react';
 
 const Dashboard = () => {
-  const { user, isAdmin, loading, signOut } = useAuth();
+  const { user, isAdmin, isModerator, loading, signOut } = useAuth();
   const { t } = useLanguage();
   const navigate = useNavigate();
 
@@ -43,7 +43,13 @@ const Dashboard = () => {
     { title: t('reports'), icon: FileText, path: '/reports', color: 'bg-purple-500' },
   ];
 
-  const cards = isAdmin ? adminCards : userCards;
+  const moderatorCards = [
+    { title: t('payments'), icon: DollarSign, path: '/payments', color: 'bg-yellow-500' },
+    { title: t('expenses'), icon: FileText, path: '/expenses', color: 'bg-red-500' },
+    { title: t('reports'), icon: FileText, path: '/reports', color: 'bg-purple-500' },
+  ];
+
+  const cards = isAdmin ? adminCards : isModerator ? moderatorCards : userCards;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/10">
