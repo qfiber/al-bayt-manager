@@ -262,7 +262,7 @@ export const translations = {
     loading: 'جاري التحميل...',
     error: 'خطأ',
     success: 'نجح',
-    poweredBy: 'مدعوم من',
+    poweredBy: 'تصميم',
     footerPoweredByText: 'تصميم شركة كيوفايبر',
     backToDashboard: 'العودة إلى لوحة التحكم',
     update: 'تحديث',
