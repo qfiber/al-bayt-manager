@@ -8,6 +8,7 @@ import { AuthProvider } from "./contexts/AuthContext";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Register from "./pages/Register";
+import Setup2FA from "./pages/Setup2FA";
 import Dashboard from "./pages/Dashboard";
 import Buildings from "./pages/Buildings";
 import Apartments from "./pages/Apartments";
@@ -34,6 +35,7 @@ const App = () => (
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/setup-2fa" element={<Setup2FA />} />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/buildings" element={<Buildings />} />
               <Route path="/apartments" element={<Apartments />} />
