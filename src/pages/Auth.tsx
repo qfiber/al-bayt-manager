@@ -101,7 +101,6 @@ const Auth = () => {
       const { data: factorsData, error: factorsError } = await supabase.auth.mfa.listFactors();
       
       console.log('MFA Factors:', factorsData);
-      console.log('Session AAL:', (session as any)?.aal);
       
       if (factorsError) {
         console.error('Error fetching factors:', factorsError);
@@ -115,12 +114,18 @@ const Auth = () => {
       console.log('Has verified TOTP:', hasVerifiedTotp);
       console.log('TOTP Factors:', totpFactors);
       
-      // Check the Authentication Assurance Level from the session
-      const sessionAal = (session as any)?.aal;
+      // Use the official method to get the authentication assurance level
+      const { data: aalData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+      const currentLevel = aalData?.currentLevel;
+      const nextLevel = aalData?.nextLevel;
       
-      // If user has verified 2FA factors, we need to check if 2FA was already verified
-      // AAL1 = password only, AAL2 = password + 2FA
-      if (hasVerifiedTotp && sessionAal !== 'aal2') {
+      console.log('Current AAL:', currentLevel);
+      console.log('Next AAL:', nextLevel);
+      
+      // If user has verified 2FA factors and nextLevel suggests 2FA is needed
+      // currentLevel: aal1 = password only, aal2 = password + 2FA
+      // nextLevel: indicates what level can be achieved
+      if (hasVerifiedTotp && currentLevel === 'aal1' && nextLevel === 'aal2') {
         // User has 2FA enabled but hasn't verified it yet in this session
         console.log('Requiring 2FA verification');
         setRequire2FA(true);
