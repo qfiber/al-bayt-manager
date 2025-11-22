@@ -9,14 +9,15 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Building } from 'lucide-react';
-import { Turnstile } from '@marsidev/react-turnstile';
+
 
 const Auth = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
-  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [require2FA, setRequire2FA] = useState(false);
+  const [verificationCode, setVerificationCode] = useState('');
   const { signIn, user, loading } = useAuth();
   const { t } = useLanguage();
   const navigate = useNavigate();
@@ -67,35 +68,14 @@ const Auth = () => {
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!turnstileToken) {
-      toast({
-        title: 'Error',
-        description: 'Please complete the captcha verification',
-        variant: 'destructive',
-      });
-      return;
-    }
-
     setIsLoading(true);
 
     try {
-      // Verify turnstile token
-      const { data: verifyData, error: verifyError } = await supabase.functions.invoke('verify-turnstile', {
-        body: { token: turnstileToken },
+      // First, attempt to sign in with email and password
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
       });
-
-      if (verifyError || !verifyData?.success) {
-        toast({
-          title: 'Error',
-          description: 'Captcha verification failed',
-          variant: 'destructive',
-        });
-        setIsLoading(false);
-        return;
-      }
-
-      const { error } = await signIn(email, password);
 
       if (error) {
         toast({
@@ -103,7 +83,19 @@ const Auth = () => {
           description: error.message,
           variant: 'destructive',
         });
+        setIsLoading(false);
+        return;
+      }
+
+      // Check if user has 2FA enabled
+      const { data: factors } = await supabase.auth.mfa.listFactors();
+      
+      if (factors && factors.totp && factors.totp.length > 0) {
+        // User has 2FA enabled, show verification input
+        setRequire2FA(true);
+        setIsLoading(false);
       } else {
+        // No 2FA, proceed to dashboard
         toast({
           title: 'Success',
           description: 'Signed in successfully',
@@ -115,6 +107,54 @@ const Auth = () => {
       toast({
         title: 'Error',
         description: 'An error occurred during sign in',
+        variant: 'destructive',
+      });
+      setIsLoading(false);
+    }
+  };
+
+  const handleVerify2FA = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+
+    try {
+      const { data: factors } = await supabase.auth.mfa.listFactors();
+      const totpFactor = factors?.totp?.[0];
+
+      if (!totpFactor) {
+        throw new Error('No 2FA factor found');
+      }
+
+      const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({
+        factorId: totpFactor.id,
+      });
+
+      if (challengeError) throw challengeError;
+
+      const { error: verifyError } = await supabase.auth.mfa.verify({
+        factorId: totpFactor.id,
+        challengeId: challengeData.id,
+        code: verificationCode,
+      });
+
+      if (verifyError) {
+        toast({
+          title: 'Error',
+          description: 'Invalid verification code',
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Success',
+          description: 'Signed in successfully',
+        });
+        navigate('/dashboard');
+      }
+    } catch (error) {
+      console.error('2FA verification error:', error);
+      toast({
+        title: 'Error',
+        description: 'An error occurred during verification',
         variant: 'destructive',
       });
     }
@@ -151,50 +191,83 @@ const Auth = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSignIn} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">{t('email')}</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="email@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
+          {!require2FA ? (
+            <form onSubmit={handleSignIn} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">{t('email')}</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="email@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  disabled={isLoading}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="password">{t('password')}</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  disabled={isLoading}
+                />
+              </div>
+
+              <Button 
+                type="submit" 
+                className="w-full" 
                 disabled={isLoading}
-              />
-            </div>
+              >
+                {isLoading ? t('signingIn') : t('signInButton')}
+              </Button>
+            </form>
+          ) : (
+            <form onSubmit={handleVerify2FA} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="code">Two-Factor Authentication Code</Label>
+                <Input
+                  id="code"
+                  type="text"
+                  placeholder="000000"
+                  value={verificationCode}
+                  onChange={(e) => setVerificationCode(e.target.value)}
+                  required
+                  disabled={isLoading}
+                  maxLength={6}
+                  pattern="[0-9]{6}"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Enter the 6-digit code from your authenticator app
+                </p>
+              </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="password">{t('password')}</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
+              <Button 
+                type="submit" 
+                className="w-full" 
                 disabled={isLoading}
-              />
-            </div>
+              >
+                {isLoading ? 'Verifying...' : 'Verify'}
+              </Button>
 
-            <div className="flex justify-center">
-              <Turnstile
-                siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
-                onSuccess={(token) => setTurnstileToken(token)}
-                onError={() => setTurnstileToken(null)}
-                onExpire={() => setTurnstileToken(null)}
-              />
-            </div>
-
-            <Button 
-              type="submit" 
-              className="w-full" 
-              disabled={isLoading || !turnstileToken}
-            >
-              {isLoading ? t('signingIn') : t('signInButton')}
-            </Button>
-          </form>
+              <Button 
+                type="button" 
+                variant="outline"
+                className="w-full" 
+                onClick={() => {
+                  setRequire2FA(false);
+                  setVerificationCode('');
+                }}
+              >
+                Back
+              </Button>
+            </form>
+          )}
           
           <div className="mt-6 text-center text-sm">
             <p className="text-muted-foreground">
