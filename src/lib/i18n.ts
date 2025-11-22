@@ -1,5 +1,7 @@
 export const translations = {
   ar: {
+    // Site
+    siteTitle: 'نظام إدارة المباني - كيوفايبر',
     // Auth
     login: 'تسجيل الدخول',
     signup: 'إنشاء حساب',
@@ -278,6 +280,8 @@ export const translations = {
     partial: 'جزئي',
   },
   en: {
+    // Site
+    siteTitle: 'Building Management System - qFiber LTD',
     // Auth
     login: 'Login',
     signup: 'Sign Up',
