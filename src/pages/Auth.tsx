@@ -61,10 +61,11 @@ const Auth = () => {
   }, []);
 
   useEffect(() => {
-    if (!loading && user && !require2FA) {
+    // Only auto-navigate if not currently checking for 2FA
+    if (!loading && user && !require2FA && !isLoading) {
       navigate('/dashboard');
     }
-  }, [user, loading, navigate, require2FA]);
+  }, [user, loading, navigate, require2FA, isLoading]);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
