@@ -9,12 +9,14 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Building } from 'lucide-react';
+import { Turnstile } from '@marsidev/react-turnstile';
 
 const Auth = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const { signIn, user, loading } = useAuth();
   const { t } = useLanguage();
   const navigate = useNavigate();
@@ -65,9 +67,34 @@ const Auth = () => {
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!turnstileToken) {
+      toast({
+        title: 'Error',
+        description: 'Please complete the captcha verification',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsLoading(true);
 
     try {
+      // Verify turnstile token
+      const { data: verifyData, error: verifyError } = await supabase.functions.invoke('verify-turnstile', {
+        body: { token: turnstileToken },
+      });
+
+      if (verifyError || !verifyData?.success) {
+        toast({
+          title: 'Error',
+          description: 'Captcha verification failed',
+          variant: 'destructive',
+        });
+        setIsLoading(false);
+        return;
+      }
+
       const { error } = await signIn(email, password);
 
       if (error) {
@@ -151,10 +178,19 @@ const Auth = () => {
               />
             </div>
 
+            <div className="flex justify-center">
+              <Turnstile
+                siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
+                onSuccess={(token) => setTurnstileToken(token)}
+                onError={() => setTurnstileToken(null)}
+                onExpire={() => setTurnstileToken(null)}
+              />
+            </div>
+
             <Button 
               type="submit" 
               className="w-full" 
-              disabled={isLoading}
+              disabled={isLoading || !turnstileToken}
             >
               {isLoading ? t('signingIn') : t('signInButton')}
             </Button>
