@@ -260,7 +260,27 @@ const UserManagement = () => {
         throw new Error(data.error || 'Failed to create user');
       }
     } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      console.error('Create user error:', error);
+      
+      // Extract the most relevant error message
+      let errorMessage = 'Failed to create user';
+      
+      if (error.message) {
+        errorMessage = error.message;
+      } else if (error.context?.body) {
+        try {
+          const bodyError = JSON.parse(error.context.body);
+          errorMessage = bodyError.error || errorMessage;
+        } catch (e) {
+          // Ignore JSON parse errors
+        }
+      }
+      
+      toast({ 
+        title: 'Error', 
+        description: errorMessage, 
+        variant: 'destructive' 
+      });
     } finally {
       setIsCreating(false);
     }

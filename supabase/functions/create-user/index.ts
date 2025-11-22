@@ -84,6 +84,12 @@ serve(async (req) => {
 
     if (createError) {
       console.error('Error creating user:', createError);
+      
+      // Handle specific error cases with user-friendly messages
+      if (createError.message?.includes('already been registered')) {
+        throw new Error('A user with this email already exists. Please use a different email address.');
+      }
+      
       throw createError;
     }
 
