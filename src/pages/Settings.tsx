@@ -313,25 +313,25 @@ const Settings = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Shield className="w-5 h-5" />
-                Security
+                {t('security')}
               </CardTitle>
               <CardDescription>
-                Manage your account security settings
+                {t('manageSecuritySettings')}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between p-4 border rounded-lg">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <Label className="text-base font-semibold">Two-Factor Authentication</Label>
+                    <Label className="text-base font-semibold">{t('twoFactorAuthentication')}</Label>
                     {!checking2FA && (
                       <span className={`text-xs px-2 py-0.5 rounded-full ${has2FA ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-200' : 'bg-muted text-muted-foreground'}`}>
-                        {has2FA ? 'Enabled' : 'Disabled'}
+                        {has2FA ? t('enabled') : t('disabled')}
                       </span>
                     )}
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    Add an extra layer of security to your account with authenticator app verification
+                    {t('addExtraSecurityWithAuthApp')}
                   </p>
                 </div>
                 <Button 
@@ -339,7 +339,7 @@ const Settings = () => {
                   onClick={() => navigate('/setup-2fa')}
                   disabled={checking2FA}
                 >
-                  {checking2FA ? 'Loading...' : 'Manage'}
+                  {checking2FA ? t('loading') : t('manage')}
                 </Button>
               </div>
             </CardContent>
