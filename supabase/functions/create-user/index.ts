@@ -61,6 +61,17 @@ serve(async (req) => {
       throw new Error('Email, password, and name are required');
     }
 
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      throw new Error('Invalid email format. Please provide a valid email address.');
+    }
+
+    // Validate password length
+    if (password.length < 6) {
+      throw new Error('Password must be at least 6 characters long.');
+    }
+
     // Create the user in auth.users
     const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
       email,
