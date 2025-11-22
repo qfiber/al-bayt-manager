@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,6 +19,7 @@ const Setup2FA = () => {
   const [has2FA, setHas2FA] = useState(false);
   const [showDisableVerification, setShowDisableVerification] = useState(false);
   const { user } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -56,14 +58,14 @@ const Setup2FA = () => {
       setFactorId(data.id);
 
       toast({
-        title: 'Success',
-        description: 'Scan the QR code with your authenticator app',
+        title: t('success'),
+        description: t('scanQRWithApp'),
       });
     } catch (error) {
       console.error('Enrollment error:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to start 2FA setup',
+        title: t('error'),
+        description: t('failedToStart2FASetup'),
         variant: 'destructive',
       });
     }
@@ -89,22 +91,22 @@ const Setup2FA = () => {
 
       if (error) {
         toast({
-          title: 'Error',
-          description: 'Invalid verification code',
+          title: t('error'),
+          description: t('invalidVerificationCode'),
           variant: 'destructive',
         });
       } else {
         toast({
-          title: 'Success',
-          description: '2FA enabled successfully!',
+          title: t('success'),
+          description: t('twoFactorEnabledSuccess'),
         });
         navigate('/settings');
       }
     } catch (error) {
       console.error('Verification error:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to verify code',
+        title: t('error'),
+        description: t('failedToVerifyCode'),
         variant: 'destructive',
       });
     }
@@ -120,7 +122,7 @@ const Setup2FA = () => {
       const totpFactor = factors?.totp?.[0];
 
       if (!totpFactor) {
-        throw new Error('No 2FA factor found');
+        throw new Error(t('no2FAFactorFound'));
       }
 
       // First, verify with 2FA to get AAL2
@@ -138,8 +140,8 @@ const Setup2FA = () => {
 
       if (verifyError) {
         toast({
-          title: 'Error',
-          description: 'Invalid verification code',
+          title: t('error'),
+          description: t('invalidVerificationCode'),
           variant: 'destructive',
         });
         setIsLoading(false);
@@ -154,8 +156,8 @@ const Setup2FA = () => {
       if (error) throw error;
 
       toast({
-        title: 'Success',
-        description: '2FA disabled successfully',
+        title: t('success'),
+        description: t('twoFactorDisabledSuccess'),
       });
       setHas2FA(false);
       setShowDisableVerification(false);
@@ -164,8 +166,8 @@ const Setup2FA = () => {
     } catch (error) {
       console.error('Disable 2FA error:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to disable 2FA',
+        title: t('error'),
+        description: t('failedToDisable2FA'),
         variant: 'destructive',
       });
     }
@@ -185,11 +187,11 @@ const Setup2FA = () => {
               <Shield className="w-10 h-10 text-primary" />
             </div>
           </div>
-          <CardTitle className="text-2xl font-bold">Two-Factor Authentication</CardTitle>
+          <CardTitle className="text-2xl font-bold">{t('twoFactorAuth')}</CardTitle>
           <CardDescription>
             {has2FA 
-              ? 'Your account is protected with 2FA' 
-              : 'Add an extra layer of security to your account'}
+              ? t('accountProtectedWith2FA')
+              : t('addExtraSecurityLayer')}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -197,14 +199,14 @@ const Setup2FA = () => {
             <div className="space-y-4">
               <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
                 <p className="text-sm text-green-800 dark:text-green-200">
-                  Two-factor authentication is currently enabled for your account.
+                  {t('twoFactorCurrentlyEnabled')}
                 </p>
               </div>
               
               {showDisableVerification ? (
                 <form onSubmit={handleDisable2FA} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="disable-code">Verification Code</Label>
+                    <Label htmlFor="disable-code">{t('verificationCode')}</Label>
                     <Input
                       id="disable-code"
                       type="text"
@@ -217,7 +219,7 @@ const Setup2FA = () => {
                       pattern="[0-9]{6}"
                     />
                     <p className="text-xs text-muted-foreground">
-                      Enter the 6-digit code from your authenticator app to confirm
+                      {t('enterCodeToConfirm')}
                     </p>
                   </div>
                   <Button 
@@ -226,7 +228,7 @@ const Setup2FA = () => {
                     className="w-full"
                     disabled={isLoading}
                   >
-                    {isLoading ? 'Disabling...' : 'Confirm Disable 2FA'}
+                    {isLoading ? t('disabling') : t('confirmDisable2FA')}
                   </Button>
                   <Button 
                     type="button"
@@ -238,7 +240,7 @@ const Setup2FA = () => {
                     }}
                     disabled={isLoading}
                   >
-                    Cancel
+                    {t('cancel')}
                   </Button>
                 </form>
               ) : (
@@ -249,14 +251,14 @@ const Setup2FA = () => {
                     onClick={() => setShowDisableVerification(true)}
                     disabled={isLoading}
                   >
-                    Disable 2FA
+                    {t('disable2FA')}
                   </Button>
                   <Button 
                     variant="outline"
                     className="w-full" 
                     onClick={() => navigate('/settings')}
                   >
-                    Back to Settings
+                    {t('backToSettings')}
                   </Button>
                 </>
               )}
@@ -269,7 +271,7 @@ const Setup2FA = () => {
                 </div>
                 
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium">Manual Entry Code</Label>
+                  <Label className="text-sm font-medium">{t('manualEntryCode')}</Label>
                   <Input
                     type="text"
                     value={secret}
@@ -277,12 +279,12 @@ const Setup2FA = () => {
                     className="font-mono text-xs"
                   />
                   <p className="text-xs text-muted-foreground">
-                    Use this code if you can't scan the QR code
+                    {t('useCodeIfCantScan')}
                   </p>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="code">Verification Code</Label>
+                  <Label htmlFor="code">{t('verificationCode')}</Label>
                   <Input
                     id="code"
                     type="text"
@@ -295,7 +297,7 @@ const Setup2FA = () => {
                     pattern="[0-9]{6}"
                   />
                   <p className="text-xs text-muted-foreground">
-                    Enter the 6-digit code from your authenticator app
+                    {t('enterSixDigitCode')}
                   </p>
                 </div>
               </div>
@@ -305,18 +307,18 @@ const Setup2FA = () => {
                 className="w-full" 
                 disabled={isLoading}
               >
-                {isLoading ? 'Verifying...' : 'Enable 2FA'}
+                {isLoading ? t('verifying') : t('enable2FA')}
               </Button>
             </form>
           ) : (
             <div className="space-y-4">
               <div className="space-y-2">
-                <h3 className="font-semibold">How to set up 2FA:</h3>
+                <h3 className="font-semibold">{t('howToSetup2FA')}</h3>
                 <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground">
-                  <li>Install an authenticator app (Google Authenticator, Authy, etc.)</li>
-                  <li>Click "Start Setup" below to generate a QR code</li>
-                  <li>Scan the QR code with your authenticator app</li>
-                  <li>Enter the 6-digit code to verify</li>
+                  <li>{t('installAuthApp')}</li>
+                  <li>{t('clickStartSetup')}</li>
+                  <li>{t('scanQRCode')}</li>
+                  <li>{t('enterCodeToVerify')}</li>
                 </ol>
               </div>
 
@@ -326,7 +328,7 @@ const Setup2FA = () => {
                 disabled={isLoading}
               >
                 <QrCode className="w-4 h-4 mr-2" />
-                {isLoading ? 'Setting up...' : 'Start Setup'}
+                {isLoading ? t('settingUp') : t('startSetup')}
               </Button>
 
               <Button 
@@ -334,7 +336,7 @@ const Setup2FA = () => {
                 className="w-full" 
                 onClick={() => navigate('/settings')}
               >
-                Cancel
+                {t('cancel')}
               </Button>
             </div>
           )}

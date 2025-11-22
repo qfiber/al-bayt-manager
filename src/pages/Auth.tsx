@@ -80,7 +80,7 @@ const Auth = () => {
 
       if (error) {
         toast({
-          title: 'Error',
+          title: t('error'),
           description: error.message,
           variant: 'destructive',
         });
@@ -90,8 +90,8 @@ const Auth = () => {
 
       if (!session) {
         toast({
-          title: 'Error',
-          description: 'Session not found',
+          title: t('error'),
+          description: t('sessionNotFound'),
           variant: 'destructive',
         });
         setIsLoading(false);
@@ -135,16 +135,16 @@ const Auth = () => {
         // Either no 2FA or already verified
         console.log('Proceeding to dashboard');
         toast({
-          title: 'Success',
-          description: 'Signed in successfully',
+          title: t('success'),
+          description: t('signedInSuccessfully'),
         });
         navigate('/dashboard');
       }
     } catch (error) {
       console.error('Sign in error:', error);
       toast({
-        title: 'Error',
-        description: 'An error occurred during sign in',
+        title: t('error'),
+        description: t('errorDuringSignIn'),
         variant: 'destructive',
       });
       setIsLoading(false);
@@ -177,22 +177,22 @@ const Auth = () => {
 
       if (verifyError) {
         toast({
-          title: 'Error',
-          description: 'Invalid verification code',
+          title: t('error'),
+          description: t('invalidVerificationCode'),
           variant: 'destructive',
         });
       } else {
         toast({
-          title: 'Success',
-          description: 'Signed in successfully',
+          title: t('success'),
+          description: t('signedInSuccessfully'),
         });
         navigate('/dashboard');
       }
     } catch (error) {
       console.error('2FA verification error:', error);
       toast({
-        title: 'Error',
-        description: 'An error occurred during verification',
+        title: t('error'),
+        description: t('errorDuringVerification'),
         variant: 'destructive',
       });
     }
@@ -268,7 +268,7 @@ const Auth = () => {
           ) : (
             <form onSubmit={handleVerify2FA} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="code">Two-Factor Authentication Code</Label>
+                <Label htmlFor="code">{t('twoFactorAuthCode')}</Label>
                 <Input
                   id="code"
                   type="text"
@@ -281,7 +281,7 @@ const Auth = () => {
                   pattern="[0-9]{6}"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Enter the 6-digit code from your authenticator app
+                  {t('enterSixDigitCode')}
                 </p>
               </div>
 
@@ -290,7 +290,7 @@ const Auth = () => {
                 className="w-full" 
                 disabled={isLoading}
               >
-                {isLoading ? 'Verifying...' : 'Verify'}
+                {isLoading ? t('verifying') : t('verify')}
               </Button>
 
               <Button 
@@ -302,16 +302,16 @@ const Auth = () => {
                   setVerificationCode('');
                 }}
               >
-                Back
+                {t('back')}
               </Button>
             </form>
           )}
           
           <div className="mt-6 text-center text-sm">
             <p className="text-muted-foreground">
-              Don't have an account?{' '}
+              {t('dontHaveAccount')}{' '}
               <a href="/register" className="text-primary hover:underline">
-                Register
+                {t('register')}
               </a>
             </p>
           </div>
