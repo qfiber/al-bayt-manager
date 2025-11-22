@@ -72,7 +72,7 @@ const Auth = () => {
 
     try {
       // First, attempt to sign in with email and password
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const { data: { session }, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
@@ -87,15 +87,30 @@ const Auth = () => {
         return;
       }
 
-      // Check if user has 2FA enabled
-      const { data: factors } = await supabase.auth.mfa.listFactors();
+      if (!session) {
+        toast({
+          title: 'Error',
+          description: 'Session not found',
+          variant: 'destructive',
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      // Check if user has 2FA factors
+      const { data: { totp, all } } = await supabase.auth.mfa.listFactors();
+      const has2FA = totp && totp.length > 0;
       
-      if (factors && factors.totp && factors.totp.length > 0) {
-        // User has 2FA enabled, show verification input
+      // Check the Authentication Assurance Level from the session
+      // When 2FA is enabled but not yet verified, we need to require it
+      const sessionAal = (session as any).aal;
+      
+      // If user has 2FA and session is only aal1 (password only), require 2FA verification
+      if (has2FA && sessionAal === 'aal1') {
         setRequire2FA(true);
         setIsLoading(false);
       } else {
-        // No 2FA, proceed to dashboard
+        // Either no 2FA or already verified (aal2)
         toast({
           title: 'Success',
           description: 'Signed in successfully',
