@@ -7,6 +7,7 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   isAdmin: boolean;
+  isModerator: boolean;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signUp: (email: string, password: string, name: string, phone?: string) => Promise<{ error: any }>;
@@ -19,6 +20,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isModerator, setIsModerator] = useState(false);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
@@ -32,9 +34,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (session?.user) {
           setTimeout(() => {
             checkAdminStatus(session.user.id);
+            checkModeratorStatus(session.user.id);
           }, 0);
         } else {
           setIsAdmin(false);
+          setIsModerator(false);
         }
       }
     );
@@ -46,6 +50,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       if (session?.user) {
         checkAdminStatus(session.user.id);
+        checkModeratorStatus(session.user.id);
       }
       setLoading(false);
     });
@@ -70,6 +75,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (error) {
       console.error('Error checking admin status:', error);
       setIsAdmin(false);
+    }
+  };
+
+  const checkModeratorStatus = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userId)
+        .eq('role', 'moderator')
+        .maybeSingle();
+
+      if (!error && data) {
+        setIsModerator(true);
+      } else {
+        setIsModerator(false);
+      }
+    } catch (error) {
+      console.error('Error checking moderator status:', error);
+      setIsModerator(false);
     }
   };
 
@@ -114,7 +139,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, isAdmin, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ user, session, isAdmin, isModerator, loading, signIn, signUp, signOut }}>
       {children}
     </AuthContext.Provider>
   );
