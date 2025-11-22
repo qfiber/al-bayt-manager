@@ -113,19 +113,24 @@ serve(async (req) => {
 
     console.log('Profile created/updated');
 
-    // Upsert the user role (trigger may have already created it)
-    const { error: roleUpsertError } = await supabaseAdmin
+    // Handle the user role (trigger may have already created it)
+    // First, delete any existing role for this user
+    await supabaseAdmin
       .from('user_roles')
-      .upsert({ 
+      .delete()
+      .eq('user_id', newUser.user.id);
+
+    // Then insert the desired role
+    const { error: roleInsertError } = await supabaseAdmin
+      .from('user_roles')
+      .insert({ 
         user_id: newUser.user.id, 
         role: role || 'user' 
-      }, {
-        onConflict: 'user_id,role',
-        ignoreDuplicates: false
       });
 
-    if (roleUpsertError) {
-      console.error('Error upserting role:', roleUpsertError);
+    if (roleInsertError) {
+      console.error('Error inserting role:', roleInsertError);
+      throw roleInsertError;
     }
 
     console.log('User role set');
