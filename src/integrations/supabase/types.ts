@@ -228,8 +228,6 @@ export type Database = {
           logo_url: string | null
           monthly_fee: number
           system_language: string
-          turnstile_secret_key: string | null
-          turnstile_site_key: string | null
           updated_at: string | null
         }
         Insert: {
@@ -238,8 +236,6 @@ export type Database = {
           logo_url?: string | null
           monthly_fee?: number
           system_language?: string
-          turnstile_secret_key?: string | null
-          turnstile_site_key?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -248,8 +244,6 @@ export type Database = {
           logo_url?: string | null
           monthly_fee?: number
           system_language?: string
-          turnstile_secret_key?: string | null
-          turnstile_site_key?: string | null
           updated_at?: string | null
         }
         Relationships: []

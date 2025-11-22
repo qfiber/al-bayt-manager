@@ -10,12 +10,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useToast } from '@/hooks/use-toast';
 import { Building } from 'lucide-react';
 
-const Auth = () => {
+const Register = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
-  const { signIn, user, loading } = useAuth();
+  const { signUp, user, loading } = useAuth();
   const { t } = useLanguage();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -39,7 +41,6 @@ const Auth = () => {
     
     fetchSettings();
     
-    // Subscribe to settings changes for real-time updates
     const channel = supabase
       .channel('settings-changes')
       .on('postgres_changes', 
@@ -63,12 +64,31 @@ const Auth = () => {
     }
   }, [user, loading, navigate]);
 
-  const handleSignIn = async (e: React.FormEvent) => {
+  const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!email || !password || !name) {
+      toast({
+        title: 'Error',
+        description: 'Please fill in all required fields',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (password.length < 8) {
+      toast({
+        title: 'Error',
+        description: 'Password must be at least 8 characters long',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      const { error } = await signIn(email, password);
+      const { error } = await signUp(email, password, name, phone);
 
       if (error) {
         toast({
@@ -79,15 +99,15 @@ const Auth = () => {
       } else {
         toast({
           title: 'Success',
-          description: 'Signed in successfully',
+          description: 'Account created successfully! Please sign in.',
         });
-        navigate('/dashboard');
+        navigate('/auth');
       }
     } catch (error) {
-      console.error('Sign in error:', error);
+      console.error('Sign up error:', error);
       toast({
         title: 'Error',
-        description: 'An error occurred during sign in',
+        description: 'An error occurred during registration',
         variant: 'destructive',
       });
     }
@@ -120,11 +140,24 @@ const Auth = () => {
           </div>
           <CardTitle className="text-2xl font-bold">{t('buildingManagementSystem')}</CardTitle>
           <CardDescription>
-            {t('signInToAccount')}
+            Create a new account
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSignIn} className="space-y-4">
+          <form onSubmit={handleSignUp} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">{t('name')}</Label>
+              <Input
+                id="name"
+                type="text"
+                placeholder="Full Name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+                disabled={isLoading}
+              />
+            </div>
+            
             <div className="space-y-2">
               <Label htmlFor="email">{t('email')}</Label>
               <Input
@@ -139,6 +172,18 @@ const Auth = () => {
             </div>
 
             <div className="space-y-2">
+              <Label htmlFor="phone">{t('phone')}</Label>
+              <Input
+                id="phone"
+                type="tel"
+                placeholder="Phone (optional)"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                disabled={isLoading}
+              />
+            </div>
+
+            <div className="space-y-2">
               <Label htmlFor="password">{t('password')}</Label>
               <Input
                 id="password"
@@ -148,7 +193,11 @@ const Auth = () => {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 disabled={isLoading}
+                minLength={8}
               />
+              <p className="text-xs text-muted-foreground">
+                Password must be at least 8 characters
+              </p>
             </div>
 
             <Button 
@@ -156,15 +205,15 @@ const Auth = () => {
               className="w-full" 
               disabled={isLoading}
             >
-              {isLoading ? t('signingIn') : t('signInButton')}
+              {isLoading ? 'Creating Account...' : 'Create Account'}
             </Button>
           </form>
           
           <div className="mt-6 text-center text-sm">
             <p className="text-muted-foreground">
-              Don't have an account?{' '}
-              <a href="/register" className="text-primary hover:underline">
-                Register
+              Already have an account?{' '}
+              <a href="/auth" className="text-primary hover:underline">
+                Sign in
               </a>
             </p>
           </div>
@@ -178,4 +227,4 @@ const Auth = () => {
   );
 };
 
-export default Auth;
+export default Register;
