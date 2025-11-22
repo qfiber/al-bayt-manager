@@ -7,6 +7,7 @@ import { LanguageProvider } from "./contexts/LanguageContext";
 import { AuthProvider } from "./contexts/AuthContext";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
+import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import Buildings from "./pages/Buildings";
 import Apartments from "./pages/Apartments";
@@ -32,6 +33,7 @@ const App = () => (
             <Routes>
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route path="/auth" element={<Auth />} />
+              <Route path="/register" element={<Register />} />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/buildings" element={<Buildings />} />
               <Route path="/apartments" element={<Apartments />} />
