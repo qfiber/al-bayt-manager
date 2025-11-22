@@ -148,7 +148,7 @@ const Auth = () => {
           </div>
           
           <div className="mt-4 pt-4 border-t text-center text-xs text-muted-foreground">
-            <p>{t('poweredBy')} <span className="font-medium text-foreground">{t('buildingManagementSystem')}</span></p>
+            <p>{t('footerPoweredByText')}</p>
           </div>
         </CardContent>
       </Card>
