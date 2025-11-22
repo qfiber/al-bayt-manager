@@ -98,29 +98,36 @@ const Auth = () => {
       }
 
       // Check if user has 2FA factors
-      const { data: factorsData } = await supabase.auth.mfa.listFactors();
+      const { data: factorsData, error: factorsError } = await supabase.auth.mfa.listFactors();
+      
+      console.log('MFA Factors:', factorsData);
+      console.log('Session AAL:', (session as any)?.aal);
+      
+      if (factorsError) {
+        console.error('Error fetching factors:', factorsError);
+      }
+      
       const totpFactors = factorsData?.totp || [];
       
       // Check if user has any verified TOTP factors
       const hasVerifiedTotp = totpFactors.some(factor => factor.status === 'verified');
       
+      console.log('Has verified TOTP:', hasVerifiedTotp);
+      console.log('TOTP Factors:', totpFactors);
+      
       // Check the Authentication Assurance Level from the session
       const sessionAal = (session as any)?.aal;
       
-      // If user has verified 2FA factors and session is only aal1 (password only), 
-      // or if we can't determine AAL but have verified factors, require 2FA verification
-      if (hasVerifiedTotp && (!sessionAal || sessionAal === 'aal1')) {
+      // If user has verified 2FA factors, we need to check if 2FA was already verified
+      // AAL1 = password only, AAL2 = password + 2FA
+      if (hasVerifiedTotp && sessionAal !== 'aal2') {
+        // User has 2FA enabled but hasn't verified it yet in this session
+        console.log('Requiring 2FA verification');
         setRequire2FA(true);
         setIsLoading(false);
-      } else if (!hasVerifiedTotp) {
-        // No 2FA enabled, proceed normally
-        toast({
-          title: 'Success',
-          description: 'Signed in successfully',
-        });
-        navigate('/dashboard');
       } else {
-        // 2FA already verified (aal2)
+        // Either no 2FA or already verified
+        console.log('Proceeding to dashboard');
         toast({
           title: 'Success',
           description: 'Signed in successfully',
