@@ -1,7 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Building, Home, DollarSign, FileText, Settings, Key } from 'lucide-react';
@@ -10,12 +11,31 @@ const Dashboard = () => {
   const { user, isAdmin, isModerator, loading, signOut } = useAuth();
   const { t } = useLanguage();
   const navigate = useNavigate();
+  const [userName, setUserName] = useState<string>('');
 
   useEffect(() => {
     if (!loading && !user) {
       navigate('/auth');
     }
   }, [user, loading, navigate]);
+
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      if (user) {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('name')
+          .eq('id', user.id)
+          .single();
+
+        if (data && !error) {
+          setUserName(data.name);
+        }
+      }
+    };
+
+    fetchUserProfile();
+  }, [user]);
 
   if (loading) {
     return (
@@ -58,7 +78,7 @@ const Dashboard = () => {
           <div>
             <h1 className="text-3xl font-bold">{t('dashboard')}</h1>
             <p className="text-muted-foreground mt-2">
-              {t('welcomeBack')}, {user.email}
+              {t('welcomeBack')}, {userName || user.email}
             </p>
           </div>
           <Button onClick={signOut} variant="outline">
