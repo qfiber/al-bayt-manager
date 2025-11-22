@@ -528,8 +528,8 @@ const UserManagement = () => {
                       <TableCell className="font-medium text-right">{userProfile.name}</TableCell>
                       <TableCell className="text-right">{userProfile.phone || '-'}</TableCell>
                       <TableCell className="text-right">
-                        <Badge variant={userProfile.role === 'admin' ? 'default' : 'secondary'}>
-                          {t(userProfile.role as 'admin' | 'user')}
+                        <Badge variant={userProfile.role === 'admin' ? 'default' : userProfile.role === 'moderator' ? 'outline' : 'secondary'}>
+                          {t(userProfile.role as 'admin' | 'moderator' | 'user')}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
@@ -623,7 +623,7 @@ const UserManagement = () => {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="user">{t('user')}</SelectItem>
-                    <SelectItem value="moderator">Moderator</SelectItem>
+                    <SelectItem value="moderator">{t('moderator')}</SelectItem>
                     <SelectItem value="admin">{t('admin')}</SelectItem>
                   </SelectContent>
                 </Select>
@@ -694,7 +694,7 @@ const UserManagement = () => {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="user">{t('user')}</SelectItem>
-                    <SelectItem value="moderator">Moderator</SelectItem>
+                    <SelectItem value="moderator">{t('moderator')}</SelectItem>
                     <SelectItem value="admin">{t('admin')}</SelectItem>
                   </SelectContent>
                 </Select>
