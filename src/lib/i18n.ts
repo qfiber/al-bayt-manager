@@ -25,7 +25,7 @@ export const translations = {
     
     // Dashboard
     welcomeBack: 'مرحباً بعودتك',
-    clickToManage: 'انقر للإدارة',
+    clickToManage: 'إدارة',
     buildingManagementSystem: 'نظام إدارة المباني',
     
     // Buildings
@@ -195,7 +195,7 @@ export const translations = {
     error: 'خطأ',
     success: 'نجح',
     poweredBy: 'مدعوم من',
-    footerPoweredByText: 'مدعوم من نظام إدارة المباني',
+    footerPoweredByText: 'تصميم شركة كيوفايبر',
     backToDashboard: 'العودة إلى لوحة التحكم',
     update: 'تحديث',
     create: 'إنشاء',
