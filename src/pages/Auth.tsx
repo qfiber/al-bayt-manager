@@ -98,19 +98,29 @@ const Auth = () => {
       }
 
       // Check if user has 2FA factors
-      const { data: { totp, all } } = await supabase.auth.mfa.listFactors();
-      const has2FA = totp && totp.length > 0;
+      const { data: factorsData } = await supabase.auth.mfa.listFactors();
+      const totpFactors = factorsData?.totp || [];
+      
+      // Check if user has any verified TOTP factors
+      const hasVerifiedTotp = totpFactors.some(factor => factor.status === 'verified');
       
       // Check the Authentication Assurance Level from the session
-      // When 2FA is enabled but not yet verified, we need to require it
-      const sessionAal = (session as any).aal;
+      const sessionAal = (session as any)?.aal;
       
-      // If user has 2FA and session is only aal1 (password only), require 2FA verification
-      if (has2FA && sessionAal === 'aal1') {
+      // If user has verified 2FA factors and session is only aal1 (password only), 
+      // or if we can't determine AAL but have verified factors, require 2FA verification
+      if (hasVerifiedTotp && (!sessionAal || sessionAal === 'aal1')) {
         setRequire2FA(true);
         setIsLoading(false);
+      } else if (!hasVerifiedTotp) {
+        // No 2FA enabled, proceed normally
+        toast({
+          title: 'Success',
+          description: 'Signed in successfully',
+        });
+        navigate('/dashboard');
       } else {
-        // Either no 2FA or already verified (aal2)
+        // 2FA already verified (aal2)
         toast({
           title: 'Success',
           description: 'Signed in successfully',
