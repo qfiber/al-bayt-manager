@@ -70,8 +70,8 @@ const Register = () => {
 
     if (!email || !password || !name) {
       toast({
-        title: 'Error',
-        description: 'Please fill in all required fields',
+        title: t('error'),
+        description: t('fillAllRequiredFields'),
         variant: 'destructive',
       });
       return;
@@ -79,8 +79,8 @@ const Register = () => {
 
     if (password.length < 8) {
       toast({
-        title: 'Error',
-        description: 'Password must be at least 8 characters long',
+        title: t('error'),
+        description: t('passwordMinLengthError'),
         variant: 'destructive',
       });
       return;
@@ -93,22 +93,22 @@ const Register = () => {
 
       if (error) {
         toast({
-          title: 'Error',
+          title: t('error'),
           description: error.message,
           variant: 'destructive',
         });
       } else {
         toast({
-          title: 'Success',
-          description: 'Account created successfully! Please sign in.',
+          title: t('success'),
+          description: t('accountCreatedSuccess'),
         });
         navigate('/auth');
       }
     } catch (error) {
       console.error('Sign up error:', error);
       toast({
-        title: 'Error',
-        description: 'An error occurred during registration',
+        title: t('error'),
+        description: t('registrationError'),
         variant: 'destructive',
       });
     }
@@ -141,7 +141,7 @@ const Register = () => {
           </div>
           <CardTitle className="text-2xl font-bold">{t('buildingManagementSystem')}</CardTitle>
           <CardDescription>
-            Create a new account
+            {t('createNewAccount')}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -151,7 +151,7 @@ const Register = () => {
               <Input
                 id="name"
                 type="text"
-                placeholder="Full Name"
+                placeholder={t('fullName')}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
@@ -177,7 +177,7 @@ const Register = () => {
               <Input
                 id="phone"
                 type="tel"
-                placeholder="Phone (optional)"
+                placeholder={t('phoneOptional')}
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 disabled={isLoading}
@@ -197,7 +197,7 @@ const Register = () => {
                 minLength={8}
               />
               <p className="text-xs text-muted-foreground">
-                Password must be at least 8 characters
+                {t('passwordMinLength')}
               </p>
             </div>
 
@@ -206,15 +206,15 @@ const Register = () => {
               className="w-full" 
               disabled={isLoading}
             >
-              {isLoading ? 'Creating Account...' : 'Create Account'}
+              {isLoading ? t('creatingAccount') : t('createAccount')}
             </Button>
           </form>
           
           <div className="mt-6 text-center text-sm">
             <p className="text-muted-foreground">
-              Already have an account?{' '}
+              {t('alreadyHaveAccount')}{' '}
               <a href="/auth" className="text-primary hover:underline">
-                Sign in
+                {t('signIn')}
               </a>
             </p>
           </div>
