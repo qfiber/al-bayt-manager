@@ -61,10 +61,10 @@ const Auth = () => {
   }, []);
 
   useEffect(() => {
-    if (!loading && user) {
+    if (!loading && user && !require2FA) {
       navigate('/dashboard');
     }
-  }, [user, loading, navigate]);
+  }, [user, loading, navigate, require2FA]);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
