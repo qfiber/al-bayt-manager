@@ -9,7 +9,7 @@ import { Building, Home, DollarSign, FileText, Settings, Key } from 'lucide-reac
 
 const Dashboard = () => {
   const { user, isAdmin, isModerator, loading, signOut } = useAuth();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const navigate = useNavigate();
   const [userName, setUserName] = useState<string>('');
 
@@ -111,7 +111,15 @@ const Dashboard = () => {
         </div>
 
         <footer className="mt-12 text-center text-sm text-muted-foreground">
-          {t('poweredBy')} {t('buildingManagementSystem')}
+          {language === 'ar' ? 'تصميم شركة ' : 'Powered by '}
+          <a 
+            href="https://qfiber.co.il" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-primary hover:underline"
+          >
+            {language === 'ar' ? 'كيوفايبر' : 'qFiber LTD'}
+          </a>
         </footer>
       </div>
     </div>

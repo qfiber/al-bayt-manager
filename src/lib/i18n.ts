@@ -576,7 +576,7 @@ export const translations = {
     error: "Error",
     success: "Success",
     poweredBy: "Powered by",
-    footerPoweredByText: "Powered by Building Management System",
+    footerPoweredByText: "Powered by qFiber LTD",
     backToDashboard: "Back to Dashboard",
     update: "Update",
     create: "Create",

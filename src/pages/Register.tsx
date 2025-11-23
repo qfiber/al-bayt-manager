@@ -19,7 +19,7 @@ const Register = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const { signUp, user, loading } = useAuth();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -220,7 +220,17 @@ const Register = () => {
           </div>
           
           <div className="mt-4 pt-4 border-t text-center text-xs text-muted-foreground">
-            <p>{t('footerPoweredByText')}</p>
+            <p>
+              {language === 'ar' ? 'تصميم شركة ' : 'Powered by '}
+              <a 
+                href="https://qfiber.co.il" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-primary hover:underline"
+              >
+                {language === 'ar' ? 'كيوفايبر' : 'qFiber LTD'}
+              </a>
+            </p>
           </div>
         </CardContent>
       </Card>

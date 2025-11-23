@@ -19,7 +19,7 @@ const Auth = () => {
   const [require2FA, setRequire2FA] = useState(false);
   const [verificationCode, setVerificationCode] = useState('');
   const { signIn, user, loading } = useAuth();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -317,7 +317,17 @@ const Auth = () => {
           </div>
           
           <div className="mt-4 pt-4 border-t text-center text-xs text-muted-foreground">
-            <p>{t('footerPoweredByText')}</p>
+            <p>
+              {language === 'ar' ? 'تصميم شركة ' : 'Powered by '}
+              <a 
+                href="https://qfiber.co.il" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-primary hover:underline"
+              >
+                {language === 'ar' ? 'كيوفايبر' : 'qFiber LTD'}
+              </a>
+            </p>
           </div>
         </CardContent>
       </Card>
