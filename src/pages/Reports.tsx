@@ -20,10 +20,14 @@ interface ExpenseByCategory {
 }
 
 interface BuildingStats {
+  buildingId: string;
   buildingName: string;
   totalApartments: number;
   occupied: number;
   vacant: number;
+  income: number;
+  expenses: number;
+  netIncome: number;
 }
 
 interface MonthlyData {
@@ -127,20 +131,45 @@ const Reports = () => {
 
     const stats = await Promise.all(
       (buildings || []).map(async (building) => {
+        // Get apartments for this building
         const { data: apartments } = await supabase
           .from('apartments')
-          .select('status')
+          .select('id, status')
           .eq('building_id', building.id);
 
         const total = apartments?.length || 0;
         const occupied = apartments?.filter(a => a.status === 'occupied').length || 0;
         const vacant = total - occupied;
 
+        // Get income from payments for this building's apartments
+        const apartmentIds = apartments?.map(a => a.id) || [];
+        let income = 0;
+        if (apartmentIds.length > 0) {
+          const { data: payments } = await supabase
+            .from('payments')
+            .select('amount')
+            .in('apartment_id', apartmentIds);
+          
+          income = payments?.reduce((sum, p) => sum + p.amount, 0) || 0;
+        }
+
+        // Get expenses for this building
+        const { data: expenses } = await supabase
+          .from('expenses')
+          .select('amount')
+          .eq('building_id', building.id);
+
+        const buildingExpenses = expenses?.reduce((sum, e) => sum + e.amount, 0) || 0;
+
         return {
+          buildingId: building.id,
           buildingName: building.name,
           totalApartments: total,
           occupied,
           vacant,
+          income,
+          expenses: buildingExpenses,
+          netIncome: income - buildingExpenses,
         };
       })
     );
@@ -245,12 +274,46 @@ const Reports = () => {
           </Card>
         </div>
 
+        {/* Building Financial Reports */}
+        <div className="mb-8">
+          <h2 className="text-2xl font-bold mb-4">{t('buildingFinancialReports')}</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {buildingStats.map((building) => (
+              <Card key={building.buildingId}>
+                <CardHeader>
+                  <CardTitle className="text-lg">{building.buildingName}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">{t('occupancy')}</span>
+                    <span className="font-medium">{building.occupied}/{building.totalApartments}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">{t('buildingIncome')}</span>
+                    <span className="font-medium text-green-600">₪{building.income.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">{t('buildingExpenses')}</span>
+                    <span className="font-medium text-red-600">₪{building.expenses.toFixed(2)}</span>
+                  </div>
+                  <div className="pt-2 border-t flex justify-between items-center">
+                    <span className="text-sm font-semibold">{t('buildingNetIncome')}</span>
+                    <span className={`font-bold ${building.netIncome >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      ₪{building.netIncome.toFixed(2)}
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+
         {/* Charts Section */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          {/* Expenses by Category */}
+          {/* Combined Expenses by Category */}
           <Card>
             <CardHeader>
-              <CardTitle>{t('expensesByCategory')}</CardTitle>
+              <CardTitle>{t('combinedExpensesByCategory')}</CardTitle>
             </CardHeader>
             <CardContent>
               {expensesByCategory.length > 0 ? (
