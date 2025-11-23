@@ -34,6 +34,7 @@ const Settings = () => {
   const [systemLanguage, setSystemLanguage] = useState('ar');
   const [isSaving, setIsSaving] = useState(false);
   const [logoFile, setLogoFile] = useState<LogoFile>({ file: null, preview: null });
+  const [brandingLogoUrl, setBrandingLogoUrl] = useState<string | null>(null);
   const [has2FA, setHas2FA] = useState(false);
   const [checking2FA, setChecking2FA] = useState(true);
 
@@ -104,6 +105,16 @@ const Settings = () => {
         setSystemLanguage('ar');
       }
     }
+
+    // Fetch branding logo
+    const { data: brandingData } = await supabase
+      .from('public_branding')
+      .select('logo_url')
+      .maybeSingle();
+    
+    if (brandingData?.logo_url) {
+      setBrandingLogoUrl(brandingData.logo_url);
+    }
   };
 
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -152,21 +163,44 @@ const Settings = () => {
         logoUrl = await uploadLogo();
       }
 
-      const updateData: any = {
+      // Update settings (monthly fee and language only)
+      const settingsUpdateData = {
         monthly_fee: parseFloat(monthlyFee),
         system_language: systemLanguage,
       };
 
-      if (logoUrl) {
-        updateData.logo_url = logoUrl;
-      }
-
-      const { error } = await supabase
+      const { error: settingsError } = await supabase
         .from('settings')
-        .update(updateData)
+        .update(settingsUpdateData)
         .eq('id', settings.id);
 
-      if (error) throw error;
+      if (settingsError) throw settingsError;
+
+      // Update public_branding if logo changed
+      if (logoUrl) {
+        // Check if branding record exists
+        const { data: existingBranding } = await supabase
+          .from('public_branding')
+          .select('id')
+          .maybeSingle();
+
+        if (existingBranding) {
+          // Update existing record
+          const { error: brandingError } = await supabase
+            .from('public_branding')
+            .update({ logo_url: logoUrl })
+            .eq('id', existingBranding.id);
+
+          if (brandingError) throw brandingError;
+        } else {
+          // Insert new record
+          const { error: brandingError } = await supabase
+            .from('public_branding')
+            .insert({ logo_url: logoUrl, company_name: 'qFiber LTD' });
+
+          if (brandingError) throw brandingError;
+        }
+      }
 
       toast({ title: 'Success', description: 'Settings updated successfully' });
       
@@ -296,11 +330,11 @@ const Settings = () => {
                     <img src={logoFile.preview} alt={t('logoPreview')} className="max-w-xs max-h-32 object-contain" />
                   </div>
                 )}
-                {!logoFile.preview && settings?.logo_url && (
+                {!logoFile.preview && brandingLogoUrl && (
                   <div className="mt-2">
                     <Label className="text-muted-foreground">{t('currentLogo')}</Label>
                     <div className="mt-2 border rounded-lg p-4 bg-muted/20 flex items-center justify-center">
-                      <img src={settings.logo_url} alt={t('currentLogo')} className="max-w-xs max-h-32 object-contain" />
+                      <img src={brandingLogoUrl} alt={t('currentLogo')} className="max-w-xs max-h-32 object-contain" />
                     </div>
                   </div>
                 )}

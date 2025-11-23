@@ -24,14 +24,14 @@ const Auth = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    const fetchSettings = async () => {
+    const fetchBranding = async () => {
       const { data, error } = await supabase
-        .from('settings')
+        .from('public_branding')
         .select('logo_url')
         .maybeSingle();
       
       if (error) {
-        console.log('Settings fetch error:', error);
+        console.log('Branding fetch error:', error);
         return;
       }
       
@@ -40,13 +40,13 @@ const Auth = () => {
       }
     };
     
-    fetchSettings();
+    fetchBranding();
     
-    // Subscribe to settings changes for real-time updates
+    // Subscribe to branding changes for real-time updates
     const channel = supabase
-      .channel('settings-changes')
+      .channel('branding-changes')
       .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'settings' },
+        { event: '*', schema: 'public', table: 'public_branding' },
         (payload) => {
           if (payload.new && typeof payload.new === 'object' && 'logo_url' in payload.new) {
             setLogoUrl(payload.new.logo_url as string);
