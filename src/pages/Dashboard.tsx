@@ -111,14 +111,14 @@ const Dashboard = () => {
         </div>
 
         <footer className="mt-12 text-center text-sm text-muted-foreground">
-          {language === 'ar' ? 'تصميم شركة ' : 'Powered by '}
+          {language === 'ar' ? 'تصميم شركة ' : language === 'he' ? 'מופעל על ידי ' : 'Powered by '}
           <a 
             href="https://qfiber.co.il" 
             target="_blank" 
             rel="noopener noreferrer"
             className="text-primary hover:underline"
           >
-            {language === 'ar' ? 'كيوفايبر' : 'qFiber LTD'}
+            {language === 'ar' ? 'كيوفايبر' : language === 'he' ? 'qFiber בע״מ' : 'qFiber LTD'}
           </a>
         </footer>
       </div>
