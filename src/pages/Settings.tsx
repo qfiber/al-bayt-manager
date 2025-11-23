@@ -206,7 +206,7 @@ const Settings = () => {
       
       // Update the app language if it changed
       if (systemLanguage !== language) {
-        setLanguage(systemLanguage as 'ar' | 'en');
+        setLanguage(systemLanguage as 'ar' | 'en' | 'he');
       }
       
       fetchSettings();
@@ -296,6 +296,7 @@ const Settings = () => {
                   <SelectContent>
                     <SelectItem value="ar">{t('arabic')} (العربية)</SelectItem>
                     <SelectItem value="en">{t('english')} (English)</SelectItem>
+                    <SelectItem value="he">{t('hebrew')} (עברית)</SelectItem>
                   </SelectContent>
                 </Select>
                 <p className="text-sm text-muted-foreground">
@@ -395,7 +396,9 @@ const Settings = () => {
                 </div>
                 <div>
                   <Label className="text-muted-foreground">{t('currentLanguage')}</Label>
-                  <p className="text-sm mt-1">{language === 'ar' ? t('arabic') : t('english')}</p>
+                  <p className="text-sm mt-1">
+                    {language === 'ar' ? t('arabic') : language === 'he' ? t('hebrew') : t('english')}
+                  </p>
                 </div>
               </div>
             </CardContent>

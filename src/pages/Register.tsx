@@ -221,14 +221,14 @@ const Register = () => {
           
           <div className="mt-4 pt-4 border-t text-center text-xs text-muted-foreground">
             <p>
-              {language === 'ar' ? 'تصميم شركة ' : 'Powered by '}
+              {language === 'ar' ? 'تصميم شركة ' : language === 'he' ? 'מופעל על ידי ' : 'Powered by '}
               <a 
                 href="https://qfiber.co.il" 
                 target="_blank" 
                 rel="noopener noreferrer"
                 className="text-primary hover:underline"
               >
-                {language === 'ar' ? 'كيوفايبر' : 'qFiber LTD'}
+                {language === 'ar' ? 'كيوفايبر' : language === 'he' ? 'qFiber בע״מ' : 'qFiber LTD'}
               </a>
             </p>
           </div>
