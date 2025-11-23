@@ -130,6 +130,11 @@ export type Database = {
           description: string
           expense_date: string
           id: string
+          is_recurring: boolean
+          parent_expense_id: string | null
+          recurring_end_date: string | null
+          recurring_start_date: string | null
+          recurring_type: string | null
           updated_at: string | null
         }
         Insert: {
@@ -140,6 +145,11 @@ export type Database = {
           description: string
           expense_date: string
           id?: string
+          is_recurring?: boolean
+          parent_expense_id?: string | null
+          recurring_end_date?: string | null
+          recurring_start_date?: string | null
+          recurring_type?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -150,6 +160,11 @@ export type Database = {
           description?: string
           expense_date?: string
           id?: string
+          is_recurring?: boolean
+          parent_expense_id?: string | null
+          recurring_end_date?: string | null
+          recurring_start_date?: string | null
+          recurring_type?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -158,6 +173,13 @@ export type Database = {
             columns: ["building_id"]
             isOneToOne: false
             referencedRelation: "buildings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_parent_expense_id_fkey"
+            columns: ["parent_expense_id"]
+            isOneToOne: false
+            referencedRelation: "expenses"
             referencedColumns: ["id"]
           },
         ]
