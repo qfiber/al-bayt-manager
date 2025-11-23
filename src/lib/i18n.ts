@@ -97,6 +97,15 @@ export const translations = {
     noExpensesFound: "لم يتم العثور على مصروفات. أنشئ مصروفك الأول!",
     deleteExpenseConfirm: "هل أنت متأكد من رغبتك في حذف هذا المصروف؟",
     uncategorized: "غير مصنف",
+    recurringExpense: "مصروف متكرر",
+    recurringType: "نوع التكرار",
+    selectRecurringType: "اختر نوع التكرار",
+    monthly: "شهري",
+    yearly: "سنوي",
+    recurringStartDate: "تاريخ بداية التكرار",
+    recurringEndDateOptional: "تاريخ نهاية التكرار (اختياري)",
+    recurringEndDateNote: "اتركه فارغاً للتكرار إلى أجل غير مسمى",
+    recurring: "متكرر",
 
     // Reports
     apartmentReport: "تقرير الشقة",
@@ -377,6 +386,15 @@ export const translations = {
     noExpensesFound: "No expenses found. Create your first expense!",
     deleteExpenseConfirm: "Are you sure you want to delete this expense?",
     uncategorized: "Uncategorized",
+    recurringExpense: "Recurring Expense",
+    recurringType: "Recurring Type",
+    selectRecurringType: "Select recurring type",
+    monthly: "Monthly",
+    yearly: "Yearly",
+    recurringStartDate: "Recurring Start Date",
+    recurringEndDateOptional: "Recurring End Date (optional)",
+    recurringEndDateNote: "Leave empty to recur indefinitely",
+    recurring: "Recurring",
 
     // Reports
     apartmentReport: "Apartment Report",

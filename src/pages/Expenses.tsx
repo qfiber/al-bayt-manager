@@ -22,6 +22,11 @@ interface Expense {
   amount: number;
   expense_date: string;
   category: string | null;
+  is_recurring: boolean;
+  recurring_type: 'monthly' | 'yearly' | null;
+  recurring_start_date: string | null;
+  recurring_end_date: string | null;
+  parent_expense_id: string | null;
 }
 
 interface Building {
@@ -44,6 +49,10 @@ const Expenses = () => {
     amount: '',
     expense_date: '',
     category: '',
+    is_recurring: false,
+    recurring_type: '',
+    recurring_start_date: '',
+    recurring_end_date: '',
   });
 
   useEffect(() => {
@@ -83,7 +92,7 @@ const Expenses = () => {
     if (error) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
     } else {
-      setExpenses(data || []);
+      setExpenses((data as Expense[]) || []);
     }
   };
 
@@ -98,12 +107,16 @@ const Expenses = () => {
       dbDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
     }
     
-    const expenseData = {
+    const expenseData: any = {
       building_id: formData.building_id,
       description: formData.description,
       amount: parseFloat(formData.amount),
       expense_date: dbDate,
       category: formData.category || null,
+      is_recurring: formData.is_recurring,
+      recurring_type: formData.is_recurring ? formData.recurring_type || null : null,
+      recurring_start_date: formData.is_recurring && formData.recurring_start_date ? formData.recurring_start_date : null,
+      recurring_end_date: formData.is_recurring && formData.recurring_end_date ? formData.recurring_end_date : null,
     };
 
     if (editingExpense) {
@@ -166,6 +179,10 @@ const Expenses = () => {
       amount: expense.amount.toString(),
       expense_date: displayDate,
       category: expense.category || '',
+      is_recurring: expense.is_recurring,
+      recurring_type: expense.recurring_type || '',
+      recurring_start_date: expense.recurring_start_date || '',
+      recurring_end_date: expense.recurring_end_date || '',
     });
     setIsDialogOpen(true);
   };
@@ -177,6 +194,10 @@ const Expenses = () => {
       amount: '',
       expense_date: '',
       category: '',
+      is_recurring: false,
+      recurring_type: '',
+      recurring_start_date: '',
+      recurring_end_date: '',
     });
     setEditingExpense(null);
     setIsDialogOpen(false);
@@ -273,6 +294,63 @@ const Expenses = () => {
                       placeholder={t('categoryPlaceholder')}
                     />
                   </div>
+                  
+                  {/* Recurring Expense Options */}
+                  <div className="space-y-4 border-t pt-4">
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="is_recurring"
+                        checked={formData.is_recurring}
+                        onChange={(e) => setFormData({ ...formData, is_recurring: e.target.checked })}
+                        className="rounded"
+                      />
+                      <Label htmlFor="is_recurring" className="cursor-pointer">
+                        {t('recurringExpense')}
+                      </Label>
+                    </div>
+                    
+                    {formData.is_recurring && (
+                      <>
+                        <div>
+                          <Label htmlFor="recurring_type">{t('recurringType')}</Label>
+                          <Select value={formData.recurring_type} onValueChange={(value) => setFormData({ ...formData, recurring_type: value })}>
+                            <SelectTrigger>
+                              <SelectValue placeholder={t('selectRecurringType')} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="monthly">{t('monthly')}</SelectItem>
+                              <SelectItem value="yearly">{t('yearly')}</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        
+                        <div>
+                          <Label htmlFor="recurring_start_date">{t('recurringStartDate')}</Label>
+                          <Input
+                            id="recurring_start_date"
+                            type="date"
+                            value={formData.recurring_start_date}
+                            onChange={(e) => setFormData({ ...formData, recurring_start_date: e.target.value })}
+                          />
+                        </div>
+                        
+                        <div>
+                          <Label htmlFor="recurring_end_date">{t('recurringEndDateOptional')}</Label>
+                          <Input
+                            id="recurring_end_date"
+                            type="date"
+                            value={formData.recurring_end_date}
+                            onChange={(e) => setFormData({ ...formData, recurring_end_date: e.target.value })}
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {t('recurringEndDateNote')}
+                          </p>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                  
                   <div className="flex gap-2">
                     <Button type="submit" className="flex-1">
                       {editingExpense ? t('update') : t('create')}
@@ -303,13 +381,14 @@ const Expenses = () => {
                   <TableHead className="text-right">{t('category')}</TableHead>
                   <TableHead className="text-right">{t('amount')}</TableHead>
                   <TableHead className="text-right">{t('date')}</TableHead>
+                  <TableHead className="text-right">{t('recurring')}</TableHead>
                   <TableHead className="text-right">{t('actions')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {expenses.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground">
+                    <TableCell colSpan={7} className="text-center text-muted-foreground">
                       {t('noExpensesFound')}
                     </TableCell>
                   </TableRow>
@@ -321,6 +400,15 @@ const Expenses = () => {
                       <TableCell className="text-right">{expense.category || '-'}</TableCell>
                       <TableCell className="text-right">₪{expense.amount.toFixed(2)}</TableCell>
                       <TableCell className="text-right">{formatDate(expense.expense_date)}</TableCell>
+                      <TableCell className="text-right">
+                        {expense.is_recurring ? (
+                          <span className="text-xs px-2 py-1 bg-primary/10 text-primary rounded">
+                            {t(expense.recurring_type || 'recurring')}
+                          </span>
+                        ) : (
+                          '-'
+                        )}
+                      </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           <Button size="sm" variant="outline" onClick={() => handleEdit(expense)}>
