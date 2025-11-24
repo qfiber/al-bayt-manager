@@ -118,7 +118,20 @@ serve(async (req) => {
       );
     }
 
-    console.log('Password updated successfully');
+    console.log('Password updated successfully for user:', targetUserId);
+
+    // Log audit event
+    await supabaseAdmin.rpc('insert_audit_log', {
+      p_user_id: user.id,
+      p_user_email: user.email,
+      p_action_type: 'password_change',
+      p_table_name: 'profiles',
+      p_record_id: targetUserId,
+      p_action_details: {
+        target_user_id: targetUserId,
+        changed_by_admin: user.email
+      }
+    });
 
     return new Response(
       JSON.stringify({ message: 'Password updated successfully' }),

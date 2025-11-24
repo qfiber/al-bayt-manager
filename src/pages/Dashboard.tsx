@@ -5,7 +5,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Building, Home, DollarSign, FileText, Settings, Key, Plus } from 'lucide-react';
+import { Building, Home, DollarSign, FileText, Settings, Key, Plus, Shield } from 'lucide-react';
 import { GeneralInformationCard } from '@/components/GeneralInformationCard';
 import { GeneralInformationDialog } from '@/components/GeneralInformationDialog';
 import { toast } from 'sonner';
@@ -104,6 +104,7 @@ const Dashboard = () => {
     { title: t('users'), icon: Settings, path: '/users', color: 'bg-indigo-500' },
     { title: t('settings'), icon: Settings, path: '/settings', color: 'bg-gray-500' },
     { title: t('apiKeys'), icon: Key, path: '/api-keys', color: 'bg-orange-500' },
+    { title: t('auditLogs'), icon: Shield, path: '/audit-logs', color: 'bg-pink-500' },
   ];
 
   const userCards = [
@@ -115,6 +116,7 @@ const Dashboard = () => {
     { title: t('payments'), icon: DollarSign, path: '/payments', color: 'bg-yellow-500' },
     { title: t('expenses'), icon: FileText, path: '/expenses', color: 'bg-red-500' },
     { title: t('reports'), icon: FileText, path: '/reports', color: 'bg-purple-500' },
+    { title: t('auditLogs'), icon: Shield, path: '/audit-logs', color: 'bg-pink-500' },
   ];
 
   const cards = isAdmin ? adminCards : isModerator ? moderatorCards : userCards;

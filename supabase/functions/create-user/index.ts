@@ -137,6 +137,20 @@ serve(async (req) => {
 
     console.log('User creation complete:', newUser.user.id);
 
+    // Log audit event using admin client
+    await supabaseAdmin.rpc('insert_audit_log', {
+      p_user_id: user.id,
+      p_user_email: user.email,
+      p_action_type: 'create',
+      p_table_name: 'profiles',
+      p_record_id: newUser.user.id,
+      p_action_details: {
+        created_user_email: email,
+        created_user_name: name,
+        created_user_role: role
+      }
+    });
+
     return new Response(
       JSON.stringify({
         success: true,
