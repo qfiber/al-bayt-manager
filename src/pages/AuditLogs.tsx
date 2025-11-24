@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ArrowLeft, Search, Filter } from 'lucide-react';
+import { Search, Filter } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface AuditLog {
@@ -29,7 +29,7 @@ interface AuditLog {
 
 const AuditLogs = () => {
   const { user, isAdmin, isModerator, loading } = useAuth();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const navigate = useNavigate();
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [filteredLogs, setFilteredLogs] = useState<AuditLog[]>([]);
@@ -140,14 +140,14 @@ const AuditLogs = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/10">
       <div className="container mx-auto p-6">
-        <div className="flex items-center gap-4 mb-8">
-          <Button onClick={() => navigate('/dashboard')} variant="ghost" size="icon">
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
+        <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-3xl font-bold">{t('auditLogs')}</h1>
             <p className="text-muted-foreground mt-1">{t('auditLogsDescription')}</p>
           </div>
+          <Button onClick={() => navigate('/dashboard')} variant="outline">
+            {t('backToDashboard')}
+          </Button>
         </div>
 
         <Card>
@@ -216,11 +216,11 @@ const AuditLogs = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>{t('timestamp')}</TableHead>
-                    <TableHead>{t('user')}</TableHead>
-                    <TableHead>Action Type</TableHead>
-                    <TableHead>{t('table')}</TableHead>
-                    <TableHead>{t('actions')}</TableHead>
+                    <TableHead className={language === 'ar' || language === 'he' ? 'text-right' : ''}>{t('timestamp')}</TableHead>
+                    <TableHead className={language === 'ar' || language === 'he' ? 'text-right' : ''}>{t('user')}</TableHead>
+                    <TableHead className={language === 'ar' || language === 'he' ? 'text-right' : ''}>Action Type</TableHead>
+                    <TableHead className={language === 'ar' || language === 'he' ? 'text-right' : ''}>{t('table')}</TableHead>
+                    <TableHead className={language === 'ar' || language === 'he' ? 'text-right' : ''}>{t('actions')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -233,10 +233,10 @@ const AuditLogs = () => {
                   ) : (
                     filteredLogs.map((log) => (
                       <TableRow key={log.id}>
-                        <TableCell className="font-mono text-sm">
+                        <TableCell className={`font-mono text-sm ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>
                           {format(new Date(log.created_at), 'yyyy-MM-dd HH:mm:ss')}
                         </TableCell>
-                        <TableCell>
+                        <TableCell className={language === 'ar' || language === 'he' ? 'text-right' : ''}>
                           <div className="flex flex-col">
                             <span className="font-medium">{log.user_email || t('system')}</span>
                             {log.ip_address && (
@@ -244,15 +244,15 @@ const AuditLogs = () => {
                             )}
                           </div>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className={language === 'ar' || language === 'he' ? 'text-right' : ''}>
                           <Badge className={getActionColor(log.action_type)}>
                             {log.action_type}
                           </Badge>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className={language === 'ar' || language === 'he' ? 'text-right' : ''}>
                           <code className="text-sm">{log.table_name || '-'}</code>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className={language === 'ar' || language === 'he' ? 'text-right' : ''}>
                           <Button
                             variant="ghost"
                             size="sm"
