@@ -5,13 +5,19 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Building, Home, DollarSign, FileText, Settings, Key } from 'lucide-react';
+import { Building, Home, DollarSign, FileText, Settings, Key, Plus } from 'lucide-react';
+import { GeneralInformationCard } from '@/components/GeneralInformationCard';
+import { GeneralInformationDialog } from '@/components/GeneralInformationDialog';
+import { toast } from 'sonner';
 
 const Dashboard = () => {
   const { user, isAdmin, isModerator, loading, signOut } = useAuth();
   const { t, language } = useLanguage();
   const navigate = useNavigate();
   const [userName, setUserName] = useState<string>('');
+  const [generalInfo, setGeneralInfo] = useState<any[]>([]);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedInfoId, setSelectedInfoId] = useState<string | undefined>();
 
   useEffect(() => {
     if (!loading && !user) {
@@ -36,6 +42,48 @@ const Dashboard = () => {
 
     fetchUserProfile();
   }, [user]);
+
+  useEffect(() => {
+    if (user) {
+      fetchGeneralInformation();
+    }
+  }, [user]);
+
+  const fetchGeneralInformation = async () => {
+    const { data, error } = await supabase
+      .from('general_information')
+      .select('*')
+      .order('display_order', { ascending: true })
+      .order('created_at', { ascending: true });
+
+    if (!error && data) {
+      setGeneralInfo(data);
+    }
+  };
+
+  const handleDeleteInfo = async (id: string) => {
+    const { error } = await supabase
+      .from('general_information')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      toast.error(t('error'));
+    } else {
+      toast.success(t('deleteSuccess'));
+      fetchGeneralInformation();
+    }
+  };
+
+  const handleEditInfo = (id: string) => {
+    setSelectedInfoId(id);
+    setDialogOpen(true);
+  };
+
+  const handleAddInfo = () => {
+    setSelectedInfoId(undefined);
+    setDialogOpen(true);
+  };
 
   if (loading) {
     return (
@@ -109,6 +157,49 @@ const Dashboard = () => {
             </Card>
           ))}
         </div>
+
+        {/* General Information Section */}
+        <div className="mt-12">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-bold">{t('generalInformation')}</h2>
+            {isAdmin && (
+              <Button onClick={handleAddInfo}>
+                <Plus className="w-4 h-4 mr-2" />
+                {t('addInformation')}
+              </Button>
+            )}
+          </div>
+          {generalInfo.length === 0 ? (
+            <Card>
+              <CardContent className="py-8 text-center text-muted-foreground">
+                {t('noInformationAvailable')}
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {generalInfo.map((info) => (
+                <GeneralInformationCard
+                  key={info.id}
+                  id={info.id}
+                  title={info.title}
+                  text_1={info.text_1}
+                  text_2={info.text_2}
+                  text_3={info.text_3}
+                  isAdmin={isAdmin}
+                  onEdit={handleEditInfo}
+                  onDelete={handleDeleteInfo}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+
+        <GeneralInformationDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          informationId={selectedInfoId}
+          onSuccess={fetchGeneralInformation}
+        />
 
         <footer className="mt-12 text-center text-sm text-muted-foreground">
           {language === 'ar' ? 'تصميم شركة ' : language === 'he' ? 'מופעל על ידי ' : 'Powered by '}
