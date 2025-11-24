@@ -184,6 +184,39 @@ export type Database = {
           },
         ]
       }
+      general_information: {
+        Row: {
+          created_at: string | null
+          display_order: number | null
+          id: string
+          text_1: string | null
+          text_2: string | null
+          text_3: string | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          display_order?: number | null
+          id?: string
+          text_1?: string | null
+          text_2?: string | null
+          text_3?: string | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          display_order?: number | null
+          id?: string
+          text_1?: string | null
+          text_2?: string | null
+          text_3?: string | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       payments: {
         Row: {
           amount: number
