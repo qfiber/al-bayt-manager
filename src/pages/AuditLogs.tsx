@@ -280,19 +280,27 @@ const AuditLogs = () => {
               <ScrollArea className="max-h-[60vh]">
                 <div className="space-y-4">
                   <div>
-                    <h4 className="font-semibold mb-2">{t('timestamp')}</h4>
-                    <p className="text-sm font-mono">
+                    <h4 className={`font-semibold mb-2 ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>
+                      {t('timestamp')}
+                    </h4>
+                    <p className={`text-sm font-mono ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>
                       {format(new Date(selectedLog.created_at), 'PPpp')}
                     </p>
                   </div>
                   
                   <div>
-                    <h4 className="font-semibold mb-2">{t('user')}</h4>
-                    <p className="text-sm">{selectedLog.user_email || t('system')}</p>
+                    <h4 className={`font-semibold mb-2 ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>
+                      {t('user')}
+                    </h4>
+                    <p className={`text-sm ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>
+                      {selectedLog.user_email || t('system')}
+                    </p>
                   </div>
 
                   <div>
-                    <h4 className="font-semibold mb-2">{t('actions')}</h4>
+                    <h4 className={`font-semibold mb-2 ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>
+                      {t('actions')}
+                    </h4>
                     <Badge className={getActionColor(selectedLog.action_type)}>
                       {selectedLog.action_type}
                     </Badge>
@@ -300,29 +308,43 @@ const AuditLogs = () => {
 
                   {selectedLog.table_name && (
                     <div>
-                      <h4 className="font-semibold mb-2">{t('table')}</h4>
-                      <code className="text-sm">{selectedLog.table_name}</code>
+                      <h4 className={`font-semibold mb-2 ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>
+                        {t('table')}
+                      </h4>
+                      <code className={`text-sm ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>
+                        {selectedLog.table_name}
+                      </code>
                     </div>
                   )}
 
                   {selectedLog.record_id && (
                     <div>
-                      <h4 className="font-semibold mb-2">{t('recordId')}</h4>
-                      <code className="text-sm font-mono">{selectedLog.record_id}</code>
+                      <h4 className={`font-semibold mb-2 ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>
+                        {t('recordId')}
+                      </h4>
+                      <code className={`text-sm font-mono ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>
+                        {selectedLog.record_id}
+                      </code>
                     </div>
                   )}
 
                   {selectedLog.ip_address && (
                     <div>
-                      <h4 className="font-semibold mb-2">{t('ipAddress')}</h4>
-                      <code className="text-sm font-mono">{selectedLog.ip_address}</code>
+                      <h4 className={`font-semibold mb-2 ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>
+                        {t('ipAddress')}
+                      </h4>
+                      <code className={`text-sm font-mono ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>
+                        {selectedLog.ip_address}
+                      </code>
                     </div>
                   )}
 
                   {selectedLog.user_agent && (
                     <div>
-                      <h4 className="font-semibold mb-2">{t('userAgent')}</h4>
-                      <p className="text-sm text-muted-foreground break-all">
+                      <h4 className={`font-semibold mb-2 ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>
+                        {t('userAgent')}
+                      </h4>
+                      <p className={`text-sm text-muted-foreground break-all ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>
                         {selectedLog.user_agent}
                       </p>
                     </div>
@@ -330,8 +352,10 @@ const AuditLogs = () => {
 
                   {selectedLog.action_details && (
                     <div>
-                      <h4 className="font-semibold mb-2">{t('actionDetails')}</h4>
-                      <pre className="text-xs bg-muted p-4 rounded-lg overflow-auto">
+                      <h4 className={`font-semibold mb-2 ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>
+                        {t('actionDetails')}
+                      </h4>
+                      <pre className="text-xs bg-muted p-4 rounded-lg overflow-auto text-left" dir="ltr">
                         {JSON.stringify(selectedLog.action_details, null, 2)}
                       </pre>
                     </div>
