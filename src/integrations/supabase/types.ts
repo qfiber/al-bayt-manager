@@ -94,6 +94,45 @@ export type Database = {
         }
         Relationships: []
       }
+      audit_logs: {
+        Row: {
+          action_details: Json | null
+          action_type: Database["public"]["Enums"]["audit_action_type"]
+          created_at: string
+          id: string
+          ip_address: string | null
+          record_id: string | null
+          table_name: string | null
+          user_agent: string | null
+          user_email: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action_details?: Json | null
+          action_type: Database["public"]["Enums"]["audit_action_type"]
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          record_id?: string | null
+          table_name?: string | null
+          user_agent?: string | null
+          user_email?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action_details?: Json | null
+          action_type?: Database["public"]["Enums"]["audit_action_type"]
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          record_id?: string | null
+          table_name?: string | null
+          user_agent?: string | null
+          user_email?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       buildings: {
         Row: {
           address: string
@@ -379,6 +418,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      cleanup_old_audit_logs: { Args: never; Returns: undefined }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -386,9 +426,31 @@ export type Database = {
         }
         Returns: boolean
       }
+      insert_audit_log: {
+        Args: {
+          p_action_details: Json
+          p_action_type: Database["public"]["Enums"]["audit_action_type"]
+          p_record_id: string
+          p_table_name: string
+          p_user_email: string
+          p_user_id: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "admin" | "user" | "moderator"
+      audit_action_type:
+        | "login"
+        | "logout"
+        | "signup"
+        | "create"
+        | "update"
+        | "delete"
+        | "role_change"
+        | "password_change"
+        | "api_key_created"
+        | "api_key_deleted"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -517,6 +579,18 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "user", "moderator"],
+      audit_action_type: [
+        "login",
+        "logout",
+        "signup",
+        "create",
+        "update",
+        "delete",
+        "role_change",
+        "password_change",
+        "api_key_created",
+        "api_key_deleted",
+      ],
     },
   },
 } as const

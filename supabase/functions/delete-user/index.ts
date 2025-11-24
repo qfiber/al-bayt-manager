@@ -106,6 +106,18 @@ serve(async (req) => {
 
     console.log('User deletion complete:', userId);
 
+    // Log audit event
+    await supabaseAdmin.rpc('insert_audit_log', {
+      p_user_id: user.id,
+      p_user_email: user.email,
+      p_action_type: 'delete',
+      p_table_name: 'profiles',
+      p_record_id: userId,
+      p_action_details: {
+        deleted_user_id: userId
+      }
+    });
+
     return new Response(
       JSON.stringify({
         success: true,
