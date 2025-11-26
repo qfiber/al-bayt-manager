@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Users, Pencil, Trash2, UserPlus, Home, Key } from 'lucide-react';
+import { Users, Pencil, Trash2, UserPlus, Key } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 interface UserProfile {
@@ -21,7 +21,6 @@ interface UserProfile {
   phone: string | null;
   email?: string;
   role?: string;
-  apartments?: string[];
 }
 
 interface Apartment {
@@ -46,17 +45,13 @@ const UserManagement = () => {
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
-  const [assigningUser, setAssigningUser] = useState<UserProfile | null>(null);
   const [formData, setFormData] = useState<{ name: string; phone: string; role: 'admin' | 'moderator' | 'user' }>({ name: '', phone: '', role: 'user' });
   const [createFormData, setCreateFormData] = useState({ email: '', password: '', name: '', phone: '', role: 'user' as 'admin' | 'moderator' | 'user' });
-  const [selectedApartments, setSelectedApartments] = useState<string[]>([]);
   const [isCreating, setIsCreating] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [deletingUser, setDeletingUser] = useState<UserProfile | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [apartmentAssignments, setApartmentAssignments] = useState<Map<string, { userId: string; userName: string }>>(new Map());
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
   const [changingPasswordUser, setChangingPasswordUser] = useState<UserProfile | null>(null);
   const [passwordFormData, setPasswordFormData] = useState({ adminPassword: '', newPassword: '', confirmPassword: '' });
@@ -146,12 +141,10 @@ const UserManagement = () => {
     // Combine all data
     const usersWithDetails = profiles?.map(profile => {
       const userRole = roles?.find(r => r.user_id === profile.id);
-      const userApts = userApartments?.filter(ua => ua.user_id === profile.id).map(ua => ua.apartment_id) || [];
       
       return {
         ...profile,
         role: userRole?.role || 'user',
-        apartments: userApts,
       };
     }) || [];
 
@@ -166,46 +159,6 @@ const UserManagement = () => {
       role: (userProfile.role || 'user') as 'admin' | 'user',
     });
     setIsDialogOpen(true);
-  };
-
-  const handleAssignApartments = async (userProfile: UserProfile) => {
-    setAssigningUser(userProfile);
-    setSelectedApartments(userProfile.apartments || []);
-    
-    // Fetch all apartment assignments
-    const { data: allAssignments, error: assignmentsError } = await supabase
-      .from('user_apartments')
-      .select('apartment_id, user_id');
-
-    if (assignmentsError) {
-      toast({ title: 'Error', description: assignmentsError.message, variant: 'destructive' });
-      return;
-    }
-
-    // Fetch all profiles
-    const { data: allProfiles, error: profilesError } = await supabase
-      .from('profiles')
-      .select('id, name');
-
-    if (profilesError) {
-      toast({ title: 'Error', description: profilesError.message, variant: 'destructive' });
-      return;
-    }
-
-    // Create a map of apartment_id -> { userId, userName }
-    const assignmentMap = new Map<string, { userId: string; userName: string }>();
-    allAssignments?.forEach((assignment) => {
-      const profile = allProfiles?.find(p => p.id === assignment.user_id);
-      if (profile) {
-        assignmentMap.set(assignment.apartment_id, {
-          userId: assignment.user_id,
-          userName: profile.name,
-        });
-      }
-    });
-    
-    setApartmentAssignments(assignmentMap);
-    setIsAssignDialogOpen(true);
   };
 
   const handleSaveUser = async () => {
@@ -291,59 +244,6 @@ const UserManagement = () => {
     } finally {
       setIsCreating(false);
     }
-  };
-
-  const handleSaveApartments = async () => {
-    if (!assigningUser) return;
-
-    // Check for conflicts with other users
-    const conflicts: string[] = [];
-    selectedApartments.forEach(aptId => {
-      const assignment = apartmentAssignments.get(aptId);
-      if (assignment && assignment.userId !== assigningUser.id) {
-        const apt = apartments.find(a => a.id === aptId);
-        conflicts.push(`Apartment ${apt?.apartment_number} is assigned to ${assignment.userName}`);
-      }
-    });
-
-    if (conflicts.length > 0) {
-      toast({ 
-        title: 'Cannot assign apartments', 
-        description: conflicts.join(', '), 
-        variant: 'destructive' 
-      });
-      return;
-    }
-
-    // Delete existing assignments for this user
-    await supabase
-      .from('user_apartments')
-      .delete()
-      .eq('user_id', assigningUser.id);
-
-    // Insert new assignments
-    if (selectedApartments.length > 0) {
-      const assignments = selectedApartments.map(apartmentId => ({
-        user_id: assigningUser.id,
-        apartment_id: apartmentId,
-      }));
-
-      const { error } = await supabase
-        .from('user_apartments')
-        .insert(assignments);
-
-      if (error) {
-        toast({ title: 'Error', description: error.message, variant: 'destructive' });
-        return;
-      }
-    }
-
-    toast({ title: 'Success', description: 'Apartment assignments updated successfully' });
-    fetchUsers();
-    setIsAssignDialogOpen(false);
-    setAssigningUser(null);
-    setSelectedApartments([]);
-    setApartmentAssignments(new Map());
   };
 
   const resetForm = () => {
@@ -461,25 +361,6 @@ const UserManagement = () => {
     if (!apartment) return 'Unknown';
     const building = buildings.find(b => b.id === apartment.building_id);
     return `${apartment.apartment_number} - ${building?.name || 'Unknown'}`;
-  };
-
-  const toggleApartmentSelection = (apartmentId: string) => {
-    // Check if apartment is assigned to another user
-    const assignment = apartmentAssignments.get(apartmentId);
-    if (assignment && assignment.userId !== assigningUser?.id) {
-      toast({ 
-        title: 'Apartment unavailable', 
-        description: `This apartment is assigned to ${assignment.userName}`, 
-        variant: 'destructive' 
-      });
-      return;
-    }
-
-    setSelectedApartments(prev =>
-      prev.includes(apartmentId)
-        ? prev.filter(id => id !== apartmentId)
-        : [...prev, apartmentId]
-    );
   };
 
   const handleAssignOwner = async (userProfile: UserProfile) => {
@@ -626,14 +507,13 @@ const UserManagement = () => {
                   <TableHead className="text-right">{t('nameLabel')}</TableHead>
                   <TableHead className="text-right">{t('phoneLabel')}</TableHead>
                   <TableHead className="text-right">{t('role')}</TableHead>
-                  <TableHead className="text-right">{t('assignedApartments')}</TableHead>
                   <TableHead className="text-right">{t('actions')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {users.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground">
+                    <TableCell colSpan={4} className="text-center text-muted-foreground">
                       {t('noUsersFound')}
                     </TableCell>
                   </TableRow>
@@ -646,24 +526,6 @@ const UserManagement = () => {
                         <Badge variant={userProfile.role === 'admin' ? 'default' : userProfile.role === 'moderator' ? 'outline' : 'secondary'}>
                           {t(userProfile.role as 'admin' | 'moderator' | 'user')}
                         </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {userProfile.apartments && userProfile.apartments.length > 0 ? (
-                          <div className="flex flex-wrap gap-1 justify-end">
-                            {userProfile.apartments.slice(0, 2).map(aptId => (
-                              <Badge key={aptId} variant="outline" className="text-xs">
-                                {apartments.find(a => a.id === aptId)?.apartment_number || t('unknown')}
-                              </Badge>
-                            ))}
-                            {userProfile.apartments.length > 2 && (
-                              <Badge variant="outline" className="text-xs">
-                                {t('moreApartments').replace('{count}', String(userProfile.apartments.length - 2))}
-                              </Badge>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground text-sm">{t('noApartments')}</span>
-                        )}
                       </TableCell>
                        <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
@@ -682,14 +544,6 @@ const UserManagement = () => {
                             title={t('changePassword')}
                           >
                             <Key className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            onClick={() => handleAssignApartments(userProfile)}
-                            title={t('assignApartmentsTitle')}
-                          >
-                            <Home className="w-4 h-4" />
                           </Button>
                           <Button
                             size="sm"
@@ -839,77 +693,6 @@ const UserManagement = () => {
                   {isCreating ? t('creating') : t('createUser')}
                 </Button>
                 <Button variant="outline" onClick={resetCreateForm} disabled={isCreating}>
-                  {t('cancel')}
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        {/* Assign Apartments Dialog */}
-        <Dialog open={isAssignDialogOpen} onOpenChange={setIsAssignDialogOpen}>
-          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>
-                {t('assignApartmentsTitle')} - {assigningUser?.name}
-              </DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                {buildings.map(building => {
-                  const buildingApartments = apartments.filter(a => a.building_id === building.id);
-                  if (buildingApartments.length === 0) return null;
-
-                  return (
-                    <div key={building.id} className="space-y-2">
-                      <h3 className="font-semibold text-sm">{building.name}</h3>
-                      <div className="grid grid-cols-3 gap-2 pl-4">
-                        {buildingApartments.map(apartment => {
-                          const assignment = apartmentAssignments.get(apartment.id);
-                          const isAssignedToOther = assignment && assignment.userId !== assigningUser?.id;
-                          const isSelected = selectedApartments.includes(apartment.id);
-                          
-                          return (
-                            <div
-                              key={apartment.id}
-                              onClick={() => !isAssignedToOther && toggleApartmentSelection(apartment.id)}
-                              className={`
-                                p-2 rounded border text-sm text-center transition-colors
-                                ${isAssignedToOther 
-                                  ? 'bg-muted text-muted-foreground border-border cursor-not-allowed opacity-50' 
-                                  : 'cursor-pointer'
-                                }
-                                ${isSelected && !isAssignedToOther
-                                  ? 'bg-primary text-primary-foreground border-primary'
-                                  : !isAssignedToOther && 'bg-background hover:bg-accent border-border'
-                                }
-                              `}
-                              title={isAssignedToOther ? `Assigned to ${assignment.userName}` : ''}
-                            >
-                              <div>{apartment.apartment_number}</div>
-                              {isAssignedToOther && (
-                                <div className="text-xs mt-1">({assignment.userName})</div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="flex gap-2">
-                <Button onClick={handleSaveApartments} className="flex-1">
-                  {t('saveAssignments')}
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setIsAssignDialogOpen(false);
-                    setAssigningUser(null);
-                    setSelectedApartments([]);
-                  }}
-                >
                   {t('cancel')}
                 </Button>
               </div>
