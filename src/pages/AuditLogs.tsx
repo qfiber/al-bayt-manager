@@ -278,7 +278,7 @@ const AuditLogs = () => {
             </DialogHeader>
             {selectedLog && (
               <ScrollArea className="max-h-[60vh]">
-                <div className="space-y-4">
+                <div className="space-y-4 pr-4">
                   <div>
                     <h4 className={`font-semibold mb-2 ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>
                       {t('timestamp')}
