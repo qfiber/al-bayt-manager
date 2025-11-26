@@ -276,6 +276,42 @@ export type Database = {
         }
         Relationships: []
       }
+      moderator_buildings: {
+        Row: {
+          building_id: string
+          created_at: string | null
+          id: string
+          user_id: string
+        }
+        Insert: {
+          building_id: string
+          created_at?: string | null
+          id?: string
+          user_id: string
+        }
+        Update: {
+          building_id?: string
+          created_at?: string | null
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "moderator_buildings_building_id_fkey"
+            columns: ["building_id"]
+            isOneToOne: false
+            referencedRelation: "buildings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "moderator_buildings_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payments: {
         Row: {
           amount: number
@@ -456,6 +492,10 @@ export type Database = {
           p_user_id: string
         }
         Returns: undefined
+      }
+      is_moderator_of_building: {
+        Args: { _building_id: string; _user_id: string }
+        Returns: boolean
       }
     }
     Enums: {
