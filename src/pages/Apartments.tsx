@@ -22,6 +22,8 @@ interface Apartment {
   subscription_amount: number;
   subscription_status: string;
   credit: number;
+  owner_id: string | null;
+  beneficiary_id: string | null;
 }
 
 interface Building {
@@ -35,12 +37,13 @@ interface Settings {
 
 const Apartments = () => {
   const { user, isAdmin, loading } = useAuth();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [apartments, setApartments] = useState<Apartment[]>([]);
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
+  const [profiles, setProfiles] = useState<{ id: string; name: string }[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingApartment, setEditingApartment] = useState<Apartment | null>(null);
   const [formData, setFormData] = useState({
@@ -65,6 +68,7 @@ const Apartments = () => {
       fetchSettings();
       fetchBuildings();
       fetchApartments();
+      fetchProfiles();
     }
   }, [user, isAdmin]);
 
@@ -146,6 +150,19 @@ const Apartments = () => {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
     } else {
       setApartments(data || []);
+    }
+  };
+
+  const fetchProfiles = async () => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, name')
+      .order('name');
+
+    if (error) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } else {
+      setProfiles(data || []);
     }
   };
 
@@ -258,6 +275,11 @@ const Apartments = () => {
 
   const getBuildingName = (buildingId: string) => {
     return buildings.find(b => b.id === buildingId)?.name || t('unknown');
+  };
+
+  const getProfileName = (profileId: string | null) => {
+    if (!profileId) return '-';
+    return profiles.find(p => p.id === profileId)?.name || t('unknown');
   };
 
   if (loading) {
@@ -396,6 +418,7 @@ const Apartments = () => {
                   <TableHead className="text-right">{t('apartmentHash')}</TableHead>
                   <TableHead className="text-right">{t('building')}</TableHead>
                   <TableHead className="text-right">{t('status')}</TableHead>
+                  <TableHead className="text-right">{t('owner')} / {t('beneficiary')}</TableHead>
                   <TableHead className="text-right">{t('monthlySubscription')}</TableHead>
                   <TableHead className="text-right">{t('subscriptionStatus')}</TableHead>
                   <TableHead className="text-right">{t('credit')}</TableHead>
@@ -405,7 +428,7 @@ const Apartments = () => {
               <TableBody>
                 {apartments.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center text-muted-foreground">
+                    <TableCell colSpan={8} className="text-center text-muted-foreground">
                       {t('noApartmentsFound')}
                     </TableCell>
                   </TableRow>
@@ -418,6 +441,12 @@ const Apartments = () => {
                         <span className={`px-2 py-1 rounded text-xs ${apartment.status === 'vacant' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
                           {t(apartment.status as 'vacant' | 'occupied')}
                         </span>
+                      </TableCell>
+                      <TableCell className={`text-right ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>
+                        <div className="text-sm">
+                          <div>{t('owner')}: {getProfileName(apartment.owner_id)}</div>
+                          <div className="text-muted-foreground">{t('beneficiary')}: {getProfileName(apartment.beneficiary_id)}</div>
+                        </div>
                       </TableCell>
                       <TableCell className="text-right">₪{apartment.subscription_amount.toFixed(2)}</TableCell>
                       <TableCell className="text-right">
