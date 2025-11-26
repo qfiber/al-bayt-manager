@@ -61,6 +61,13 @@ const UserManagement = () => {
   const [changingPasswordUser, setChangingPasswordUser] = useState<UserProfile | null>(null);
   const [passwordFormData, setPasswordFormData] = useState({ adminPassword: '', newPassword: '', confirmPassword: '' });
   const [isChangingPassword, setIsChangingPassword] = useState(false);
+  
+  const [isOwnerDialogOpen, setIsOwnerDialogOpen] = useState(false);
+  const [isBeneficiaryDialogOpen, setIsBeneficiaryDialogOpen] = useState(false);
+  const [assigningOwnerUser, setAssigningOwnerUser] = useState<UserProfile | null>(null);
+  const [assigningBeneficiaryUser, setAssigningBeneficiaryUser] = useState<UserProfile | null>(null);
+  const [selectedOwnerApartments, setSelectedOwnerApartments] = useState<string[]>([]);
+  const [selectedBeneficiaryApartments, setSelectedBeneficiaryApartments] = useState<string[]>([]);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -475,6 +482,114 @@ const UserManagement = () => {
     );
   };
 
+  const handleAssignOwner = async (userProfile: UserProfile) => {
+    setAssigningOwnerUser(userProfile);
+    
+    // Fetch apartments where this user is owner
+    const { data: ownedApartments, error } = await supabase
+      .from('apartments')
+      .select('id')
+      .eq('owner_id', userProfile.id);
+
+    if (error) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      return;
+    }
+
+    setSelectedOwnerApartments(ownedApartments?.map(a => a.id) || []);
+    setIsOwnerDialogOpen(true);
+  };
+
+  const handleAssignBeneficiary = async (userProfile: UserProfile) => {
+    setAssigningBeneficiaryUser(userProfile);
+    
+    // Fetch apartments where this user is beneficiary
+    const { data: beneficiaryApartments, error } = await supabase
+      .from('apartments')
+      .select('id')
+      .eq('beneficiary_id', userProfile.id);
+
+    if (error) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      return;
+    }
+
+    setSelectedBeneficiaryApartments(beneficiaryApartments?.map(a => a.id) || []);
+    setIsBeneficiaryDialogOpen(true);
+  };
+
+  const handleSaveOwnerAssignments = async () => {
+    if (!assigningOwnerUser) return;
+
+    // First, remove this user as owner from all apartments
+    await supabase
+      .from('apartments')
+      .update({ owner_id: null })
+      .eq('owner_id', assigningOwnerUser.id);
+
+    // Then, set this user as owner for selected apartments
+    if (selectedOwnerApartments.length > 0) {
+      const { error } = await supabase
+        .from('apartments')
+        .update({ owner_id: assigningOwnerUser.id })
+        .in('id', selectedOwnerApartments);
+
+      if (error) {
+        toast({ title: 'Error', description: error.message, variant: 'destructive' });
+        return;
+      }
+    }
+
+    toast({ title: 'Success', description: 'Owner assignments updated successfully' });
+    setIsOwnerDialogOpen(false);
+    setAssigningOwnerUser(null);
+    setSelectedOwnerApartments([]);
+  };
+
+  const handleSaveBeneficiaryAssignments = async () => {
+    if (!assigningBeneficiaryUser) return;
+
+    // First, remove this user as beneficiary from all apartments
+    await supabase
+      .from('apartments')
+      .update({ beneficiary_id: null })
+      .eq('beneficiary_id', assigningBeneficiaryUser.id);
+
+    // Then, set this user as beneficiary for selected apartments
+    if (selectedBeneficiaryApartments.length > 0) {
+      const { error } = await supabase
+        .from('apartments')
+        .update({ beneficiary_id: assigningBeneficiaryUser.id })
+        .in('id', selectedBeneficiaryApartments);
+
+      if (error) {
+        toast({ title: 'Error', description: error.message, variant: 'destructive' });
+        return;
+      }
+    }
+
+    toast({ title: 'Success', description: 'Beneficiary assignments updated successfully' });
+    setIsBeneficiaryDialogOpen(false);
+    setAssigningBeneficiaryUser(null);
+    setSelectedBeneficiaryApartments([]);
+  };
+
+  const toggleOwnerApartmentSelection = (apartmentId: string) => {
+    setSelectedOwnerApartments(prev =>
+      prev.includes(apartmentId)
+        ? prev.filter(id => id !== apartmentId)
+        : [...prev, apartmentId]
+    );
+  };
+
+  const toggleBeneficiaryApartmentSelection = (apartmentId: string) => {
+    setSelectedBeneficiaryApartments(prev =>
+      prev.includes(apartmentId)
+        ? prev.filter(id => id !== apartmentId)
+        : [...prev, apartmentId]
+    );
+  };
+
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center">{t('loading')}</div>;
   }
@@ -556,6 +671,7 @@ const UserManagement = () => {
                             size="sm"
                             variant="outline"
                             onClick={() => handleEdit(userProfile)}
+                            title={t('editUser')}
                           >
                             <Pencil className="w-4 h-4" />
                           </Button>
@@ -563,6 +679,7 @@ const UserManagement = () => {
                             size="sm"
                             variant="outline"
                             onClick={() => handleChangePassword(userProfile)}
+                            title={t('changePassword')}
                           >
                             <Key className="w-4 h-4" />
                           </Button>
@@ -570,14 +687,32 @@ const UserManagement = () => {
                             size="sm"
                             variant="secondary"
                             onClick={() => handleAssignApartments(userProfile)}
+                            title={t('assignApartmentsTitle')}
                           >
                             <Home className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => handleAssignOwner(userProfile)}
+                            title={t('assignAsOwner')}
+                          >
+                            👤
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => handleAssignBeneficiary(userProfile)}
+                            title={t('assignAsBeneficiary')}
+                          >
+                            ⭐
                           </Button>
                           <Button
                             size="sm"
                             variant="destructive"
                             onClick={() => confirmDeleteUser(userProfile)}
                             disabled={userProfile.id === user?.id}
+                            title={t('deleteUser')}
                           >
                             <Trash2 className="w-4 h-4" />
                           </Button>
@@ -858,6 +993,130 @@ const UserManagement = () => {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Assign as Owner Dialog */}
+        <Dialog open={isOwnerDialogOpen} onOpenChange={setIsOwnerDialogOpen}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>
+                {t('assignAsOwner')} - {assigningOwnerUser?.name}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">{t('selectApartmentsAsOwner')}</p>
+              <div className="space-y-2">
+                {buildings.map(building => {
+                  const buildingApartments = apartments.filter(a => a.building_id === building.id);
+                  if (buildingApartments.length === 0) return null;
+
+                  return (
+                    <div key={building.id} className="space-y-2">
+                      <h3 className="font-semibold text-sm">{building.name}</h3>
+                      <div className="grid grid-cols-3 gap-2 pl-4">
+                        {buildingApartments.map(apartment => {
+                          const isSelected = selectedOwnerApartments.includes(apartment.id);
+                          
+                          return (
+                            <div
+                              key={apartment.id}
+                              onClick={() => toggleOwnerApartmentSelection(apartment.id)}
+                              className={`
+                                p-2 rounded border text-sm text-center transition-colors cursor-pointer
+                                ${isSelected
+                                  ? 'bg-primary text-primary-foreground border-primary'
+                                  : 'bg-background hover:bg-accent border-border'
+                                }
+                              `}
+                            >
+                              <div>{apartment.apartment_number}</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="flex gap-2">
+                <Button onClick={handleSaveOwnerAssignments} className="flex-1">
+                  {t('saveAssignments')}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setIsOwnerDialogOpen(false);
+                    setAssigningOwnerUser(null);
+                    setSelectedOwnerApartments([]);
+                  }}
+                >
+                  {t('cancel')}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Assign as Beneficiary Dialog */}
+        <Dialog open={isBeneficiaryDialogOpen} onOpenChange={setIsBeneficiaryDialogOpen}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>
+                {t('assignAsBeneficiary')} - {assigningBeneficiaryUser?.name}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">{t('selectApartmentsAsBeneficiary')}</p>
+              <div className="space-y-2">
+                {buildings.map(building => {
+                  const buildingApartments = apartments.filter(a => a.building_id === building.id);
+                  if (buildingApartments.length === 0) return null;
+
+                  return (
+                    <div key={building.id} className="space-y-2">
+                      <h3 className="font-semibold text-sm">{building.name}</h3>
+                      <div className="grid grid-cols-3 gap-2 pl-4">
+                        {buildingApartments.map(apartment => {
+                          const isSelected = selectedBeneficiaryApartments.includes(apartment.id);
+                          
+                          return (
+                            <div
+                              key={apartment.id}
+                              onClick={() => toggleBeneficiaryApartmentSelection(apartment.id)}
+                              className={`
+                                p-2 rounded border text-sm text-center transition-colors cursor-pointer
+                                ${isSelected
+                                  ? 'bg-primary text-primary-foreground border-primary'
+                                  : 'bg-background hover:bg-accent border-border'
+                                }
+                              `}
+                            >
+                              <div>{apartment.apartment_number}</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="flex gap-2">
+                <Button onClick={handleSaveBeneficiaryAssignments} className="flex-1">
+                  {t('saveAssignments')}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setIsBeneficiaryDialogOpen(false);
+                    setAssigningBeneficiaryUser(null);
+                    setSelectedBeneficiaryApartments([]);
+                  }}
+                >
+                  {t('cancel')}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
