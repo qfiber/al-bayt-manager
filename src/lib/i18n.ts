@@ -75,6 +75,11 @@ export const translations = {
     selectApartmentsAsBeneficiary: "בחר דירות להקצאה כמוטב",
     ownerOf: "בעלים של",
     beneficiaryOf: "מוטב של",
+    assignBuildings: "הקצה מבנים",
+    assignBuildingsToModerator: "הקצה מבנים למפקח",
+    selectBuildingsForModerator: "בחר מבנים להקצאה למפקח",
+    assignedBuildings: "מבנים משויכים",
+    noBuildings: "אין מבנים",
 
     // Payments
     month: "חודש",
@@ -412,6 +417,11 @@ export const translations = {
     selectApartmentsAsBeneficiary: "اختر شقق للتعيين كمستفيد",
     ownerOf: "مالك",
     beneficiaryOf: "مستفيد من",
+    assignBuildings: "تعيين المباني",
+    assignBuildingsToModerator: "تعيين المباني للمشرف",
+    selectBuildingsForModerator: "اختر المباني للتعيين للمشرف",
+    assignedBuildings: "المباني المعينة",
+    noBuildings: "لا توجد مباني",
 
     // Payments
     month: "الشهر",
@@ -749,6 +759,11 @@ export const translations = {
     selectApartmentsAsBeneficiary: "Select apartments to assign as beneficiary",
     ownerOf: "Owner of",
     beneficiaryOf: "Beneficiary of",
+    assignBuildings: "Assign Buildings",
+    assignBuildingsToModerator: "Assign Buildings to Moderator",
+    selectBuildingsForModerator: "Select buildings to assign to moderator",
+    assignedBuildings: "Assigned Buildings",
+    noBuildings: "No buildings",
 
     // Payments
     month: "Month",

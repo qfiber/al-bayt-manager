@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Users, Pencil, Trash2, UserPlus, Key } from 'lucide-react';
+import { Users, Pencil, Trash2, UserPlus, Key, Building2 } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 interface UserProfile {
@@ -63,6 +63,11 @@ const UserManagement = () => {
   const [assigningBeneficiaryUser, setAssigningBeneficiaryUser] = useState<UserProfile | null>(null);
   const [selectedOwnerApartments, setSelectedOwnerApartments] = useState<string[]>([]);
   const [selectedBeneficiaryApartments, setSelectedBeneficiaryApartments] = useState<string[]>([]);
+  
+  const [isBuildingsDialogOpen, setIsBuildingsDialogOpen] = useState(false);
+  const [assigningBuildingsUser, setAssigningBuildingsUser] = useState<UserProfile | null>(null);
+  const [selectedBuildings, setSelectedBuildings] = useState<string[]>([]);
+  const [moderatorBuildings, setModeratorBuildings] = useState<Map<string, string[]>>(new Map());
 
   useEffect(() => {
     if (!loading && !user) {
@@ -149,6 +154,28 @@ const UserManagement = () => {
     }) || [];
 
     setUsers(usersWithDetails);
+    
+    // Fetch moderator building assignments
+    fetchModeratorBuildings();
+  };
+
+  const fetchModeratorBuildings = async () => {
+    const { data, error } = await supabase
+      .from('moderator_buildings')
+      .select('user_id, building_id');
+
+    if (error) {
+      console.error('Error fetching moderator buildings:', error);
+      return;
+    }
+
+    const buildingsMap = new Map<string, string[]>();
+    data?.forEach(mb => {
+      const existing = buildingsMap.get(mb.user_id) || [];
+      buildingsMap.set(mb.user_id, [...existing, mb.building_id]);
+    });
+    
+    setModeratorBuildings(buildingsMap);
   };
 
   const handleEdit = (userProfile: UserProfile) => {
@@ -471,6 +498,75 @@ const UserManagement = () => {
     );
   };
 
+  const handleAssignBuildings = async (userProfile: UserProfile) => {
+    // Only allow assigning buildings to moderators
+    if (userProfile.role !== 'moderator') {
+      toast({ 
+        title: 'Error', 
+        description: 'Buildings can only be assigned to moderators', 
+        variant: 'destructive' 
+      });
+      return;
+    }
+
+    setAssigningBuildingsUser(userProfile);
+    
+    // Fetch buildings assigned to this moderator
+    const { data: assignedBuildings, error } = await supabase
+      .from('moderator_buildings')
+      .select('building_id')
+      .eq('user_id', userProfile.id);
+
+    if (error) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      return;
+    }
+
+    setSelectedBuildings(assignedBuildings?.map(b => b.building_id) || []);
+    setIsBuildingsDialogOpen(true);
+  };
+
+  const handleSaveBuildingAssignments = async () => {
+    if (!assigningBuildingsUser) return;
+
+    // First, remove all existing building assignments for this moderator
+    await supabase
+      .from('moderator_buildings')
+      .delete()
+      .eq('user_id', assigningBuildingsUser.id);
+
+    // Then, add new building assignments
+    if (selectedBuildings.length > 0) {
+      const assignments = selectedBuildings.map(buildingId => ({
+        user_id: assigningBuildingsUser.id,
+        building_id: buildingId,
+      }));
+
+      const { error } = await supabase
+        .from('moderator_buildings')
+        .insert(assignments);
+
+      if (error) {
+        toast({ title: 'Error', description: error.message, variant: 'destructive' });
+        return;
+      }
+    }
+
+    toast({ title: 'Success', description: 'Building assignments updated successfully' });
+    fetchModeratorBuildings();
+    setIsBuildingsDialogOpen(false);
+    setAssigningBuildingsUser(null);
+    setSelectedBuildings([]);
+  };
+
+  const toggleBuildingSelection = (buildingId: string) => {
+    setSelectedBuildings(prev =>
+      prev.includes(buildingId)
+        ? prev.filter(id => id !== buildingId)
+        : [...prev, buildingId]
+    );
+  };
+
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center">{t('loading')}</div>;
   }
@@ -507,13 +603,14 @@ const UserManagement = () => {
                   <TableHead className="text-right">{t('nameLabel')}</TableHead>
                   <TableHead className="text-right">{t('phoneLabel')}</TableHead>
                   <TableHead className="text-right">{t('role')}</TableHead>
+                  <TableHead className="text-right">{t('assignedBuildings')}</TableHead>
                   <TableHead className="text-right">{t('actions')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {users.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center text-muted-foreground">
+                    <TableCell colSpan={5} className="text-center text-muted-foreground">
                       {t('noUsersFound')}
                     </TableCell>
                   </TableRow>
@@ -526,6 +623,28 @@ const UserManagement = () => {
                         <Badge variant={userProfile.role === 'admin' ? 'default' : userProfile.role === 'moderator' ? 'outline' : 'secondary'}>
                           {t(userProfile.role as 'admin' | 'moderator' | 'user')}
                         </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {userProfile.role === 'moderator' ? (
+                          moderatorBuildings.get(userProfile.id) && moderatorBuildings.get(userProfile.id)!.length > 0 ? (
+                            <div className="flex flex-wrap gap-1 justify-end">
+                              {moderatorBuildings.get(userProfile.id)!.slice(0, 2).map(buildingId => (
+                                <Badge key={buildingId} variant="outline" className="text-xs">
+                                  {buildings.find(b => b.id === buildingId)?.name || t('unknown')}
+                                </Badge>
+                              ))}
+                              {moderatorBuildings.get(userProfile.id)!.length > 2 && (
+                                <Badge variant="outline" className="text-xs">
+                                  +{moderatorBuildings.get(userProfile.id)!.length - 2}
+                                </Badge>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">{t('noBuildings')}</span>
+                          )
+                        ) : (
+                          <span className="text-muted-foreground text-sm">-</span>
+                        )}
                       </TableCell>
                        <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
@@ -545,6 +664,16 @@ const UserManagement = () => {
                           >
                             <Key className="w-4 h-4" />
                           </Button>
+                          {userProfile.role === 'moderator' && (
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => handleAssignBuildings(userProfile)}
+                              title={t('assignBuildings')}
+                            >
+                              <Building2 className="w-4 h-4" />
+                            </Button>
+                          )}
                           <Button
                             size="sm"
                             variant="secondary"
@@ -830,6 +959,62 @@ const UserManagement = () => {
                     setIsOwnerDialogOpen(false);
                     setAssigningOwnerUser(null);
                     setSelectedOwnerApartments([]);
+                  }}
+                >
+                  {t('cancel')}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Assign Buildings to Moderator Dialog */}
+        <Dialog open={isBuildingsDialogOpen} onOpenChange={setIsBuildingsDialogOpen}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>
+                {t('assignBuildingsToModerator')} - {assigningBuildingsUser?.name}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">{t('selectBuildingsForModerator')}</p>
+              <div className="space-y-2">
+                {buildings.length === 0 ? (
+                  <p className="text-center text-muted-foreground">{t('noBuildingsFound')}</p>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2">
+                    {buildings.map(building => {
+                      const isSelected = selectedBuildings.includes(building.id);
+                      
+                      return (
+                        <div
+                          key={building.id}
+                          onClick={() => toggleBuildingSelection(building.id)}
+                          className={`
+                            p-3 rounded border text-sm text-center transition-colors cursor-pointer
+                            ${isSelected
+                              ? 'bg-primary text-primary-foreground border-primary'
+                              : 'bg-background hover:bg-accent border-border'
+                            }
+                          `}
+                        >
+                          <div className="font-medium">{building.name}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <Button onClick={handleSaveBuildingAssignments} className="flex-1">
+                  {t('saveAssignments')}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setIsBuildingsDialogOpen(false);
+                    setAssigningBuildingsUser(null);
+                    setSelectedBuildings([]);
                   }}
                 >
                   {t('cancel')}
