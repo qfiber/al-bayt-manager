@@ -212,15 +212,15 @@ const AuditLogs = () => {
           </CardHeader>
 
           <CardContent>
-            <div className="rounded-md border">
+            <div className="rounded-md border overflow-x-auto">
               <Table>
-                <TableHeader>
+                <TableHeader className="bg-muted/50">
                   <TableRow>
-                    <TableHead className={language === 'ar' || language === 'he' ? 'text-right' : ''}>{t('timestamp')}</TableHead>
-                    <TableHead className={language === 'ar' || language === 'he' ? 'text-right' : ''}>{t('user')}</TableHead>
-                    <TableHead className={language === 'ar' || language === 'he' ? 'text-right' : ''}>Action Type</TableHead>
-                    <TableHead className={language === 'ar' || language === 'he' ? 'text-right' : ''}>{t('table')}</TableHead>
-                    <TableHead className={language === 'ar' || language === 'he' ? 'text-right' : ''}>{t('actions')}</TableHead>
+                    <TableHead className={`whitespace-nowrap ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>{t('timestamp')}</TableHead>
+                    <TableHead className={`whitespace-nowrap ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>{t('user')}</TableHead>
+                    <TableHead className={`whitespace-nowrap ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>Action Type</TableHead>
+                    <TableHead className={`whitespace-nowrap ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>{t('table')}</TableHead>
+                    <TableHead className={`whitespace-nowrap ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>{t('actions')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
