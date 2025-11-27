@@ -2,3 +2,12 @@ project_id = "fduusrbjqdrfuumtisrn"
 
 [functions.api]
 verify_jwt = false
+
+[functions.delete-user]
+verify_jwt = false
+
+[functions.create-user]
+verify_jwt = false
+
+[functions.change-user-password]
+verify_jwt = false
