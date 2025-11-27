@@ -236,6 +236,7 @@ export const translations = {
     captchaHelpText: "דורש אימות CAPTCHA בכניסה והרשמה",
     captchaRequired: "נדרש אימות CAPTCHA",
     captchaVerificationFailed: "אימות CAPTCHA נכשל. אנא נסה שוב.",
+    captchaVerification: "אימות CAPTCHA",
 
     // Two-Factor Authentication
     twoFactorAuth: "אימות דו-שלבי",
@@ -588,6 +589,7 @@ export const translations = {
     captchaHelpText: "يتطلب التحقق من CAPTCHA عند تسجيل الدخول والتسجيل",
     captchaRequired: "التحقق من CAPTCHA مطلوب",
     captchaVerificationFailed: "فشل التحقق من CAPTCHA. يرجى المحاولة مرة أخرى.",
+    captchaVerification: "التحقق من CAPTCHA",
 
     // Two-Factor Authentication
     twoFactorAuth: "المصادقة الثنائية",
@@ -941,6 +943,7 @@ export const translations = {
     captchaHelpText: "Require CAPTCHA verification on login and registration",
     captchaRequired: "CAPTCHA verification is required",
     captchaVerificationFailed: "CAPTCHA verification failed. Please try again.",
+    captchaVerification: "CAPTCHA Verification",
 
     // Two-Factor Authentication
     twoFactorAuth: "Two-Factor Authentication",
