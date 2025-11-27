@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.change-user-password]
 verify_jwt = false
+
+[functions.verify-turnstile]
+verify_jwt = false

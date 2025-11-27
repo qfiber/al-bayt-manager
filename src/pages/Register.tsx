@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Building } from 'lucide-react';
+import { Turnstile } from '@marsidev/react-turnstile';
 
 
 const Register = () => {
@@ -18,37 +19,52 @@ const Register = () => {
   const [phone, setPhone] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [turnstileEnabled, setTurnstileEnabled] = useState(false);
+  const [turnstileSiteKey, setTurnstileSiteKey] = useState<string | null>(null);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const { signUp, user, loading } = useAuth();
   const { t, language } = useLanguage();
   const navigate = useNavigate();
   const { toast } = useToast();
 
   useEffect(() => {
-    const fetchSettings = async () => {
+    const fetchBranding = async () => {
       const { data, error } = await supabase
-        .from('settings')
-        .select('logo_url')
+        .from('public_branding')
+        .select('logo_url, turnstile_enabled, turnstile_site_key')
         .maybeSingle();
       
       if (error) {
-        console.log('Settings fetch error:', error);
+        console.log('Branding fetch error:', error);
         return;
       }
       
       if (data?.logo_url) {
         setLogoUrl(data.logo_url);
       }
+      
+      if (data?.turnstile_enabled && data?.turnstile_site_key) {
+        setTurnstileEnabled(true);
+        setTurnstileSiteKey(data.turnstile_site_key);
+      }
     };
     
-    fetchSettings();
+    fetchBranding();
     
     const channel = supabase
-      .channel('settings-changes')
+      .channel('branding-changes')
       .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'settings' },
+        { event: '*', schema: 'public', table: 'public_branding' },
         (payload) => {
-          if (payload.new && typeof payload.new === 'object' && 'logo_url' in payload.new) {
-            setLogoUrl(payload.new.logo_url as string);
+          if (payload.new && typeof payload.new === 'object') {
+            const newData = payload.new as any;
+            if ('logo_url' in newData) {
+              setLogoUrl(newData.logo_url as string);
+            }
+            if ('turnstile_enabled' in newData && 'turnstile_site_key' in newData) {
+              setTurnstileEnabled(newData.turnstile_enabled || false);
+              setTurnstileSiteKey(newData.turnstile_site_key || null);
+            }
           }
         }
       )
@@ -86,9 +102,35 @@ const Register = () => {
       return;
     }
 
+    // Verify CAPTCHA if enabled
+    if (turnstileEnabled && !turnstileToken) {
+      toast({
+        title: t('error'),
+        description: t('captchaRequired'),
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsLoading(true);
 
     try {
+      if (turnstileEnabled && turnstileToken) {
+        const { data: verifyData, error: verifyError } = await supabase.functions.invoke('verify-turnstile', {
+          body: { token: turnstileToken },
+        });
+
+        if (verifyError || !verifyData?.success) {
+          toast({
+            title: t('error'),
+            description: t('captchaVerificationFailed'),
+            variant: 'destructive',
+          });
+          setIsLoading(false);
+          setTurnstileToken(null);
+          return;
+        }
+      }
       const { error } = await signUp(email, password, name, phone);
 
       if (error) {
@@ -201,6 +243,17 @@ const Register = () => {
                 {t('passwordMinLength')}
               </p>
             </div>
+
+            {turnstileEnabled && turnstileSiteKey && (
+              <div className="flex justify-center">
+                <Turnstile
+                  siteKey={turnstileSiteKey}
+                  onSuccess={(token) => setTurnstileToken(token)}
+                  onError={() => setTurnstileToken(null)}
+                  onExpire={() => setTurnstileToken(null)}
+                />
+              </div>
+            )}
 
             <Button 
               type="submit" 
