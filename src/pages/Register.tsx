@@ -68,7 +68,7 @@ const Register = () => {
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!email || !password || !name) {
+    if (!email || !password || !name || !phone) {
       toast({
         title: t('error'),
         description: t('fillAllRequiredFields'),
@@ -177,9 +177,10 @@ const Register = () => {
               <Input
                 id="phone"
                 type="tel"
-                placeholder={t('phoneOptional')}
+                placeholder={t('phone')}
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
+                required
                 disabled={isLoading}
               />
             </div>
