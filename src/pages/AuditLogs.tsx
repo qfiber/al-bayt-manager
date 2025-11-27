@@ -140,12 +140,12 @@ const AuditLogs = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/10">
       <div className="container mx-auto p-6">
-        <div className="flex justify-between items-center mb-8">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8">
           <div>
             <h1 className="text-3xl font-bold">{t('auditLogs')}</h1>
             <p className="text-muted-foreground mt-1">{t('auditLogsDescription')}</p>
           </div>
-          <Button onClick={() => navigate('/dashboard')} variant="outline">
+          <Button onClick={() => navigate('/dashboard')} variant="outline" className="w-full sm:w-auto">
             {t('backToDashboard')}
           </Button>
         </div>

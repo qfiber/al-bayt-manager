@@ -226,12 +226,12 @@ const Reports = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/10">
       <div className="container mx-auto p-6">
-        <div className="flex justify-between items-center mb-8">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8">
           <div className="flex items-center gap-3">
             <FileText className="w-8 h-8 text-primary" />
             <h1 className="text-3xl font-bold">{t('reports')}</h1>
           </div>
-          <Button variant="outline" onClick={() => navigate('/dashboard')}>
+          <Button variant="outline" onClick={() => navigate('/dashboard')} className="w-full sm:w-auto">
             {t('backToDashboard')}
           </Button>
         </div>
