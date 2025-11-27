@@ -213,7 +213,7 @@ const AuditLogs = () => {
 
           <CardContent>
             <div className="rounded-md border overflow-x-auto">
-              <Table>
+              <Table className="min-w-[600px]">
                 <TableHeader className="bg-muted/50">
                   <TableRow>
                     <TableHead className={`whitespace-nowrap ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>{t('timestamp')}</TableHead>
