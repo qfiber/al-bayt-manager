@@ -301,13 +301,23 @@ const Auth = () => {
               </div>
 
               {turnstileEnabled && turnstileSiteKey && (
-                <div className="flex justify-center">
-                  <Turnstile
-                    siteKey={turnstileSiteKey}
-                    onSuccess={(token) => setTurnstileToken(token)}
-                    onError={() => setTurnstileToken(null)}
-                    onExpire={() => setTurnstileToken(null)}
-                  />
+                <div className="space-y-2">
+                  <Label>{t('captchaVerification')}</Label>
+                  <div 
+                    className="flex justify-center items-center p-4 border rounded-lg bg-muted/20"
+                    dir="ltr"
+                  >
+                    <Turnstile
+                      siteKey={turnstileSiteKey}
+                      onSuccess={(token) => setTurnstileToken(token)}
+                      onError={() => setTurnstileToken(null)}
+                      onExpire={() => setTurnstileToken(null)}
+                      options={{
+                        theme: 'light',
+                        size: 'normal',
+                      }}
+                    />
+                  </div>
                 </div>
               )}
 
