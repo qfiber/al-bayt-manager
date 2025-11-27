@@ -227,12 +227,12 @@ const Settings = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/10">
       <div className="container mx-auto p-6 max-w-4xl">
-        <div className="flex justify-between items-center mb-8">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8">
           <div className="flex items-center gap-3">
             <SettingsIcon className="w-8 h-8 text-primary" />
             <h1 className="text-3xl font-bold">{t('settings')}</h1>
           </div>
-          <Button variant="outline" onClick={() => navigate('/dashboard')}>
+          <Button variant="outline" onClick={() => navigate('/dashboard')} className="w-full sm:w-auto">
             {t('backToDashboard')}
           </Button>
         </div>
@@ -328,14 +328,14 @@ const Settings = () => {
                 />
                 {logoFile.preview && (
                   <div className="mt-2 border rounded-lg p-4 bg-muted/20 flex items-center justify-center">
-                    <img src={logoFile.preview} alt={t('logoPreview')} className="max-w-xs max-h-32 object-contain" />
+                    <img src={logoFile.preview} alt={t('logoPreview')} className="w-full max-w-[200px] sm:max-w-xs max-h-32 object-contain" />
                   </div>
                 )}
                 {!logoFile.preview && brandingLogoUrl && (
                   <div className="mt-2">
                     <Label className="text-muted-foreground">{t('currentLogo')}</Label>
                     <div className="mt-2 border rounded-lg p-4 bg-muted/20 flex items-center justify-center">
-                      <img src={brandingLogoUrl} alt={t('currentLogo')} className="max-w-xs max-h-32 object-contain" />
+                      <img src={brandingLogoUrl} alt={t('currentLogo')} className="w-full max-w-[200px] sm:max-w-xs max-h-32 object-contain" />
                     </div>
                   </div>
                 )}
