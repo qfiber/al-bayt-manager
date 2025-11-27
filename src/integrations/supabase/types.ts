@@ -377,6 +377,8 @@ export type Database = {
           created_at: string | null
           id: string
           logo_url: string | null
+          turnstile_enabled: boolean
+          turnstile_site_key: string | null
           updated_at: string | null
         }
         Insert: {
@@ -384,6 +386,8 @@ export type Database = {
           created_at?: string | null
           id?: string
           logo_url?: string | null
+          turnstile_enabled?: boolean
+          turnstile_site_key?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -391,6 +395,8 @@ export type Database = {
           created_at?: string | null
           id?: string
           logo_url?: string | null
+          turnstile_enabled?: boolean
+          turnstile_site_key?: string | null
           updated_at?: string | null
         }
         Relationships: []
@@ -402,6 +408,8 @@ export type Database = {
           logo_url: string | null
           monthly_fee: number
           system_language: string
+          turnstile_enabled: boolean
+          turnstile_site_key: string | null
           updated_at: string | null
         }
         Insert: {
@@ -410,6 +418,8 @@ export type Database = {
           logo_url?: string | null
           monthly_fee?: number
           system_language?: string
+          turnstile_enabled?: boolean
+          turnstile_site_key?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -418,6 +428,8 @@ export type Database = {
           logo_url?: string | null
           monthly_fee?: number
           system_language?: string
+          turnstile_enabled?: boolean
+          turnstile_site_key?: string | null
           updated_at?: string | null
         }
         Relationships: []

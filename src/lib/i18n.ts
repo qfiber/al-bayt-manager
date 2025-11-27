@@ -227,6 +227,16 @@ export const translations = {
     manage: "נהל",
     addExtraSecurityWithAuthApp: "הוסף שכבת אבטחה נוספת לחשבונך עם אימות באפליקציה",
 
+    // CAPTCHA Settings
+    captchaSettings: "הגדרות CAPTCHA",
+    captchaDescription: "הגן על הכניסה וההרשמה שלך באמצעות Cloudflare Turnstile CAPTCHA",
+    enableCaptcha: "הפעל CAPTCHA",
+    captchaSiteKey: "מפתח אתר Turnstile",
+    captchaSiteKeyHelp: "קבל את המפתח הציבורי שלך מלוח המחוונים של Cloudflare Turnstile",
+    captchaHelpText: "דורש אימות CAPTCHA בכניסה והרשמה",
+    captchaRequired: "נדרש אימות CAPTCHA",
+    captchaVerificationFailed: "אימות CAPTCHA נכשל. אנא נסה שוב.",
+
     // Two-Factor Authentication
     twoFactorAuth: "אימות דו-שלבי",
     twoFactorAuthCode: "קוד אימות דו-שלבי",
@@ -568,6 +578,16 @@ export const translations = {
     disabled: "معطل",
     manage: "إدارة",
     addExtraSecurityWithAuthApp: "أضف طبقة أمان إضافية لحسابك من خلال التحقق من تطبيق المصادقة",
+
+    // CAPTCHA Settings
+    captchaSettings: "إعدادات CAPTCHA",
+    captchaDescription: "احمِ صفحات تسجيل الدخول والتسجيل الخاصة بك باستخدام Cloudflare Turnstile CAPTCHA",
+    enableCaptcha: "تفعيل CAPTCHA",
+    captchaSiteKey: "مفتاح موقع Turnstile",
+    captchaSiteKeyHelp: "احصل على مفتاحك العام من لوحة تحكم Cloudflare Turnstile",
+    captchaHelpText: "يتطلب التحقق من CAPTCHA عند تسجيل الدخول والتسجيل",
+    captchaRequired: "التحقق من CAPTCHA مطلوب",
+    captchaVerificationFailed: "فشل التحقق من CAPTCHA. يرجى المحاولة مرة أخرى.",
 
     // Two-Factor Authentication
     twoFactorAuth: "المصادقة الثنائية",
@@ -911,6 +931,16 @@ export const translations = {
     disabled: "Disabled",
     manage: "Manage",
     addExtraSecurityWithAuthApp: "Add an extra layer of security to your account with authenticator app verification",
+
+    // CAPTCHA Settings
+    captchaSettings: "CAPTCHA Settings",
+    captchaDescription: "Protect your login and registration pages with Cloudflare Turnstile CAPTCHA",
+    enableCaptcha: "Enable CAPTCHA",
+    captchaSiteKey: "Turnstile Site Key",
+    captchaSiteKeyHelp: "Get your public site key from the Cloudflare Turnstile dashboard",
+    captchaHelpText: "Require CAPTCHA verification on login and registration",
+    captchaRequired: "CAPTCHA verification is required",
+    captchaVerificationFailed: "CAPTCHA verification failed. Please try again.",
 
     // Two-Factor Authentication
     twoFactorAuth: "Two-Factor Authentication",

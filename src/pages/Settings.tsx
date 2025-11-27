@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { Switch } from '@/components/ui/switch';
 import { Settings as SettingsIcon, Save, DollarSign, Globe, Upload, Shield } from 'lucide-react';
 
 interface SettingsData {
@@ -16,6 +17,8 @@ interface SettingsData {
   monthly_fee: number;
   system_language: string;
   logo_url: string | null;
+  turnstile_enabled: boolean;
+  turnstile_site_key: string | null;
 }
 
 interface LogoFile {
@@ -37,6 +40,8 @@ const Settings = () => {
   const [brandingLogoUrl, setBrandingLogoUrl] = useState<string | null>(null);
   const [has2FA, setHas2FA] = useState(false);
   const [checking2FA, setChecking2FA] = useState(true);
+  const [turnstileEnabled, setTurnstileEnabled] = useState(false);
+  const [turnstileSiteKey, setTurnstileSiteKey] = useState('');
 
   useEffect(() => {
     if (!loading && !user) {
@@ -89,6 +94,8 @@ const Settings = () => {
       setSettings(data);
       setMonthlyFee(data.monthly_fee.toString());
       setSystemLanguage(data.system_language);
+      setTurnstileEnabled(data.turnstile_enabled || false);
+      setTurnstileSiteKey(data.turnstile_site_key || '');
     } else {
       // Create initial settings if none exist
       const { data: newSettings, error: createError } = await supabase
@@ -163,10 +170,12 @@ const Settings = () => {
         logoUrl = await uploadLogo();
       }
 
-      // Update settings (monthly fee and language only)
+      // Update settings (monthly fee, language, and turnstile)
       const settingsUpdateData = {
         monthly_fee: parseFloat(monthlyFee),
         system_language: systemLanguage,
+        turnstile_enabled: turnstileEnabled,
+        turnstile_site_key: turnstileSiteKey || null,
       };
 
       const { error: settingsError } = await supabase
@@ -376,6 +385,48 @@ const Settings = () => {
                 >
                   {checking2FA ? t('loading') : t('manage')}
                 </Button>
+              </div>
+
+              {/* CAPTCHA Settings */}
+              <div className="border-t pt-4 mt-4">
+                <div className="space-y-4">
+                  <div>
+                    <Label className="text-base font-semibold">{t('captchaSettings')}</Label>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {t('captchaDescription')}
+                    </p>
+                  </div>
+                  
+                  <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/20">
+                    <div>
+                      <Label htmlFor="turnstile-enabled">{t('enableCaptcha')}</Label>
+                      <p className="text-sm text-muted-foreground">
+                        {t('captchaHelpText')}
+                      </p>
+                    </div>
+                    <Switch
+                      id="turnstile-enabled"
+                      checked={turnstileEnabled}
+                      onCheckedChange={setTurnstileEnabled}
+                    />
+                  </div>
+
+                  {turnstileEnabled && (
+                    <div className="space-y-2">
+                      <Label htmlFor="turnstile-site-key">{t('captchaSiteKey')}</Label>
+                      <Input
+                        id="turnstile-site-key"
+                        type="text"
+                        placeholder="0x4AAAAAAA..."
+                        value={turnstileSiteKey}
+                        onChange={(e) => setTurnstileSiteKey(e.target.value)}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        {t('captchaSiteKeyHelp')}
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
             </CardContent>
           </Card>
