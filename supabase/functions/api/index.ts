@@ -65,14 +65,129 @@ Deno.serve(async (req) => {
     // Route to different endpoints - all read-only
     switch (endpoint) {
       case 'apartments': {
-        const { data, error } = await supabase
-          .from('apartments')
-          .select('*, buildings(*)');
-        
-        if (error) throw error;
-        return new Response(JSON.stringify({ data }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
+        // Check if there's an ID in the path (e.g., /api/apartments/123)
+        const apartmentId = pathParts[pathParts.length - 2] === 'apartments' && pathParts.length > 2 
+          ? pathParts[pathParts.length - 1] 
+          : null;
+
+        if (apartmentId) {
+          // Single apartment endpoint
+          const { data: apartment, error: aptError } = await supabase
+            .from('apartments')
+            .select('*, buildings(*)')
+            .eq('id', apartmentId)
+            .single();
+          
+          if (aptError) throw aptError;
+
+          // Get user info (owner or beneficiary)
+          let userName = null;
+          let userPhone = null;
+          const userId = apartment.beneficiary_id || apartment.owner_id;
+          
+          if (userId) {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('name, phone')
+              .eq('id', userId)
+              .single();
+            
+            if (profile) {
+              userName = profile.name;
+              userPhone = profile.phone;
+            }
+          }
+
+          // Calculate months occupied and debt
+          let monthsOccupied = 0;
+          let debtDetails = [];
+          let totalDebt = 0;
+
+          if (apartment.occupancy_start) {
+            const startDate = new Date(apartment.occupancy_start);
+            const now = new Date();
+            
+            // Calculate months from start to now
+            monthsOccupied = (now.getFullYear() - startDate.getFullYear()) * 12 + 
+                            (now.getMonth() - startDate.getMonth()) + 1;
+
+            // Calculate debt per month
+            const totalOwed = monthsOccupied * apartment.subscription_amount;
+            totalDebt = totalOwed + apartment.credit; // credit is negative for debt
+
+            // Generate month-by-month debt details
+            for (let i = 0; i < monthsOccupied; i++) {
+              const monthDate = new Date(startDate.getFullYear(), startDate.getMonth() + i, 1);
+              const monthStr = `${String(monthDate.getMonth() + 1).padStart(2, '0')}/${monthDate.getFullYear()}`;
+              
+              // Check if this month is paid
+              const { data: payment } = await supabase
+                .from('payments')
+                .select('amount')
+                .eq('apartment_id', apartment.id)
+                .eq('month', monthStr)
+                .maybeSingle();
+
+              debtDetails.push({
+                month: monthStr,
+                amount_due: apartment.subscription_amount,
+                amount_paid: payment?.amount || 0,
+                balance: apartment.subscription_amount - (payment?.amount || 0)
+              });
+            }
+          }
+
+          return new Response(JSON.stringify({ 
+            data: {
+              ...apartment,
+              user_name: userName,
+              user_phone: userPhone,
+              months_occupied: monthsOccupied,
+              total_debt: totalDebt,
+              debt_details: debtDetails
+            }
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        } else {
+          // All apartments endpoint
+          const { data: apartments, error } = await supabase
+            .from('apartments')
+            .select('*, buildings(*)');
+          
+          if (error) throw error;
+
+          // Enrich each apartment with user info and credit
+          const enrichedApartments = await Promise.all(apartments.map(async (apt) => {
+            let userName = null;
+            let userPhone = null;
+            const userId = apt.beneficiary_id || apt.owner_id;
+            
+            if (userId) {
+              const { data: profile } = await supabase
+                .from('profiles')
+                .select('name, phone')
+                .eq('id', userId)
+                .single();
+              
+              if (profile) {
+                userName = profile.name;
+                userPhone = profile.phone;
+              }
+            }
+
+            return {
+              ...apt,
+              user_name: userName,
+              user_phone: userPhone,
+              total_credit: apt.credit
+            };
+          }));
+
+          return new Response(JSON.stringify({ data: enrichedApartments }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
       }
 
       case 'buildings': {
@@ -136,6 +251,7 @@ Deno.serve(async (req) => {
             error: 'Unknown endpoint',
             available_endpoints: [
               '/apartments',
+              '/apartments/{id}',
               '/buildings', 
               '/expenses',
               '/payments',
