@@ -349,7 +349,6 @@ const Apartments = () => {
                         <SelectValue placeholder={t('selectFloor')} />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">{t('selectFloor')}</SelectItem>
                         <SelectItem value="Ground">{t('groundFloor')}</SelectItem>
                         {formData.building_id && buildings.find(b => b.id === formData.building_id)?.number_of_floors && 
                           Array.from({ length: buildings.find(b => b.id === formData.building_id)!.number_of_floors! }, (_, i) => i + 1).map((floor) => (
