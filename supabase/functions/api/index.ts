@@ -117,9 +117,9 @@ Deno.serve(async (req) => {
             monthsOccupied = (now.getFullYear() - startDate.getFullYear()) * 12 + 
                             (now.getMonth() - startDate.getMonth()) + 1;
 
-            // Calculate debt per month
-            const totalOwed = monthsOccupied * apartment.subscription_amount;
-            totalDebt = totalOwed + apartment.credit; // credit is negative for debt
+          // Calculate total debt from credit
+          // credit = totalPaid - totalOwed, so debt = -credit when credit is negative
+          totalDebt = Math.max(0, -apartment.credit);
 
             // Generate month-by-month debt details
             for (let i = 0; i < monthsOccupied; i++) {

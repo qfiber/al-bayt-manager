@@ -300,9 +300,8 @@ const Apartments = () => {
   };
 
   const calculateTotalDebt = (apartment: Apartment) => {
-    const monthsOccupied = calculateMonthsOccupied(apartment.occupancy_start);
-    const totalOwed = monthsOccupied * apartment.subscription_amount;
-    return totalOwed + apartment.credit; // credit is negative for debt
+    // credit = totalPaid - totalOwed, so debt = -credit when credit is negative
+    return Math.max(0, -apartment.credit);
   };
 
   const [debtDialogOpen, setDebtDialogOpen] = useState(false);
