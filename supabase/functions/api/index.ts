@@ -58,7 +58,13 @@ Deno.serve(async (req) => {
     // Parse URL to get endpoint and query params
     const url = new URL(req.url);
     const pathParts = url.pathname.split('/').filter(p => p);
-    const endpoint = pathParts[pathParts.length - 1]; // Last part after /api/
+    
+    // Check if this is a parameterized route (e.g., /apartments/{id})
+    // The second-to-last part would be the endpoint name
+    const endpoint = pathParts.length > 2 && 
+                    ['apartments', 'buildings', 'expenses', 'payments', 'users'].includes(pathParts[pathParts.length - 2])
+      ? pathParts[pathParts.length - 2]
+      : pathParts[pathParts.length - 1];
 
     console.log('API request:', endpoint, 'from user:', apiKeyData.user_id);
 
