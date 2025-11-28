@@ -227,24 +227,77 @@ export default function ApiKeys() {
           </div>
           <div className="space-y-2">
             <p className="font-semibold text-sm">{language === 'ar' ? 'نقاط النهاية المتاحة:' : 'Available Endpoints:'}</p>
-            <div className="bg-muted p-4 rounded-lg" dir="ltr">
-              <ul className="list-disc list-inside space-y-1 font-mono text-sm text-left">
-                <li>/apartments</li>
-                <li>/buildings</li>
-                <li>/expenses</li>
-                <li>/payments</li>
-                <li>/users</li>
-                <li>/user-apartments</li>
-              </ul>
+            <div className="bg-muted p-4 rounded-lg space-y-3" dir="ltr">
+              <div className="space-y-1">
+                <p className="font-mono text-sm font-semibold text-left">/apartments</p>
+                <p className="text-xs text-muted-foreground text-left">
+                  {language === 'ar' 
+                    ? 'جميع الشقق مع اسم المستخدم ورقم الهاتف والرصيد الإجمالي'
+                    : 'All apartments with user name, phone, and total credit'}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="font-mono text-sm font-semibold text-left">/apartments/{'{id}'}</p>
+                <p className="text-xs text-muted-foreground text-left">
+                  {language === 'ar' 
+                    ? 'شقة محددة مع أشهر الإشغال، الديون الإجمالية، وتفاصيل الديون لكل شهر'
+                    : 'Specific apartment with months occupied, total debt, and month-by-month debt details'}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="font-mono text-sm font-semibold text-left">/buildings</p>
+                <p className="text-xs text-muted-foreground text-left">
+                  {language === 'ar' ? 'جميع المباني' : 'All buildings'}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="font-mono text-sm font-semibold text-left">/expenses</p>
+                <p className="text-xs text-muted-foreground text-left">
+                  {language === 'ar' ? 'جميع المصروفات مع معلومات المبنى' : 'All expenses with building information'}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="font-mono text-sm font-semibold text-left">/payments</p>
+                <p className="text-xs text-muted-foreground text-left">
+                  {language === 'ar' ? 'جميع الدفعات مع معلومات الشقة' : 'All payments with apartment information'}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="font-mono text-sm font-semibold text-left">/users</p>
+                <p className="text-xs text-muted-foreground text-left">
+                  {language === 'ar' ? 'جميع ملفات المستخدمين' : 'All user profiles'}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="font-mono text-sm font-semibold text-left">/user-apartments</p>
+                <p className="text-xs text-muted-foreground text-left">
+                  {language === 'ar' ? 'تعيينات الشقق للمستخدمين' : 'User apartment assignments'}
+                </p>
+              </div>
             </div>
           </div>
           <div className="space-y-2">
             <p className="font-semibold text-sm">
-              {language === 'ar' ? 'مثال على استخدام curl:' : 'Example curl usage:'}
+              {language === 'ar' ? 'أمثلة على استخدام curl:' : 'Example curl usage:'}
             </p>
-            <code className="block bg-muted p-4 rounded text-sm font-mono text-left" dir="ltr">
-              curl -H "x-api-key: YOUR_API_KEY" {apiBaseUrl}/apartments
-            </code>
+            <div className="space-y-2">
+              <div>
+                <p className="text-xs text-muted-foreground mb-1 text-left" dir="ltr">
+                  {language === 'ar' ? 'جميع الشقق:' : 'All apartments:'}
+                </p>
+                <code className="block bg-muted p-4 rounded text-sm font-mono text-left" dir="ltr">
+                  curl -H "x-api-key: YOUR_API_KEY" {apiBaseUrl}/apartments
+                </code>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground mb-1 text-left" dir="ltr">
+                  {language === 'ar' ? 'شقة محددة:' : 'Specific apartment:'}
+                </p>
+                <code className="block bg-muted p-4 rounded text-sm font-mono text-left" dir="ltr">
+                  curl -H "x-api-key: YOUR_API_KEY" {apiBaseUrl}/apartments/APARTMENT_ID
+                </code>
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>
