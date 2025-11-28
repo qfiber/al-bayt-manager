@@ -49,6 +49,7 @@ const Apartments = () => {
   const [profiles, setProfiles] = useState<{ id: string; name: string }[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingApartment, setEditingApartment] = useState<Apartment | null>(null);
+  const [selectedBuildingFilter, setSelectedBuildingFilter] = useState<string>('all');
   const [formData, setFormData] = useState({
     apartment_number: '',
     building_id: '',
@@ -351,6 +352,14 @@ const Apartments = () => {
 
   if (!user || !isAdmin) return null;
 
+  const filteredBuildings = selectedBuildingFilter === 'all' 
+    ? buildings 
+    : buildings.filter(b => b.id === selectedBuildingFilter);
+
+  const getApartmentsForBuilding = (buildingId: string) => {
+    return apartments.filter(a => a.building_id === buildingId);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/10">
       <div className="container mx-auto p-6">
@@ -359,7 +368,20 @@ const Apartments = () => {
             <Home className="w-8 h-8 text-primary" />
             <h1 className="text-3xl font-bold">{t('apartments')}</h1>
           </div>
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-2 flex-wrap items-center">
+            <Select value={selectedBuildingFilter} onValueChange={setSelectedBuildingFilter}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder={t('filterByBuilding')} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t('allBuildings')}</SelectItem>
+                {buildings.map((building) => (
+                  <SelectItem key={building.id} value={building.id}>
+                    {building.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
                 <Button onClick={() => resetForm()} className="w-full sm:w-auto">
@@ -491,82 +513,92 @@ const Apartments = () => {
           </div>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>{t('allApartments')}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="text-right">{t('apartmentHash')}</TableHead>
-                  <TableHead className="text-right">{t('building')}</TableHead>
-                  <TableHead className="text-right">{t('floor')}</TableHead>
-                  <TableHead className="text-right">{t('status')}</TableHead>
-                  <TableHead className="text-right">{t('owner')} / {t('beneficiary')}</TableHead>
-                  <TableHead className="text-right">{t('monthlySubscription')}</TableHead>
-                  <TableHead className="text-right">{t('monthsOccupied')}</TableHead>
-                  <TableHead className="text-right">{t('totalDebt')}</TableHead>
-                  <TableHead className="text-right">{t('credit')}</TableHead>
-                  <TableHead className="text-right">{t('actions')}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {apartments.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={9} className="text-center text-muted-foreground">
-                      {t('noApartmentsFound')}
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  apartments.map((apartment) => (
-                    <TableRow key={apartment.id}>
-                      <TableCell className="font-medium text-right">{apartment.apartment_number}</TableCell>
-                      <TableCell className="text-right">{getBuildingName(apartment.building_id)}</TableCell>
-                      <TableCell className="text-right">
-                        {apartment.floor === 'Ground' ? t('groundFloor') : apartment.floor || '-'}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <span className={`px-2 py-1 rounded text-xs ${apartment.status === 'vacant' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                          {t(apartment.status as 'vacant' | 'occupied')}
-                        </span>
-                      </TableCell>
-                      <TableCell className={`text-right ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>
-                        <div className="text-sm">
-                          <div>{t('owner')}: {getProfileName(apartment.owner_id)}</div>
-                          <div className="text-muted-foreground">{t('beneficiary')}: {getProfileName(apartment.beneficiary_id)}</div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">₪{apartment.subscription_amount.toFixed(2)}</TableCell>
-                      <TableCell className="text-right">
-                        {calculateMonthsOccupied(apartment.occupancy_start)}
-                      </TableCell>
-                      <TableCell className={`text-right font-semibold ${calculateTotalDebt(apartment) > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                        ₪{Math.abs(calculateTotalDebt(apartment)).toFixed(2)}
-                      </TableCell>
-                      <TableCell className={`text-right ${apartment.credit > 0 ? 'text-green-600 font-semibold' : apartment.credit < 0 ? 'text-red-600 font-semibold' : ''}`}>
-                        ₪{apartment.credit.toFixed(2)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button size="sm" variant="outline" onClick={() => showDebtDetails(apartment)}>
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={() => handleEdit(apartment)}>
-                            <Pencil className="w-4 h-4" />
-                          </Button>
-                          <Button size="sm" variant="destructive" onClick={() => handleDelete(apartment.id)}>
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+        {filteredBuildings.length === 0 ? (
+          <Card>
+            <CardContent className="py-8">
+              <p className="text-center text-muted-foreground">{t('noBuildingsFound')}</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-6">
+            {filteredBuildings.map((building) => {
+              const buildingApartments = getApartmentsForBuilding(building.id);
+              
+              return (
+                <Card key={building.id}>
+                  <CardHeader>
+                    <CardTitle>{building.name}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {buildingApartments.length === 0 ? (
+                      <p className="text-center text-muted-foreground py-4">{t('noApartmentsInBuilding')}</p>
+                    ) : (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="text-right">{t('apartmentHash')}</TableHead>
+                            <TableHead className="text-right">{t('floor')}</TableHead>
+                            <TableHead className="text-right">{t('status')}</TableHead>
+                            <TableHead className="text-right">{t('owner')} / {t('beneficiary')}</TableHead>
+                            <TableHead className="text-right">{t('monthlySubscription')}</TableHead>
+                            <TableHead className="text-right">{t('monthsOccupied')}</TableHead>
+                            <TableHead className="text-right">{t('totalDebt')}</TableHead>
+                            <TableHead className="text-right">{t('credit')}</TableHead>
+                            <TableHead className="text-right">{t('actions')}</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {buildingApartments.map((apartment) => (
+                            <TableRow key={apartment.id}>
+                              <TableCell className="font-medium text-right">{apartment.apartment_number}</TableCell>
+                              <TableCell className="text-right">
+                                {apartment.floor === 'Ground' ? t('groundFloor') : apartment.floor || '-'}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <span className={`px-2 py-1 rounded text-xs ${apartment.status === 'vacant' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                                  {t(apartment.status as 'vacant' | 'occupied')}
+                                </span>
+                              </TableCell>
+                              <TableCell className={`text-right ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>
+                                <div className="text-sm">
+                                  <div>{t('owner')}: {getProfileName(apartment.owner_id)}</div>
+                                  <div className="text-muted-foreground">{t('beneficiary')}: {getProfileName(apartment.beneficiary_id)}</div>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-right">₪{apartment.subscription_amount.toFixed(2)}</TableCell>
+                              <TableCell className="text-right">
+                                {calculateMonthsOccupied(apartment.occupancy_start)}
+                              </TableCell>
+                              <TableCell className={`text-right font-semibold ${calculateTotalDebt(apartment) > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                ₪{Math.abs(calculateTotalDebt(apartment)).toFixed(2)}
+                              </TableCell>
+                              <TableCell className={`text-right ${apartment.credit > 0 ? 'text-green-600 font-semibold' : apartment.credit < 0 ? 'text-red-600 font-semibold' : ''}`}>
+                                ₪{apartment.credit.toFixed(2)}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex justify-end gap-2">
+                                  <Button size="sm" variant="outline" onClick={() => showDebtDetails(apartment)}>
+                                    <Eye className="w-4 h-4" />
+                                  </Button>
+                                  <Button size="sm" variant="outline" onClick={() => handleEdit(apartment)}>
+                                    <Pencil className="w-4 h-4" />
+                                  </Button>
+                                  <Button size="sm" variant="destructive" onClick={() => handleDelete(apartment.id)}>
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
 
         <AlertDialog open={debtDialogOpen} onOpenChange={setDebtDialogOpen}>
           <AlertDialogContent className="max-w-3xl">

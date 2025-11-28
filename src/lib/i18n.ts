@@ -94,6 +94,8 @@ export const translations = {
     selectBuildingsForModerator: "בחר מבנים להקצאה למפקח",
     assignedBuildings: "מבנים משויכים",
     noBuildings: "אין מבנים",
+    filterByBuilding: "סנן לפי בניין",
+    noApartmentsInBuilding: "אין דירות בבניין זה",
 
     // Payments
     month: "חודש",
@@ -463,6 +465,8 @@ export const translations = {
     selectBuildingsForModerator: "اختر المباني للتعيين للمشرف",
     assignedBuildings: "المباني المعينة",
     noBuildings: "لا توجد مباني",
+    filterByBuilding: "تصفية حسب المبنى",
+    noApartmentsInBuilding: "لا توجد شقق في هذا المبنى",
 
     // Payments
     month: "الشهر",
@@ -832,6 +836,8 @@ export const translations = {
     selectBuildingsForModerator: "Select buildings to assign to moderator",
     assignedBuildings: "Assigned Buildings",
     noBuildings: "No buildings",
+    filterByBuilding: "Filter by Building",
+    noApartmentsInBuilding: "No apartments in this building",
 
     // Payments
     month: "Month",
