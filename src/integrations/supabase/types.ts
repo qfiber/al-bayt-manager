@@ -21,6 +21,7 @@ export type Database = {
           building_id: string
           created_at: string | null
           credit: number
+          floor: string | null
           id: string
           occupancy_start: string | null
           owner_id: string | null
@@ -35,6 +36,7 @@ export type Database = {
           building_id: string
           created_at?: string | null
           credit?: number
+          floor?: string | null
           id?: string
           occupancy_start?: string | null
           owner_id?: string | null
@@ -49,6 +51,7 @@ export type Database = {
           building_id?: string
           created_at?: string | null
           credit?: number
+          floor?: string | null
           id?: string
           occupancy_start?: string | null
           owner_id?: string | null
@@ -160,6 +163,7 @@ export type Database = {
           id: string
           logo_url: string | null
           name: string
+          number_of_floors: number | null
           updated_at: string | null
         }
         Insert: {
@@ -168,6 +172,7 @@ export type Database = {
           id?: string
           logo_url?: string | null
           name: string
+          number_of_floors?: number | null
           updated_at?: string | null
         }
         Update: {
@@ -176,6 +181,7 @@ export type Database = {
           id?: string
           logo_url?: string | null
           name?: string
+          number_of_floors?: number | null
           updated_at?: string | null
         }
         Relationships: []

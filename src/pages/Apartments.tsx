@@ -17,6 +17,7 @@ interface Apartment {
   id: string;
   apartment_number: string;
   building_id: string;
+  floor: string | null;
   status: string;
   occupancy_start: string | null;
   subscription_amount: number;
@@ -29,6 +30,7 @@ interface Apartment {
 interface Building {
   id: string;
   name: string;
+  number_of_floors: number | null;
 }
 
 interface Settings {
@@ -49,6 +51,7 @@ const Apartments = () => {
   const [formData, setFormData] = useState({
     apartment_number: '',
     building_id: '',
+    floor: '',
     status: 'vacant',
     occupancy_start: '',
     subscription_amount: '',
@@ -130,7 +133,7 @@ const Apartments = () => {
   const fetchBuildings = async () => {
     const { data, error } = await supabase
       .from('buildings')
-      .select('id, name')
+      .select('id, name, number_of_floors')
       .order('name');
 
     if (error) {
@@ -184,6 +187,7 @@ const Apartments = () => {
     const apartmentData = {
       apartment_number: formData.apartment_number,
       building_id: formData.building_id,
+      floor: formData.floor || null,
       status: formData.status,
       occupancy_start: dbDate,
       subscription_amount: subscriptionAmount,
@@ -251,6 +255,7 @@ const Apartments = () => {
     const currentFormData = {
       apartment_number: apartment.apartment_number,
       building_id: apartment.building_id,
+      floor: apartment.floor || '',
       status: apartment.status,
       occupancy_start: displayDate,
       subscription_amount: apartment.subscription_amount.toString(),
@@ -264,6 +269,7 @@ const Apartments = () => {
     setFormData({
       apartment_number: '',
       building_id: '',
+      floor: '',
       status: 'vacant',
       occupancy_start: '',
       subscription_amount: '',
@@ -330,6 +336,28 @@ const Apartments = () => {
                             {building.name}
                           </SelectItem>
                         ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="floor">{t('floor')}</Label>
+                    <Select 
+                      value={formData.floor} 
+                      onValueChange={(value) => setFormData({ ...formData, floor: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={t('selectFloor')} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">{t('selectFloor')}</SelectItem>
+                        <SelectItem value="Ground">{t('groundFloor')}</SelectItem>
+                        {formData.building_id && buildings.find(b => b.id === formData.building_id)?.number_of_floors && 
+                          Array.from({ length: buildings.find(b => b.id === formData.building_id)!.number_of_floors! }, (_, i) => i + 1).map((floor) => (
+                            <SelectItem key={floor} value={floor.toString()}>
+                              {floor}
+                            </SelectItem>
+                          ))
+                        }
                       </SelectContent>
                     </Select>
                   </div>
@@ -417,6 +445,7 @@ const Apartments = () => {
                 <TableRow>
                   <TableHead className="text-right">{t('apartmentHash')}</TableHead>
                   <TableHead className="text-right">{t('building')}</TableHead>
+                  <TableHead className="text-right">{t('floor')}</TableHead>
                   <TableHead className="text-right">{t('status')}</TableHead>
                   <TableHead className="text-right">{t('owner')} / {t('beneficiary')}</TableHead>
                   <TableHead className="text-right">{t('monthlySubscription')}</TableHead>
@@ -428,7 +457,7 @@ const Apartments = () => {
               <TableBody>
                 {apartments.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center text-muted-foreground">
+                    <TableCell colSpan={9} className="text-center text-muted-foreground">
                       {t('noApartmentsFound')}
                     </TableCell>
                   </TableRow>
@@ -437,6 +466,9 @@ const Apartments = () => {
                     <TableRow key={apartment.id}>
                       <TableCell className="font-medium text-right">{apartment.apartment_number}</TableCell>
                       <TableCell className="text-right">{getBuildingName(apartment.building_id)}</TableCell>
+                      <TableCell className="text-right">
+                        {apartment.floor === 'Ground' ? t('groundFloor') : apartment.floor || '-'}
+                      </TableCell>
                       <TableCell className="text-right">
                         <span className={`px-2 py-1 rounded text-xs ${apartment.status === 'vacant' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
                           {t(apartment.status as 'vacant' | 'occupied')}
