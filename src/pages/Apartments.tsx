@@ -10,8 +10,9 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Home, Plus, Pencil, Trash2 } from 'lucide-react';
+import { Home, Plus, Pencil, Trash2, Eye } from 'lucide-react';
 
 interface Apartment {
   id: string;
@@ -288,6 +289,63 @@ const Apartments = () => {
     return profiles.find(p => p.id === profileId)?.name || t('unknown');
   };
 
+  const calculateMonthsOccupied = (occupancyStart: string | null) => {
+    if (!occupancyStart) return 0;
+    
+    const startDate = new Date(occupancyStart);
+    const now = new Date();
+    
+    return (now.getFullYear() - startDate.getFullYear()) * 12 + 
+           (now.getMonth() - startDate.getMonth()) + 1;
+  };
+
+  const calculateTotalDebt = (apartment: Apartment) => {
+    const monthsOccupied = calculateMonthsOccupied(apartment.occupancy_start);
+    const totalOwed = monthsOccupied * apartment.subscription_amount;
+    return totalOwed + apartment.credit; // credit is negative for debt
+  };
+
+  const [debtDialogOpen, setDebtDialogOpen] = useState(false);
+  const [selectedApartment, setSelectedApartment] = useState<Apartment | null>(null);
+  const [debtDetails, setDebtDetails] = useState<any[]>([]);
+
+  const showDebtDetails = async (apartment: Apartment) => {
+    setSelectedApartment(apartment);
+    
+    if (!apartment.occupancy_start) {
+      setDebtDetails([]);
+      setDebtDialogOpen(true);
+      return;
+    }
+
+    const startDate = new Date(apartment.occupancy_start);
+    const now = new Date();
+    const monthsOccupied = calculateMonthsOccupied(apartment.occupancy_start);
+    
+    const details = [];
+    for (let i = 0; i < monthsOccupied; i++) {
+      const monthDate = new Date(startDate.getFullYear(), startDate.getMonth() + i, 1);
+      const monthStr = `${String(monthDate.getMonth() + 1).padStart(2, '0')}/${monthDate.getFullYear()}`;
+      
+      const { data: payment } = await supabase
+        .from('payments')
+        .select('amount')
+        .eq('apartment_id', apartment.id)
+        .eq('month', monthStr)
+        .maybeSingle();
+
+      details.push({
+        month: monthStr,
+        amount_due: apartment.subscription_amount,
+        amount_paid: payment?.amount || 0,
+        balance: apartment.subscription_amount - (payment?.amount || 0)
+      });
+    }
+    
+    setDebtDetails(details);
+    setDebtDialogOpen(true);
+  };
+
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center">{t('loading')}</div>;
   }
@@ -448,7 +506,8 @@ const Apartments = () => {
                   <TableHead className="text-right">{t('status')}</TableHead>
                   <TableHead className="text-right">{t('owner')} / {t('beneficiary')}</TableHead>
                   <TableHead className="text-right">{t('monthlySubscription')}</TableHead>
-                  <TableHead className="text-right">{t('subscriptionStatus')}</TableHead>
+                  <TableHead className="text-right">{t('monthsOccupied')}</TableHead>
+                  <TableHead className="text-right">{t('totalDebt')}</TableHead>
                   <TableHead className="text-right">{t('credit')}</TableHead>
                   <TableHead className="text-right">{t('actions')}</TableHead>
                 </TableRow>
@@ -481,19 +540,19 @@ const Apartments = () => {
                       </TableCell>
                       <TableCell className="text-right">₪{apartment.subscription_amount.toFixed(2)}</TableCell>
                       <TableCell className="text-right">
-                        <span className={`px-2 py-1 rounded text-xs ${
-                          apartment.subscription_status === 'paid' ? 'bg-green-100 text-green-800' : 
-                          apartment.subscription_status === 'partial' ? 'bg-yellow-100 text-yellow-800' : 
-                          'bg-red-100 text-red-800'
-                        }`}>
-                          {t(apartment.subscription_status as 'paid' | 'due' | 'partial')}
-                        </span>
+                        {calculateMonthsOccupied(apartment.occupancy_start)}
+                      </TableCell>
+                      <TableCell className={`text-right font-semibold ${calculateTotalDebt(apartment) > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                        ₪{Math.abs(calculateTotalDebt(apartment)).toFixed(2)}
                       </TableCell>
                       <TableCell className={`text-right ${apartment.credit > 0 ? 'text-green-600 font-semibold' : apartment.credit < 0 ? 'text-red-600 font-semibold' : ''}`}>
                         ₪{apartment.credit.toFixed(2)}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
+                          <Button size="sm" variant="outline" onClick={() => showDebtDetails(apartment)}>
+                            <Eye className="w-4 h-4" />
+                          </Button>
                           <Button size="sm" variant="outline" onClick={() => handleEdit(apartment)}>
                             <Pencil className="w-4 h-4" />
                           </Button>
@@ -509,6 +568,51 @@ const Apartments = () => {
             </Table>
           </CardContent>
         </Card>
+
+        <AlertDialog open={debtDialogOpen} onOpenChange={setDebtDialogOpen}>
+          <AlertDialogContent className="max-w-3xl">
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {t('debtDetails')} - {selectedApartment ? `${t('apt')} ${selectedApartment.apartment_number}` : ''}
+              </AlertDialogTitle>
+            </AlertDialogHeader>
+            <div className="max-h-96 overflow-y-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-right">{t('monthYear')}</TableHead>
+                    <TableHead className="text-right">{t('amountDue')}</TableHead>
+                    <TableHead className="text-right">{t('amountPaid')}</TableHead>
+                    <TableHead className="text-right">{t('balance')}</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {debtDetails.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center text-muted-foreground">
+                        {t('noData')}
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    debtDetails.map((detail, index) => (
+                      <TableRow key={index}>
+                        <TableCell className="text-right font-medium">{detail.month}</TableCell>
+                        <TableCell className="text-right">₪{detail.amount_due.toFixed(2)}</TableCell>
+                        <TableCell className="text-right">₪{detail.amount_paid.toFixed(2)}</TableCell>
+                        <TableCell className={`text-right font-semibold ${detail.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                          ₪{Math.abs(detail.balance).toFixed(2)}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+            <div className="flex justify-end mt-4">
+              <Button onClick={() => setDebtDialogOpen(false)}>{t('close')}</Button>
+            </div>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   );

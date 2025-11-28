@@ -26,6 +26,7 @@ interface Apartment {
   building_id: string;
   subscription_amount: number;
   credit: number;
+  occupancy_start: string | null;
 }
 
 interface Building {
@@ -135,39 +136,65 @@ const Payments = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    const apartment = apartments.find(a => a.id === formData.apartment_id);
+    if (!apartment) {
+      toast({ title: 'Error', description: 'Apartment not found', variant: 'destructive' });
+      return;
+    }
+
+    // Calculate earliest unpaid month
+    if (!apartment.occupancy_start) {
+      toast({ title: 'Error', description: 'Apartment has no occupancy start date', variant: 'destructive' });
+      return;
+    }
+
+    const startDate = new Date(apartment.occupancy_start);
+    const now = new Date();
+    const monthsOccupied = (now.getFullYear() - startDate.getFullYear()) * 12 + 
+                          (now.getMonth() - startDate.getMonth()) + 1;
+
+    // Find the first unpaid month
+    let earliestUnpaidMonth = null;
+    for (let i = 0; i < monthsOccupied; i++) {
+      const monthDate = new Date(startDate.getFullYear(), startDate.getMonth() + i, 1);
+      const monthStr = `${String(monthDate.getMonth() + 1).padStart(2, '0')}/${monthDate.getFullYear()}`;
+      
+      const { data: existingPayment } = await supabase
+        .from('payments')
+        .select('amount')
+        .eq('apartment_id', formData.apartment_id)
+        .eq('month', monthStr)
+        .maybeSingle();
+
+      if (!existingPayment || existingPayment.amount < apartment.subscription_amount) {
+        earliestUnpaidMonth = monthStr;
+        break;
+      }
+    }
+
+    if (!earliestUnpaidMonth) {
+      // All months are paid, the payment will go to credit
+      earliestUnpaidMonth = `${String(now.getMonth() + 2).padStart(2, '0')}/${now.getFullYear()}`;
+    }
+
+    const paymentAmount = parseFloat(formData.amount);
     const paymentData = {
       apartment_id: formData.apartment_id,
-      amount: parseFloat(formData.amount),
-      month: formData.month,
+      amount: paymentAmount,
+      month: earliestUnpaidMonth,
     };
 
-    if (editingPayment) {
-      const { error } = await supabase
-        .from('payments')
-        .update(paymentData)
-        .eq('id', editingPayment.id);
+    const { error } = await supabase
+      .from('payments')
+      .insert([paymentData]);
 
-      if (error) {
-        toast({ title: 'Error', description: error.message, variant: 'destructive' });
-      } else {
-        toast({ title: 'Success', description: 'Payment updated successfully' });
-        await updateApartmentCredit(formData.apartment_id, parseFloat(formData.amount));
-        fetchPayments();
-        resetForm();
-      }
+    if (error) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
     } else {
-      const { error } = await supabase
-        .from('payments')
-        .insert([paymentData]);
-
-      if (error) {
-        toast({ title: 'Error', description: error.message, variant: 'destructive' });
-      } else {
-        toast({ title: 'Success', description: 'Payment created successfully' });
-        await updateApartmentCredit(formData.apartment_id, parseFloat(formData.amount));
-        fetchPayments();
-        resetForm();
-      }
+      toast({ title: 'Success', description: `Payment of ₪${paymentAmount.toFixed(2)} applied to ${earliestUnpaidMonth}` });
+      await updateApartmentCredit(formData.apartment_id, paymentAmount);
+      fetchPayments();
+      resetForm();
     }
   };
 
@@ -299,17 +326,9 @@ const Payments = () => {
                       onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
                       required
                     />
-                  </div>
-                  <div>
-                    <Label htmlFor="month">{t('monthFormat')}</Label>
-                    <Input
-                      id="month"
-                      type="text"
-                      placeholder="01/2025"
-                      value={formData.month}
-                      onChange={(e) => setFormData({ ...formData, month: e.target.value })}
-                      required
-                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {t('paymentWillCoverEarliestMonth') || 'Payment will automatically cover the earliest unpaid month'}
+                    </p>
                   </div>
                   <div className="flex gap-2">
                     <Button type="submit" className="flex-1">
