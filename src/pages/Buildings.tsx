@@ -16,6 +16,7 @@ interface Building {
   id: string;
   name: string;
   address: string;
+  number_of_floors: number | null;
   logo_url: string | null;
   created_at: string | null;
 }
@@ -28,7 +29,7 @@ const Buildings = () => {
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingBuilding, setEditingBuilding] = useState<Building | null>(null);
-  const [formData, setFormData] = useState({ name: '', address: '' });
+  const [formData, setFormData] = useState({ name: '', address: '', number_of_floors: '' });
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
 
@@ -101,7 +102,8 @@ const Buildings = () => {
       if (editingBuilding) {
         const updateData: any = { 
           name: formData.name, 
-          address: formData.address
+          address: formData.address,
+          number_of_floors: formData.number_of_floors ? parseInt(formData.number_of_floors) : null
         };
         if (logoUrl) {
           updateData.logo_url = logoUrl;
@@ -118,6 +120,7 @@ const Buildings = () => {
         const insertData: any = { 
           name: formData.name, 
           address: formData.address,
+          number_of_floors: formData.number_of_floors ? parseInt(formData.number_of_floors) : null,
           logo_url: logoUrl
         };
 
@@ -154,7 +157,11 @@ const Buildings = () => {
 
   const handleEdit = (building: Building) => {
     setEditingBuilding(building);
-    setFormData({ name: building.name, address: building.address });
+    setFormData({ 
+      name: building.name, 
+      address: building.address,
+      number_of_floors: building.number_of_floors?.toString() || ''
+    });
     if (building.logo_url) {
       setLogoPreview(building.logo_url);
     }
@@ -162,7 +169,7 @@ const Buildings = () => {
   };
 
   const resetForm = () => {
-    setFormData({ name: '', address: '' });
+    setFormData({ name: '', address: '', number_of_floors: '' });
     setLogoFile(null);
     setLogoPreview(null);
     setEditingBuilding(null);
@@ -215,6 +222,17 @@ const Buildings = () => {
                     />
                   </div>
                   <div>
+                    <Label htmlFor="number_of_floors">{t('numberOfFloors')}</Label>
+                    <Input
+                      id="number_of_floors"
+                      type="number"
+                      min="1"
+                      value={formData.number_of_floors}
+                      onChange={(e) => setFormData({ ...formData, number_of_floors: e.target.value })}
+                      placeholder={t('optional')}
+                    />
+                  </div>
+                  <div>
                     <Label htmlFor="logo">{t('logoOptional')}</Label>
                     <Input
                       id="logo"
@@ -255,6 +273,7 @@ const Buildings = () => {
                 <TableRow>
                   <TableHead className="text-right">{t('nameLabel')}</TableHead>
                   <TableHead className="text-right">{t('address')}</TableHead>
+                  <TableHead className="text-right">{t('numberOfFloors')}</TableHead>
                   <TableHead className="text-right">{t('logo')}</TableHead>
                   <TableHead className="text-right">{t('actions')}</TableHead>
                 </TableRow>
@@ -262,7 +281,7 @@ const Buildings = () => {
               <TableBody>
                 {buildings.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center text-muted-foreground">
+                    <TableCell colSpan={5} className="text-center text-muted-foreground">
                       {t('noBuildingsFound')}
                     </TableCell>
                   </TableRow>
@@ -271,6 +290,9 @@ const Buildings = () => {
                     <TableRow key={building.id}>
                       <TableCell className="font-medium text-right">{building.name}</TableCell>
                       <TableCell className="text-right">{building.address}</TableCell>
+                      <TableCell className="text-right">
+                        {building.number_of_floors || '-'}
+                      </TableCell>
                       <TableCell className="text-right">
                         {building.logo_url ? (
                           <img src={building.logo_url} alt={building.name} className="w-10 h-10 object-cover rounded" />

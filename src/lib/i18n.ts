@@ -33,6 +33,7 @@ export const translations = {
     // Buildings
     buildingName: "שם הבניין",
     address: "כתובת",
+    numberOfFloors: "מספר קומות",
     logo: "לוגו",
     addBuilding: "הוסף בניין",
     editBuilding: "ערוך בניין",
@@ -46,6 +47,9 @@ export const translations = {
 
     // Apartments
     apartmentNumber: "מספר דירה",
+    floor: "קומה",
+    groundFloor: "קומת קרקע",
+    selectFloor: "בחר קומה",
     status: "סטטוס",
     vacant: "פנויה",
     occupied: "תפוסה",
@@ -307,6 +311,7 @@ export const translations = {
     poweredBy: "מופעל על ידי",
     footerPoweredByText: "מופעל על ידי qFiber בע״מ",
     footerPoweredBy: "מופעל על ידי",
+    optional: "אופציונלי",
     generalInformation: "מידע כללי",
     addInformation: "הוסף מידע",
     editInformation: "ערוך מידע",
@@ -386,6 +391,7 @@ export const translations = {
     // Buildings
     buildingName: "اسم المبنى",
     address: "العنوان",
+    numberOfFloors: "عدد الطوابق",
     logo: "الشعار",
     addBuilding: "إضافة مبنى",
     editBuilding: "تعديل المبنى",
@@ -399,6 +405,9 @@ export const translations = {
 
     // Apartments
     apartmentNumber: "رقم الشقة",
+    floor: "الطابق",
+    groundFloor: "الطابق الأرضي",
+    selectFloor: "اختر طابق",
     status: "الحالة",
     vacant: "شاغرة",
     occupied: "مشغولة",
@@ -660,6 +669,7 @@ export const translations = {
     poweredBy: "تصميم",
     footerPoweredByText: "تصميم شركة كيوفايبر",
     footerPoweredBy: "تصميم شركة",
+    optional: "اختياري",
     generalInformation: "معلومات عامة",
     addInformation: "إضافة معلومات",
     editInformation: "تعديل المعلومات",
@@ -739,6 +749,7 @@ export const translations = {
     // Buildings
     buildingName: "Building Name",
     address: "Address",
+    numberOfFloors: "Number of Floors",
     logo: "Logo",
     addBuilding: "Add Building",
     editBuilding: "Edit Building",
@@ -752,6 +763,9 @@ export const translations = {
 
     // Apartments
     apartmentNumber: "Apartment Number",
+    floor: "Floor",
+    groundFloor: "Ground Floor",
+    selectFloor: "Select floor",
     status: "Status",
     vacant: "Vacant",
     occupied: "Occupied",
@@ -1014,6 +1028,7 @@ export const translations = {
     poweredBy: "Powered by",
     footerPoweredByText: "Powered by qFiber LTD",
     footerPoweredBy: "Powered by",
+    optional: "Optional",
     generalInformation: "General Information",
     addInformation: "Add Information",
     editInformation: "Edit Information",
