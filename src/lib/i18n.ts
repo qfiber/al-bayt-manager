@@ -96,6 +96,10 @@ export const translations = {
     noBuildings: "אין מבנים",
     filterByBuilding: "סנן לפי בניין",
     noApartmentsInBuilding: "אין דירות בבניין זה",
+  unsavedChanges: "שינויים לא שמורים",
+  unsavedChangesWarning: "יש לך שינויים לא שמורים. האם אתה בטוח שאתה רוצה לסגור מבלי לשמור?",
+  stayOnPage: "להישאר בעמוד",
+  discardChanges: "להתעלם משינויים",
 
     // Payments
     month: "חודש",
@@ -467,6 +471,10 @@ export const translations = {
     noBuildings: "لا توجد مباني",
     filterByBuilding: "تصفية حسب المبنى",
     noApartmentsInBuilding: "لا توجد شقق في هذا المبنى",
+  unsavedChanges: "تغييرات غير محفوظة",
+  unsavedChangesWarning: "لديك تغييرات غير محفوظة. هل أنت متأكد من أنك تريد الإغلاق دون الحفظ؟",
+  stayOnPage: "البقاء في الصفحة",
+  discardChanges: "تجاهل التغييرات",
 
     // Payments
     month: "الشهر",
@@ -838,6 +846,10 @@ export const translations = {
     noBuildings: "No buildings",
     filterByBuilding: "Filter by Building",
     noApartmentsInBuilding: "No apartments in this building",
+  unsavedChanges: "Unsaved Changes",
+  unsavedChangesWarning: "You have unsaved changes. Are you sure you want to close without saving?",
+  stayOnPage: "Stay on Page",
+  discardChanges: "Discard Changes",
 
     // Payments
     month: "Month",
