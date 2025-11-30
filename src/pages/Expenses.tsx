@@ -140,7 +140,33 @@ const Expenses = () => {
       if (error) {
         toast({ title: 'Error', description: error.message, variant: 'destructive' });
       } else {
-        toast({ title: 'Success', description: 'Expense created successfully' });
+        // Fetch all apartments for this building to split the expense
+        const { data: apartments, error: apartmentsError } = await supabase
+          .from('apartments')
+          .select('id, credit')
+          .eq('building_id', formData.building_id);
+
+        if (!apartmentsError && apartments && apartments.length > 0) {
+          // Calculate per-apartment expense
+          const totalAmount = parseFloat(formData.amount);
+          const perApartmentAmount = totalAmount / apartments.length;
+
+          // Update each apartment's credit by deducting their share
+          for (const apt of apartments) {
+            await supabase
+              .from('apartments')
+              .update({ credit: apt.credit - perApartmentAmount })
+              .eq('id', apt.id);
+          }
+
+          toast({ 
+            title: t('success'), 
+            description: `${t('expenseCreatedAndSplit')} ${apartments.length} ${t('apartments')} (₪${perApartmentAmount.toFixed(2)} ${t('perApartment')})` 
+          });
+        } else {
+          toast({ title: t('success'), description: t('expenseCreatedSuccessfully') });
+        }
+        
         fetchExpenses();
         resetForm();
       }
