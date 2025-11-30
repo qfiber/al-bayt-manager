@@ -10,9 +10,9 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Home, Plus, Pencil, Trash2, Eye } from 'lucide-react';
+import { Home, Plus, Pencil, Trash2, Eye, XCircle } from 'lucide-react';
 
 interface Apartment {
   id: string;
@@ -39,7 +39,7 @@ interface Settings {
 }
 
 const Apartments = () => {
-  const { user, isAdmin, loading } = useAuth();
+  const { user, isAdmin, isModerator, loading } = useAuth();
   const { t, language } = useLanguage();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -50,6 +50,9 @@ const Apartments = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingApartment, setEditingApartment] = useState<Apartment | null>(null);
   const [selectedBuildingFilter, setSelectedBuildingFilter] = useState<string>('all');
+  const [terminateDialogOpen, setTerminateDialogOpen] = useState(false);
+  const [apartmentToTerminate, setApartmentToTerminate] = useState<Apartment | null>(null);
+  const [calculatedTerminationCredit, setCalculatedTerminationCredit] = useState(0);
   const [formData, setFormData] = useState({
     apartment_number: '',
     building_id: '',
@@ -308,6 +311,62 @@ const Apartments = () => {
   const [debtDialogOpen, setDebtDialogOpen] = useState(false);
   const [selectedApartment, setSelectedApartment] = useState<Apartment | null>(null);
   const [debtDetails, setDebtDetails] = useState<any[]>([]);
+
+  const calculateTerminationCredit = (apartment: Apartment): number => {
+    if (!apartment.occupancy_start) return 0;
+
+    const now = new Date();
+    const currentDay = now.getDate();
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const daysRemaining = daysInMonth - currentDay + 1;
+
+    const creditForRemainingDays = (apartment.subscription_amount / daysInMonth) * daysRemaining;
+    
+    // Custom rounding: 0.01-0.5 rounds down, 0.51+ rounds up
+    const wholePart = Math.floor(creditForRemainingDays);
+    const fractionalPart = creditForRemainingDays - wholePart;
+    
+    if (fractionalPart >= 0.51) {
+      return wholePart + 1;
+    } else {
+      return wholePart;
+    }
+  };
+
+  const handleTerminateOccupancy = async () => {
+    if (!apartmentToTerminate) return;
+
+    const creditToAdd = calculatedTerminationCredit;
+    const newCredit = apartmentToTerminate.credit + creditToAdd;
+
+    const { error } = await supabase
+      .from('apartments')
+      .update({
+        status: 'vacant',
+        occupancy_start: null,
+        credit: newCredit
+      })
+      .eq('id', apartmentToTerminate.id);
+
+    if (error) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } else {
+      toast({ 
+        title: t('success'), 
+        description: t('occupancyTerminated').replace('{credit}', `₪${creditToAdd.toFixed(2)}`)
+      });
+      fetchApartments();
+      setTerminateDialogOpen(false);
+      setApartmentToTerminate(null);
+    }
+  };
+
+  const openTerminateDialog = (apartment: Apartment) => {
+    setApartmentToTerminate(apartment);
+    const credit = calculateTerminationCredit(apartment);
+    setCalculatedTerminationCredit(credit);
+    setTerminateDialogOpen(true);
+  };
 
   const showDebtDetails = async (apartment: Apartment) => {
     setSelectedApartment(apartment);
@@ -580,6 +639,16 @@ const Apartments = () => {
                                   <Button size="sm" variant="outline" onClick={() => showDebtDetails(apartment)}>
                                     <Eye className="w-4 h-4" />
                                   </Button>
+                                  {apartment.status === 'occupied' && apartment.occupancy_start && (isAdmin || isModerator) && (
+                                    <Button 
+                                      size="sm" 
+                                      variant="outline" 
+                                      onClick={() => openTerminateDialog(apartment)}
+                                      className="text-orange-600 hover:text-orange-700"
+                                    >
+                                      <XCircle className="w-4 h-4" />
+                                    </Button>
+                                  )}
                                   <Button size="sm" variant="outline" onClick={() => handleEdit(apartment)}>
                                     <Pencil className="w-4 h-4" />
                                   </Button>
@@ -642,6 +711,30 @@ const Apartments = () => {
             <div className="flex justify-end mt-4">
               <Button onClick={() => setDebtDialogOpen(false)}>{t('close')}</Button>
             </div>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <AlertDialog open={terminateDialogOpen} onOpenChange={setTerminateDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{t('terminateOccupancy')}</AlertDialogTitle>
+              <AlertDialogDescription>
+                {t('terminateOccupancyConfirm')
+                  .replace('{apartment}', apartmentToTerminate?.apartment_number || '')
+                  .replace('{credit}', `₪${calculatedTerminationCredit.toFixed(2)}`)}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => {
+                setTerminateDialogOpen(false);
+                setApartmentToTerminate(null);
+              }}>
+                {t('cancel')}
+              </AlertDialogCancel>
+              <AlertDialogAction onClick={handleTerminateOccupancy}>
+                {t('confirm')}
+              </AlertDialogAction>
+            </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
       </div>
