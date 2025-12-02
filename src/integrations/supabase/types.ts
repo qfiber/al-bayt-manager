@@ -21,6 +21,7 @@ export type Database = {
           created_at: string
           expense_id: string
           id: string
+          is_canceled: boolean
         }
         Insert: {
           amount: number
@@ -28,6 +29,7 @@ export type Database = {
           created_at?: string
           expense_id: string
           id?: string
+          is_canceled?: boolean
         }
         Update: {
           amount?: number
@@ -35,6 +37,7 @@ export type Database = {
           created_at?: string
           expense_id?: string
           id?: string
+          is_canceled?: boolean
         }
         Relationships: [
           {

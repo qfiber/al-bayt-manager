@@ -311,6 +311,7 @@ const Apartments = () => {
   const [debtDialogOpen, setDebtDialogOpen] = useState(false);
   const [selectedApartment, setSelectedApartment] = useState<Apartment | null>(null);
   const [debtDetails, setDebtDetails] = useState<any[]>([]);
+  const [apartmentExpenses, setApartmentExpenses] = useState<any[]>([]);
 
   const calculateTerminationCredit = (apartment: Apartment): number => {
     if (!apartment.occupancy_start) return 0;
@@ -371,6 +372,15 @@ const Apartments = () => {
   const showDebtDetails = async (apartment: Apartment) => {
     setSelectedApartment(apartment);
     
+    // Fetch apartment expenses
+    const { data: expensesData } = await supabase
+      .from('apartment_expenses')
+      .select('*, expense:expenses(description, expense_date)')
+      .eq('apartment_id', apartment.id)
+      .order('created_at', { ascending: false });
+    
+    setApartmentExpenses(expensesData || []);
+    
     if (!apartment.occupancy_start) {
       setDebtDetails([]);
       setDebtDialogOpen(true);
@@ -403,6 +413,40 @@ const Apartments = () => {
     
     setDebtDetails(details);
     setDebtDialogOpen(true);
+  };
+
+  const handleCancelExpense = async (expenseId: string, apartmentId: string, amount: number) => {
+    const { error } = await supabase
+      .from('apartment_expenses')
+      .update({ is_canceled: true })
+      .eq('id', expenseId);
+
+    if (error) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      return;
+    }
+
+    // Restore credit to apartment
+    const apartment = apartments.find(a => a.id === apartmentId);
+    if (apartment) {
+      const { error: creditError } = await supabase
+        .from('apartments')
+        .update({ credit: apartment.credit + amount })
+        .eq('id', apartmentId);
+
+      if (creditError) {
+        toast({ title: 'Error', description: creditError.message, variant: 'destructive' });
+        return;
+      }
+    }
+
+    toast({ title: t('success'), description: t('expenseCanceled') });
+    
+    // Refresh data
+    if (selectedApartment) {
+      await showDebtDetails(selectedApartment);
+    }
+    await fetchApartments();
   };
 
   if (loading) {
@@ -670,43 +714,96 @@ const Apartments = () => {
         )}
 
         <AlertDialog open={debtDialogOpen} onOpenChange={setDebtDialogOpen}>
-          <AlertDialogContent className="max-w-3xl">
+          <AlertDialogContent className="max-w-4xl">
             <AlertDialogHeader>
               <AlertDialogTitle>
                 {t('debtDetails')} - {selectedApartment ? `${t('apt')} ${selectedApartment.apartment_number}` : ''}
               </AlertDialogTitle>
             </AlertDialogHeader>
-            <div className="max-h-96 overflow-y-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="text-right">{t('monthYear')}</TableHead>
-                    <TableHead className="text-right">{t('amountDue')}</TableHead>
-                    <TableHead className="text-right">{t('amountPaid')}</TableHead>
-                    <TableHead className="text-right">{t('balance')}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {debtDetails.length === 0 ? (
+            <div className="max-h-96 overflow-y-auto space-y-6">
+              <div>
+                <h3 className="text-lg font-semibold mb-3">{t('monthlyPayments')}</h3>
+                <Table>
+                  <TableHeader>
                     <TableRow>
-                      <TableCell colSpan={4} className="text-center text-muted-foreground">
-                        {t('noData')}
-                      </TableCell>
+                      <TableHead className="text-right">{t('monthYear')}</TableHead>
+                      <TableHead className="text-right">{t('amountDue')}</TableHead>
+                      <TableHead className="text-right">{t('amountPaid')}</TableHead>
+                      <TableHead className="text-right">{t('balance')}</TableHead>
                     </TableRow>
-                  ) : (
-                    debtDetails.map((detail, index) => (
-                      <TableRow key={index}>
-                        <TableCell className="text-right font-medium">{detail.month}</TableCell>
-                        <TableCell className="text-right">₪{detail.amount_due.toFixed(2)}</TableCell>
-                        <TableCell className="text-right">₪{detail.amount_paid.toFixed(2)}</TableCell>
-                        <TableCell className={`text-right font-semibold ${detail.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                          ₪{Math.abs(detail.balance).toFixed(2)}
+                  </TableHeader>
+                  <TableBody>
+                    {debtDetails.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-center text-muted-foreground">
+                          {t('noData')}
                         </TableCell>
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
+                    ) : (
+                      debtDetails.map((detail, index) => (
+                        <TableRow key={index}>
+                          <TableCell className="text-right font-medium">{detail.month}</TableCell>
+                          <TableCell className="text-right">₪{detail.amount_due.toFixed(2)}</TableCell>
+                          <TableCell className="text-right">₪{detail.amount_paid.toFixed(2)}</TableCell>
+                          <TableCell className={`text-right font-semibold ${detail.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                            ₪{Math.abs(detail.balance).toFixed(2)}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {apartmentExpenses.length > 0 && (
+                <div className="border-t pt-4">
+                  <h3 className="text-lg font-semibold mb-3">{t('buildingExpenses')}</h3>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-right">{t('description')}</TableHead>
+                        <TableHead className="text-right">{t('date')}</TableHead>
+                        <TableHead className="text-right">{t('amount')}</TableHead>
+                        <TableHead className="text-right">{t('status')}</TableHead>
+                        {(isAdmin || isModerator) && <TableHead className="text-right">{t('actions')}</TableHead>}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {apartmentExpenses.map((expense) => (
+                        <TableRow key={expense.id}>
+                          <TableCell className="text-right">{expense.expense?.description || '-'}</TableCell>
+                          <TableCell className="text-right">{expense.created_at ? new Date(expense.created_at).toLocaleDateString() : '-'}</TableCell>
+                          <TableCell className="text-right text-red-600 font-medium">₪{expense.amount.toFixed(2)}</TableCell>
+                          <TableCell className="text-right">
+                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                              expense.is_canceled 
+                                ? 'bg-gray-100 text-gray-800' 
+                                : 'bg-red-100 text-red-800'
+                            }`}>
+                              {expense.is_canceled ? t('canceled') : t('active')}
+                            </span>
+                          </TableCell>
+                          {(isAdmin || isModerator) && (
+                            <TableCell className="text-right">
+                              {!expense.is_canceled && (
+                                <Button 
+                                  size="sm" 
+                                  variant="outline" 
+                                  onClick={() => handleCancelExpense(expense.id, expense.apartment_id, expense.amount)}
+                                  className="text-orange-600 hover:text-orange-700"
+                                >
+                                  <XCircle className="w-4 h-4 mr-1" />
+                                  {t('cancel')}
+                                </Button>
+                              )}
+                            </TableCell>
+                          )}
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
             </div>
             <div className="flex justify-end mt-4">
               <Button onClick={() => setDebtDialogOpen(false)}>{t('close')}</Button>
