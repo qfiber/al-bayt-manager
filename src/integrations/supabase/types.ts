@@ -14,6 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      apartment_expenses: {
+        Row: {
+          amount: number
+          apartment_id: string
+          created_at: string
+          expense_id: string
+          id: string
+        }
+        Insert: {
+          amount: number
+          apartment_id: string
+          created_at?: string
+          expense_id: string
+          id?: string
+        }
+        Update: {
+          amount?: number
+          apartment_id?: string
+          created_at?: string
+          expense_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "apartment_expenses_apartment_id_fkey"
+            columns: ["apartment_id"]
+            isOneToOne: false
+            referencedRelation: "apartments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "apartment_expenses_expense_id_fkey"
+            columns: ["expense_id"]
+            isOneToOne: false
+            referencedRelation: "expenses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       apartments: {
         Row: {
           apartment_number: string

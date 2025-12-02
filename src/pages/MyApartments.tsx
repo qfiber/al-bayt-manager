@@ -31,11 +31,25 @@ interface Payment {
   apartment_id: string;
   amount: number;
   month: string;
+  created_at: string;
+}
+
+interface ApartmentExpense {
+  id: string;
+  apartment_id: string;
+  expense_id: string;
+  amount: number;
+  created_at: string;
+  expense?: {
+    description: string;
+    expense_date: string;
+  };
 }
 
 interface ApartmentWithDetails extends Apartment {
   building: Building | null;
   payments: Payment[];
+  apartmentExpenses: ApartmentExpense[];
 }
 
 const MyApartments = () => {
@@ -96,14 +110,23 @@ const MyApartments = () => {
         .from('payments')
         .select('*')
         .in('apartment_id', apartmentIds)
-        .order('month', { ascending: false });
+        .order('created_at', { ascending: false });
 
       if (payError) throw payError;
+
+      const { data: apartmentExpensesData, error: expensesError } = await supabase
+        .from('apartment_expenses')
+        .select('*, expense:expenses(description, expense_date)')
+        .in('apartment_id', apartmentIds)
+        .order('created_at', { ascending: false });
+
+      if (expensesError) throw expensesError;
 
       const apartmentsWithDetails: ApartmentWithDetails[] = (apartmentsData || []).map(apt => ({
         ...apt,
         building: buildingsData?.find(b => b.id === apt.building_id) || null,
         payments: paymentsData?.filter(p => p.apartment_id === apt.id) || [],
+        apartmentExpenses: apartmentExpensesData?.filter(ae => ae.apartment_id === apt.id) || [],
       }));
 
       setApartments(apartmentsWithDetails);
@@ -222,21 +245,54 @@ const MyApartments = () => {
                     </Card>
                   </div>
 
-                  {apartment.payments.length > 0 && (
+                  {(apartment.payments.length > 0 || apartment.apartmentExpenses.length > 0) && (
                     <div className="pt-4 border-t">
-                      <h3 className="text-lg font-semibold mb-3">Payment History</h3>
+                      <h3 className="text-lg font-semibold mb-3">Transaction History</h3>
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>Month</TableHead>
-                            <TableHead>Amount (₪)</TableHead>
+                            <TableHead>Date</TableHead>
+                            <TableHead>Description</TableHead>
+                            <TableHead>Type</TableHead>
+                            <TableHead className="text-right">Amount (₪)</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {apartment.payments.map((payment) => (
-                            <TableRow key={payment.id}>
-                              <TableCell>{payment.month}</TableCell>
-                              <TableCell>₪{payment.amount.toFixed(2)}</TableCell>
+                          {[
+                            ...apartment.payments.map(p => ({
+                              id: p.id,
+                              date: p.created_at,
+                              description: `Payment for ${p.month}`,
+                              type: 'payment',
+                              amount: p.amount
+                            })),
+                            ...apartment.apartmentExpenses.map(ae => ({
+                              id: ae.id,
+                              date: ae.created_at,
+                              description: ae.expense?.description || 'Building expense',
+                              type: 'expense',
+                              amount: ae.amount
+                            }))
+                          ]
+                          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                          .map((transaction) => (
+                            <TableRow key={transaction.id}>
+                              <TableCell>{formatDate(transaction.date)}</TableCell>
+                              <TableCell>{transaction.description}</TableCell>
+                              <TableCell>
+                                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                                  transaction.type === 'payment' 
+                                    ? 'bg-green-100 text-green-800' 
+                                    : 'bg-red-100 text-red-800'
+                                }`}>
+                                  {transaction.type === 'payment' ? 'Payment' : 'Expense'}
+                                </span>
+                              </TableCell>
+                              <TableCell className={`text-right font-medium ${
+                                transaction.type === 'payment' ? 'text-green-600' : 'text-red-600'
+                              }`}>
+                                {transaction.type === 'payment' ? '+' : '-'}₪{transaction.amount.toFixed(2)}
+                              </TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
