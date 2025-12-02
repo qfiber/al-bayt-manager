@@ -140,6 +140,22 @@ const Expenses = () => {
       if (error) {
         toast({ title: 'Error', description: error.message, variant: 'destructive' });
       } else {
+        // Get the created expense ID
+        const { data: createdExpense, error: fetchError } = await supabase
+          .from('expenses')
+          .select('id')
+          .eq('building_id', formData.building_id)
+          .eq('description', formData.description)
+          .eq('amount', parseFloat(formData.amount))
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+
+        if (fetchError) {
+          toast({ title: 'Error', description: fetchError.message, variant: 'destructive' });
+          return;
+        }
+
         // Fetch all apartments for this building to split the expense
         const { data: apartments, error: apartmentsError } = await supabase
           .from('apartments')
@@ -150,6 +166,22 @@ const Expenses = () => {
           // Calculate per-apartment expense
           const totalAmount = parseFloat(formData.amount);
           const perApartmentAmount = totalAmount / apartments.length;
+
+          // Create apartment_expenses records and update credits
+          const apartmentExpenses = apartments.map(apt => ({
+            apartment_id: apt.id,
+            expense_id: createdExpense.id,
+            amount: perApartmentAmount
+          }));
+
+          const { error: insertError } = await supabase
+            .from('apartment_expenses')
+            .insert(apartmentExpenses);
+
+          if (insertError) {
+            toast({ title: 'Error', description: insertError.message, variant: 'destructive' });
+            return;
+          }
 
           // Update each apartment's credit by deducting their share
           for (const apt of apartments) {
@@ -176,6 +208,36 @@ const Expenses = () => {
   const handleDelete = async (id: string) => {
     if (!confirm(t('deleteExpenseConfirm'))) return;
 
+    // First, fetch apartment_expenses to restore credits
+    const { data: apartmentExpenses, error: fetchError } = await supabase
+      .from('apartment_expenses')
+      .select('apartment_id, amount')
+      .eq('expense_id', id);
+
+    if (fetchError) {
+      toast({ title: 'Error', description: fetchError.message, variant: 'destructive' });
+      return;
+    }
+
+    // Restore credits to apartments
+    if (apartmentExpenses && apartmentExpenses.length > 0) {
+      for (const expenseRecord of apartmentExpenses) {
+        const { data: apartment } = await supabase
+          .from('apartments')
+          .select('credit')
+          .eq('id', expenseRecord.apartment_id)
+          .single();
+
+        if (apartment) {
+          await supabase
+            .from('apartments')
+            .update({ credit: apartment.credit + expenseRecord.amount })
+            .eq('id', expenseRecord.apartment_id);
+        }
+      }
+    }
+
+    // Delete the expense (apartment_expenses will cascade delete)
     const { error } = await supabase
       .from('expenses')
       .delete()
@@ -184,7 +246,7 @@ const Expenses = () => {
     if (error) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
     } else {
-      toast({ title: 'Success', description: 'Expense deleted successfully' });
+      toast({ title: 'Success', description: t('expenseDeletedAndRestored') });
       fetchExpenses();
     }
   };
