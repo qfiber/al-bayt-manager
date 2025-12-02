@@ -40,6 +40,7 @@ interface ApartmentExpense {
   expense_id: string;
   amount: number;
   created_at: string;
+  is_canceled: boolean;
   expense?: {
     description: string;
     expense_date: string;
@@ -264,32 +265,41 @@ const MyApartments = () => {
                               date: p.created_at,
                               description: `Payment for ${p.month}`,
                               type: 'payment',
-                              amount: p.amount
+                              amount: p.amount,
+                              is_canceled: false
                             })),
                             ...apartment.apartmentExpenses.map(ae => ({
                               id: ae.id,
                               date: ae.created_at,
                               description: ae.expense?.description || 'Building expense',
                               type: 'expense',
-                              amount: ae.amount
+                              amount: ae.amount,
+                              is_canceled: ae.is_canceled
                             }))
                           ]
                           .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
                           .map((transaction) => (
                             <TableRow key={transaction.id}>
                               <TableCell>{formatDate(transaction.date)}</TableCell>
-                              <TableCell>{transaction.description}</TableCell>
+                              <TableCell>
+                                {transaction.description}
+                                {transaction.type === 'expense' && transaction.is_canceled && (
+                                  <span className="ml-2 text-xs text-muted-foreground">(Canceled)</span>
+                                )}
+                              </TableCell>
                               <TableCell>
                                 <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
                                   transaction.type === 'payment' 
                                     ? 'bg-green-100 text-green-800' 
+                                    : transaction.is_canceled
+                                    ? 'bg-gray-100 text-gray-800'
                                     : 'bg-red-100 text-red-800'
                                 }`}>
-                                  {transaction.type === 'payment' ? 'Payment' : 'Expense'}
+                                  {transaction.type === 'payment' ? 'Payment' : transaction.is_canceled ? 'Canceled Expense' : 'Expense'}
                                 </span>
                               </TableCell>
                               <TableCell className={`text-right font-medium ${
-                                transaction.type === 'payment' ? 'text-green-600' : 'text-red-600'
+                                transaction.type === 'payment' ? 'text-green-600' : transaction.is_canceled ? 'text-gray-600' : 'text-red-600'
                               }`}>
                                 {transaction.type === 'payment' ? '+' : '-'}₪{transaction.amount.toFixed(2)}
                               </TableCell>
