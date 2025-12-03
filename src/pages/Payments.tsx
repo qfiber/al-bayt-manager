@@ -18,6 +18,7 @@ interface Payment {
   apartment_id: string;
   amount: number;
   month: string;
+  is_canceled: boolean;
 }
 
 interface Apartment {
@@ -101,7 +102,7 @@ const Payments = () => {
     if (error) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
     } else {
-      setPayments(data || []);
+      setPayments((data as Payment[]) || []);
     }
   };
 
@@ -161,12 +162,12 @@ const Payments = () => {
       
       const { data: existingPayment } = await supabase
         .from('payments')
-        .select('amount')
+        .select('amount, is_canceled')
         .eq('apartment_id', formData.apartment_id)
         .eq('month', monthStr)
         .maybeSingle();
 
-      if (!existingPayment || existingPayment.amount < apartment.subscription_amount) {
+      if (!existingPayment || existingPayment.is_canceled || existingPayment.amount < apartment.subscription_amount) {
         earliestUnpaidMonth = monthStr;
         break;
       }
@@ -201,47 +202,56 @@ const Payments = () => {
   const handleDelete = async (id: string) => {
     if (!confirm(t('deletePaymentConfirm'))) return;
 
-    // Get payment details before deletion
+    // Get payment details before cancellation
     const payment = payments.find(p => p.id === id);
-    if (!payment) return;
+    if (!payment || payment.is_canceled) return;
 
     const { error } = await supabase
       .from('payments')
-      .delete()
+      .update({ is_canceled: true })
       .eq('id', id);
 
     if (error) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
     } else {
-      // Recalculate apartment credit and status after deletion
-      const { data: remainingPayments } = await supabase
+      // Recalculate apartment credit and status after cancellation (only active payments)
+      const { data: remainingPayments, error: remainingError } = await supabase
         .from('payments')
         .select('amount')
-        .eq('apartment_id', payment.apartment_id);
+        .eq('apartment_id', payment.apartment_id)
+        .eq('is_canceled', false);
 
-      const totalPaid = remainingPayments?.reduce((sum, p) => sum + p.amount, 0) || 0;
-      const apartment = apartments.find(a => a.id === payment.apartment_id);
-      
-      if (apartment) {
-        const newCredit = totalPaid - apartment.subscription_amount;
-        let newStatus = 'due';
-        
-        if (newCredit >= 0) {
-          newStatus = 'paid';
-        } else if (totalPaid > 0) {
-          newStatus = 'partial';
+      if (remainingError) {
+        toast({ title: 'Error', description: remainingError.message, variant: 'destructive' });
+      } else {
+        const totalPaid = remainingPayments?.reduce((sum, p) => sum + p.amount, 0) || 0;
+        const apartment = apartments.find(a => a.id === payment.apartment_id);
+
+        if (apartment) {
+          const newCredit = totalPaid - apartment.subscription_amount;
+          let newStatus = 'due';
+
+          if (newCredit >= 0) {
+            newStatus = 'paid';
+          } else if (totalPaid > 0) {
+            newStatus = 'partial';
+          }
+
+          const { error: updateError } = await supabase
+            .from('apartments')
+            .update({
+              credit: newCredit,
+              subscription_status: newStatus,
+            })
+            .eq('id', payment.apartment_id);
+
+          if (updateError) {
+            toast({ title: 'Error', description: updateError.message, variant: 'destructive' });
+          }
         }
-
-        await supabase
-          .from('apartments')
-          .update({ 
-            credit: newCredit,
-            subscription_status: newStatus
-          })
-          .eq('id', payment.apartment_id);
       }
 
-      toast({ title: 'Success', description: 'Payment deleted successfully' });
+      toast({ title: t('success'), description: t('paymentCanceled') });
       fetchPayments();
       fetchApartments();
     }
