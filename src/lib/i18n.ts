@@ -121,9 +121,10 @@ export const translations = {
     selectApartmentPlaceholder: "בחר דירה",
     monthFormat: "חודש (MM/YYYY)",
     noPaymentsFound: "לא נמצאו תשלומים. צור את התשלום הראשון שלך!",
-    deletePaymentConfirm: "האם אתה בטוח שברצונך למחוק את התשלום הזה?",
+    deletePaymentConfirm: "האם אתה בטוח שברצונך לבטל את התשלום הזה?",
     amountLabel: "סכום (₪)",
     paymentWillCoverEarliestMonth: "התשלום יכסה אוטומטית את החודש הלא-משולם המוקדם ביותר",
+    paymentCanceled: "התשלום בוטל והיתרה עודכנה",
 
     // Expenses
     description: "תיאור",
@@ -508,9 +509,10 @@ export const translations = {
     selectApartmentPlaceholder: "اختر شقة",
     monthFormat: "الشهر (MM/YYYY)",
     noPaymentsFound: "لم يتم العثور على مدفوعات. أنشئ مدفوعك الأول!",
-    deletePaymentConfirm: "هل أنت متأكد من رغبتك في حذف هذه الدفعة؟",
+    deletePaymentConfirm: "هل أنت متأكد من رغبتك في إلغاء هذه الدفعة؟",
     amountLabel: "المبلغ (₪)",
     paymentWillCoverEarliestMonth: "سيغطي الدفع تلقائياً أقدم شهر غير مدفوع",
+    paymentCanceled: "تم إلغاء الدفعة وتحديث الرصيد",
 
     // Expenses
     description: "الوصف",
@@ -895,9 +897,10 @@ export const translations = {
     selectApartmentPlaceholder: "Select an apartment",
     monthFormat: "Month (MM/YYYY)",
     noPaymentsFound: "No payments found. Create your first payment!",
-    deletePaymentConfirm: "Are you sure you want to delete this payment?",
+    deletePaymentConfirm: "Are you sure you want to cancel this payment?",
     amountLabel: "Amount (₪)",
     paymentWillCoverEarliestMonth: "Payment will automatically cover the earliest unpaid month",
+    paymentCanceled: "Payment canceled and balance updated",
 
     // Expenses
     description: "Description",

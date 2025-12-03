@@ -34,6 +34,12 @@ interface Building {
   name: string;
 }
 
+interface ApartmentOption {
+  id: string;
+  apartment_number: string;
+  building_id: string;
+}
+
 const Expenses = () => {
   const { user, isAdmin, isModerator, loading } = useAuth();
   const { t } = useLanguage();
@@ -41,6 +47,7 @@ const Expenses = () => {
   const { toast } = useToast();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [buildings, setBuildings] = useState<Building[]>([]);
+  const [apartments, setApartments] = useState<ApartmentOption[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [formData, setFormData] = useState({
@@ -53,6 +60,8 @@ const Expenses = () => {
     recurring_type: '',
     recurring_start_date: '',
     recurring_end_date: '',
+    is_single_apartment: false,
+    apartment_id: '',
   });
 
   useEffect(() => {
@@ -66,6 +75,7 @@ const Expenses = () => {
   useEffect(() => {
     if (user && (isAdmin || isModerator)) {
       fetchBuildings();
+      fetchApartments();
       fetchExpenses();
     }
   }, [user, isAdmin, isModerator]);
@@ -80,6 +90,19 @@ const Expenses = () => {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
     } else {
       setBuildings(data || []);
+    }
+  };
+
+  const fetchApartments = async () => {
+    const { data, error } = await supabase
+      .from('apartments')
+      .select('id, apartment_number, building_id')
+      .order('apartment_number');
+
+    if (error) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } else {
+      setApartments((data as ApartmentOption[]) || []);
     }
   };
 
@@ -271,6 +294,8 @@ const Expenses = () => {
       recurring_type: expense.recurring_type || '',
       recurring_start_date: expense.recurring_start_date || '',
       recurring_end_date: expense.recurring_end_date || '',
+      is_single_apartment: false,
+      apartment_id: '',
     });
     setIsDialogOpen(true);
   };
@@ -286,6 +311,8 @@ const Expenses = () => {
       recurring_type: '',
       recurring_start_date: '',
       recurring_end_date: '',
+      is_single_apartment: false,
+      apartment_id: '',
     });
     setEditingExpense(null);
     setIsDialogOpen(false);
