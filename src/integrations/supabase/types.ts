@@ -366,6 +366,7 @@ export type Database = {
           apartment_id: string
           created_at: string | null
           id: string
+          is_canceled: boolean
           month: string
           updated_at: string | null
         }
@@ -374,6 +375,7 @@ export type Database = {
           apartment_id: string
           created_at?: string | null
           id?: string
+          is_canceled?: boolean
           month: string
           updated_at?: string | null
         }
@@ -382,6 +384,7 @@ export type Database = {
           apartment_id?: string
           created_at?: string | null
           id?: string
+          is_canceled?: boolean
           month?: string
           updated_at?: string | null
         }
