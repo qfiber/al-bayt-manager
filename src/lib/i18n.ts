@@ -130,6 +130,9 @@ export const translations = {
     amountLabel: "סכום (₪)",
     paymentWillCoverEarliestMonth: "התשלום יכסה אוטומטית את החודש הלא-משולם המוקדם ביותר",
     paymentCanceled: "התשלום בוטל והיתרה עודכנה",
+    waive: "וותר",
+    cancelPayment: "בטל תשלום",
+    subscriptionWaived: "המנוי לחודש זה בוטל והיתרה עודכנה",
 
     // Expenses
     description: "תיאור",
@@ -523,6 +526,9 @@ export const translations = {
     amountLabel: "المبلغ (₪)",
     paymentWillCoverEarliestMonth: "سيغطي الدفع تلقائياً أقدم شهر غير مدفوع",
     paymentCanceled: "تم إلغاء الدفعة وتحديث الرصيد",
+    waive: "تنازل",
+    cancelPayment: "إلغاء الدفع",
+    subscriptionWaived: "تم التنازل عن اشتراك هذا الشهر وتحديث الرصيد",
 
     // Expenses
     description: "الوصف",
@@ -916,6 +922,9 @@ export const translations = {
     amountLabel: "Amount (₪)",
     paymentWillCoverEarliestMonth: "Payment will automatically cover the earliest unpaid month",
     paymentCanceled: "Payment canceled and balance updated",
+    waive: "Waive",
+    cancelPayment: "Cancel Payment",
+    subscriptionWaived: "Subscription for this month waived and balance updated",
 
     // Expenses
     description: "Description",
