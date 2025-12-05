@@ -179,47 +179,89 @@ const Expenses = () => {
           return;
         }
 
-        // Fetch all apartments for this building to split the expense
-        const { data: apartments, error: apartmentsError } = await supabase
-          .from('apartments')
-          .select('id, credit')
-          .eq('building_id', formData.building_id);
+        // Check if single apartment mode
+        if (formData.is_single_apartment && formData.apartment_id) {
+          // Apply expense to single apartment
+          const { data: targetApartment, error: aptError } = await supabase
+            .from('apartments')
+            .select('id, credit')
+            .eq('id', formData.apartment_id)
+            .single();
 
-        if (!apartmentsError && apartments && apartments.length > 0) {
-          // Calculate per-apartment expense
-          const totalAmount = parseFloat(formData.amount);
-          const perApartmentAmount = totalAmount / apartments.length;
+          if (aptError || !targetApartment) {
+            toast({ title: 'Error', description: aptError?.message || 'Apartment not found', variant: 'destructive' });
+            return;
+          }
 
-          // Create apartment_expenses records and update credits
-          const apartmentExpenses = apartments.map(apt => ({
-            apartment_id: apt.id,
-            expense_id: createdExpense.id,
-            amount: perApartmentAmount
-          }));
+          const expenseAmount = parseFloat(formData.amount);
 
+          // Create single apartment_expense record
           const { error: insertError } = await supabase
             .from('apartment_expenses')
-            .insert(apartmentExpenses);
+            .insert([{
+              apartment_id: formData.apartment_id,
+              expense_id: createdExpense.id,
+              amount: expenseAmount
+            }]);
 
           if (insertError) {
             toast({ title: 'Error', description: insertError.message, variant: 'destructive' });
             return;
           }
 
-          // Update each apartment's credit by deducting their share
-          for (const apt of apartments) {
-            await supabase
-              .from('apartments')
-              .update({ credit: apt.credit - perApartmentAmount })
-              .eq('id', apt.id);
-          }
+          // Update apartment credit
+          await supabase
+            .from('apartments')
+            .update({ credit: targetApartment.credit - expenseAmount })
+            .eq('id', formData.apartment_id);
 
           toast({ 
             title: t('success'), 
-            description: `${t('expenseCreatedAndSplit')} ${apartments.length} ${t('apartments')} (₪${perApartmentAmount.toFixed(2)} ${t('perApartment')})` 
+            description: t('expenseAppliedToApartment')
           });
         } else {
-          toast({ title: t('success'), description: t('expenseCreatedSuccessfully') });
+          // Fetch all apartments for this building to split the expense
+          const { data: buildingApartments, error: apartmentsError } = await supabase
+            .from('apartments')
+            .select('id, credit')
+            .eq('building_id', formData.building_id);
+
+          if (!apartmentsError && buildingApartments && buildingApartments.length > 0) {
+            // Calculate per-apartment expense
+            const totalAmount = parseFloat(formData.amount);
+            const perApartmentAmount = totalAmount / buildingApartments.length;
+
+            // Create apartment_expenses records and update credits
+            const apartmentExpensesRecords = buildingApartments.map(apt => ({
+              apartment_id: apt.id,
+              expense_id: createdExpense.id,
+              amount: perApartmentAmount
+            }));
+
+            const { error: insertError } = await supabase
+              .from('apartment_expenses')
+              .insert(apartmentExpensesRecords);
+
+            if (insertError) {
+              toast({ title: 'Error', description: insertError.message, variant: 'destructive' });
+              return;
+            }
+
+            // Update each apartment's credit by deducting their share
+            for (const apt of buildingApartments) {
+              await supabase
+                .from('apartments')
+                .update({ credit: apt.credit - perApartmentAmount })
+                .eq('id', apt.id);
+            }
+
+            toast({ 
+              title: t('success'), 
+              description: `${t('expenseCreatedAndSplit')} ${buildingApartments.length} ${t('apartments')} (₪${perApartmentAmount.toFixed(2)} ${t('perApartment')})` 
+            });
+          } else {
+            toast({ title: t('success'), description: t('expenseCreatedSuccessfully') });
+          }
         }
         
         fetchExpenses();
@@ -465,6 +507,44 @@ const Expenses = () => {
                       </>
                     )}
                   </div>
+
+                  {/* Single Apartment Expense Option */}
+                  {!editingExpense && formData.building_id && (
+                    <div className="space-y-4 border-t pt-4">
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          id="is_single_apartment"
+                          checked={formData.is_single_apartment}
+                          onChange={(e) => setFormData({ ...formData, is_single_apartment: e.target.checked, apartment_id: '' })}
+                          className="rounded"
+                        />
+                        <Label htmlFor="is_single_apartment" className="cursor-pointer">
+                          {t('applyToSingleApartment')}
+                        </Label>
+                      </div>
+                      
+                      {formData.is_single_apartment && (
+                        <div>
+                          <Label htmlFor="apartment_id">{t('selectApartment')}</Label>
+                          <Select value={formData.apartment_id} onValueChange={(value) => setFormData({ ...formData, apartment_id: value })}>
+                            <SelectTrigger>
+                              <SelectValue placeholder={t('selectApartment')} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {apartments
+                                .filter(apt => apt.building_id === formData.building_id)
+                                .map((apt) => (
+                                  <SelectItem key={apt.id} value={apt.id}>
+                                    {apt.apartment_number}
+                                  </SelectItem>
+                                ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                    </div>
+                  )}
                   
                   <div className="flex gap-2">
                     <Button type="submit" className="flex-1">
