@@ -405,19 +405,61 @@ const Apartments = () => {
       const monthDate = new Date(startDate.getFullYear(), startDate.getMonth() + i, 1);
       const monthStr = `${String(monthDate.getMonth() + 1).padStart(2, '0')}/${monthDate.getFullYear()}`;
       
-      // Find non-canceled payment for this month
-      const payment = paymentsData?.find(p => p.month === monthStr && !p.is_canceled);
+      // Find payment for this month
+      const payment = paymentsData?.find(p => p.month === monthStr);
 
       details.push({
         month: monthStr,
         amount_due: apartment.subscription_amount,
-        amount_paid: payment?.amount || 0,
-        balance: apartment.subscription_amount - (payment?.amount || 0)
+        amount_paid: payment && !payment.is_canceled ? payment.amount : 0,
+        balance: apartment.subscription_amount - (payment && !payment.is_canceled ? payment.amount : 0),
+        payment_id: payment?.id || null,
+        is_payment_canceled: payment?.is_canceled || false
       });
     }
     
     setDebtDetails(details);
     setDebtDialogOpen(true);
+  };
+
+  const handleWaiveSubscription = async (month: string, amount: number) => {
+    if (!selectedApartment) return;
+
+    // Add a credit payment (waiver) for this month
+    const { error } = await supabase
+      .from('payments')
+      .insert({
+        apartment_id: selectedApartment.id,
+        month: month,
+        amount: amount,
+        is_canceled: false
+      });
+
+    if (error) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      return;
+    }
+
+    // Update apartment credit
+    const newCredit = selectedApartment.credit + amount;
+    const newStatus = newCredit < 0 ? 'due' : 'paid';
+    
+    const { error: creditError } = await supabase
+      .from('apartments')
+      .update({ credit: newCredit, subscription_status: newStatus })
+      .eq('id', selectedApartment.id);
+
+    if (creditError) {
+      toast({ title: 'Error', description: creditError.message, variant: 'destructive' });
+      return;
+    }
+
+    toast({ title: t('success'), description: t('subscriptionWaived') });
+    
+    // Refresh data
+    await fetchApartments();
+    const updatedApartment = { ...selectedApartment, credit: newCredit };
+    await showDebtDetails(updatedApartment);
   };
 
   const handleCancelPayment = async (paymentId: string, apartmentId: string, paymentAmount: number) => {
@@ -773,13 +815,13 @@ const Apartments = () => {
                       <TableHead className="text-right">{t('monthYear')}</TableHead>
                       <TableHead className="text-right">{t('amount')}</TableHead>
                       <TableHead className="text-right">{t('status')}</TableHead>
-                      {isAdmin && <TableHead className="text-right">{t('actions')}</TableHead>}
+                      {(isAdmin || isModerator) && <TableHead className="text-right">{t('actions')}</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {apartmentPayments.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={isAdmin ? 4 : 3} className="text-center text-muted-foreground">
+                        <TableCell colSpan={(isAdmin || isModerator) ? 4 : 3} className="text-center text-muted-foreground">
                           {t('noPayments')}
                         </TableCell>
                       </TableRow>
@@ -797,7 +839,7 @@ const Apartments = () => {
                               {payment.is_canceled ? t('canceled') : t('active')}
                             </span>
                           </TableCell>
-                          {isAdmin && (
+                          {(isAdmin || isModerator) && (
                             <TableCell className="text-right">
                               {!payment.is_canceled && (
                                 <Button 
@@ -829,12 +871,13 @@ const Apartments = () => {
                       <TableHead className="text-right">{t('amountDue')}</TableHead>
                       <TableHead className="text-right">{t('amountPaid')}</TableHead>
                       <TableHead className="text-right">{t('balance')}</TableHead>
+                      {(isAdmin || isModerator) && <TableHead className="text-right">{t('actions')}</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {debtDetails.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={4} className="text-center text-muted-foreground">
+                        <TableCell colSpan={(isAdmin || isModerator) ? 5 : 4} className="text-center text-muted-foreground">
                           {t('noData')}
                         </TableCell>
                       </TableRow>
@@ -847,6 +890,32 @@ const Apartments = () => {
                           <TableCell className={`text-right font-semibold ${detail.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>
                             ₪{Math.abs(detail.balance).toFixed(2)}
                           </TableCell>
+                          {(isAdmin || isModerator) && (
+                            <TableCell className="text-right">
+                              {detail.balance > 0 && !detail.payment_id && (
+                                <Button 
+                                  size="sm" 
+                                  variant="outline" 
+                                  onClick={() => handleWaiveSubscription(detail.month, detail.amount_due)}
+                                  className="text-orange-600 hover:text-orange-700"
+                                >
+                                  <XCircle className="w-4 h-4 mr-1" />
+                                  {t('waive')}
+                                </Button>
+                              )}
+                              {detail.payment_id && !detail.is_payment_canceled && (
+                                <Button 
+                                  size="sm" 
+                                  variant="outline" 
+                                  onClick={() => handleCancelPayment(detail.payment_id, selectedApartment!.id, detail.amount_paid)}
+                                  className="text-orange-600 hover:text-orange-700"
+                                >
+                                  <XCircle className="w-4 h-4 mr-1" />
+                                  {t('cancelPayment')}
+                                </Button>
+                              )}
+                            </TableCell>
+                          )}
                         </TableRow>
                       ))
                     )}
