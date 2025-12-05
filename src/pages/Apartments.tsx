@@ -312,6 +312,7 @@ const Apartments = () => {
   const [selectedApartment, setSelectedApartment] = useState<Apartment | null>(null);
   const [debtDetails, setDebtDetails] = useState<any[]>([]);
   const [apartmentExpenses, setApartmentExpenses] = useState<any[]>([]);
+  const [apartmentPayments, setApartmentPayments] = useState<any[]>([]);
 
   const calculateTerminationCredit = (apartment: Apartment): number => {
     if (!apartment.occupancy_start) return 0;
@@ -380,6 +381,15 @@ const Apartments = () => {
       .order('created_at', { ascending: false });
     
     setApartmentExpenses(expensesData || []);
+
+    // Fetch all payments for this apartment
+    const { data: paymentsData } = await supabase
+      .from('payments')
+      .select('*')
+      .eq('apartment_id', apartment.id)
+      .order('month', { ascending: false });
+    
+    setApartmentPayments(paymentsData || []);
     
     if (!apartment.occupancy_start) {
       setDebtDetails([]);
@@ -388,7 +398,6 @@ const Apartments = () => {
     }
 
     const startDate = new Date(apartment.occupancy_start);
-    const now = new Date();
     const monthsOccupied = calculateMonthsOccupied(apartment.occupancy_start);
     
     const details = [];
@@ -396,12 +405,8 @@ const Apartments = () => {
       const monthDate = new Date(startDate.getFullYear(), startDate.getMonth() + i, 1);
       const monthStr = `${String(monthDate.getMonth() + 1).padStart(2, '0')}/${monthDate.getFullYear()}`;
       
-      const { data: payment } = await supabase
-        .from('payments')
-        .select('amount')
-        .eq('apartment_id', apartment.id)
-        .eq('month', monthStr)
-        .maybeSingle();
+      // Find non-canceled payment for this month
+      const payment = paymentsData?.find(p => p.month === monthStr && !p.is_canceled);
 
       details.push({
         month: monthStr,
@@ -413,6 +418,44 @@ const Apartments = () => {
     
     setDebtDetails(details);
     setDebtDialogOpen(true);
+  };
+
+  const handleCancelPayment = async (paymentId: string, apartmentId: string, paymentAmount: number) => {
+    const { error } = await supabase
+      .from('payments')
+      .update({ is_canceled: true })
+      .eq('id', paymentId);
+
+    if (error) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      return;
+    }
+
+    // Recalculate apartment credit
+    const apartment = apartments.find(a => a.id === apartmentId);
+    if (apartment) {
+      const newCredit = apartment.credit - paymentAmount;
+      const newStatus = newCredit < 0 ? 'due' : 'paid';
+      
+      const { error: creditError } = await supabase
+        .from('apartments')
+        .update({ credit: newCredit, subscription_status: newStatus })
+        .eq('id', apartmentId);
+
+      if (creditError) {
+        toast({ title: 'Error', description: creditError.message, variant: 'destructive' });
+        return;
+      }
+    }
+
+    toast({ title: t('success'), description: t('paymentCanceled') });
+    
+    // Refresh data
+    await fetchApartments();
+    if (selectedApartment) {
+      const updatedApartment = { ...selectedApartment, credit: (apartment?.credit || 0) - paymentAmount };
+      await showDebtDetails(updatedApartment);
+    }
   };
 
   const handleCancelExpense = async (expenseId: string, apartmentId: string, amount: number) => {
@@ -721,8 +764,64 @@ const Apartments = () => {
               </AlertDialogTitle>
             </AlertDialogHeader>
             <div className="max-h-96 overflow-y-auto space-y-6">
+              {/* Payments Section */}
               <div>
                 <h3 className="text-lg font-semibold mb-3">{t('monthlyPayments')}</h3>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="text-right">{t('monthYear')}</TableHead>
+                      <TableHead className="text-right">{t('amount')}</TableHead>
+                      <TableHead className="text-right">{t('status')}</TableHead>
+                      {isAdmin && <TableHead className="text-right">{t('actions')}</TableHead>}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {apartmentPayments.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={isAdmin ? 4 : 3} className="text-center text-muted-foreground">
+                          {t('noPayments')}
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      apartmentPayments.map((payment) => (
+                        <TableRow key={payment.id} className={payment.is_canceled ? 'opacity-50' : ''}>
+                          <TableCell className="text-right font-medium">{payment.month}</TableCell>
+                          <TableCell className="text-right text-green-600">₪{payment.amount.toFixed(2)}</TableCell>
+                          <TableCell className="text-right">
+                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                              payment.is_canceled 
+                                ? 'bg-gray-100 text-gray-800' 
+                                : 'bg-green-100 text-green-800'
+                            }`}>
+                              {payment.is_canceled ? t('canceled') : t('active')}
+                            </span>
+                          </TableCell>
+                          {isAdmin && (
+                            <TableCell className="text-right">
+                              {!payment.is_canceled && (
+                                <Button 
+                                  size="sm" 
+                                  variant="outline" 
+                                  onClick={() => handleCancelPayment(payment.id, payment.apartment_id, payment.amount)}
+                                  className="text-orange-600 hover:text-orange-700"
+                                >
+                                  <XCircle className="w-4 h-4 mr-1" />
+                                  {t('cancel')}
+                                </Button>
+                              )}
+                            </TableCell>
+                          )}
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Debt Summary Section */}
+              <div className="border-t pt-4">
+                <h3 className="text-lg font-semibold mb-3">{t('debtSummary')}</h3>
                 <Table>
                   <TableHeader>
                     <TableRow>
