@@ -169,6 +169,16 @@ All colors MUST be HSL.
   [dir="rtl"] .rtl-flip {
     transform: scaleX(-1);
   }
+
+  /* RTL scrollbar padding - add space on the left side where scrollbar appears in RTL */
+  [dir="rtl"] .container {
+    padding-left: 1rem;
+  }
+
+  /* ScrollArea RTL fix - ensure content doesn't go under scrollbar */
+  [dir="rtl"] [data-radix-scroll-area-viewport] {
+    padding-left: 0.75rem;
+  }
 }
 
 /* Print styles for RTL languages */
@@ -192,6 +202,7 @@ All colors MUST be HSL.
     margin-right: auto !important;
     width: 100% !important;
     max-width: 100% !important;
+    padding-left: 0 !important;
   }
   
   /* Ensure charts and cards print properly in RTL */
