@@ -272,13 +272,13 @@ const AuditLogs = () => {
 
         {/* Details Dialog */}
         <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-3xl w-[95vw]">
             <DialogHeader>
               <DialogTitle>{t('auditLogDetails')}</DialogTitle>
             </DialogHeader>
             {selectedLog && (
               <ScrollArea className="max-h-[60vh]" dir="ltr">
-                <div className="space-y-4 pe-4" dir={language === 'ar' || language === 'he' ? 'rtl' : 'ltr'}>
+                <div className="space-y-4 pe-6 ps-2" dir={language === 'ar' || language === 'he' ? 'rtl' : 'ltr'}>
                   <div>
                     <h4 className={`font-semibold mb-2 ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>
                       {t('timestamp')}
