@@ -663,13 +663,10 @@ const Apartments = () => {
                       value={formData.subscription_amount}
                       onChange={(e) => setFormData({ ...formData, subscription_amount: e.target.value })}
                       required
-                      disabled={!editingApartment}
                     />
-                    {!editingApartment && (
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {t('autoCalculated').replace('{fee}', String(settings?.monthly_fee || 0))}
-                      </p>
-                    )}
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {t('autoCalculated').replace('{fee}', String(settings?.monthly_fee || 0))}
+                    </p>
                   </div>
                   <div>
                     <Label htmlFor="subscription_status">{t('subscriptionStatus')}</Label>

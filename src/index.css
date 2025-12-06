@@ -170,3 +170,32 @@ All colors MUST be HSL.
     transform: scaleX(-1);
   }
 }
+
+/* Print styles for RTL languages */
+@media print {
+  html[dir="rtl"],
+  html[dir="rtl"] body,
+  html[dir="rtl"] * {
+    direction: rtl !important;
+  }
+  
+  html[dir="rtl"] body {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    transform: none !important;
+  }
+  
+  html[dir="rtl"] .container {
+    margin-left: auto !important;
+    margin-right: auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  
+  /* Ensure charts and cards print properly in RTL */
+  html[dir="rtl"] .recharts-wrapper {
+    direction: ltr !important;
+  }
+}
