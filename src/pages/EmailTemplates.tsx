@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Mail, Pencil, Trash2, Plus, Eye, ArrowLeft } from 'lucide-react';
+import { Mail, Pencil, Trash2, Plus, Eye } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 interface EmailTemplate {
@@ -295,18 +295,17 @@ const EmailTemplates = () => {
   return (
     <div className="container mx-auto p-6 max-w-7xl" dir={isRTL ? 'rtl' : 'ltr'}>
       <div className="mb-6">
-        <Button variant="ghost" onClick={() => navigate('/settings')} className="mb-4">
-          <ArrowLeft className={`h-4 w-4 ${isRTL ? 'ml-2 rotate-180' : 'mr-2'}`} />
-          {t('backToSettings')}
-        </Button>
+        <div className="flex justify-between items-center mb-4">
+          <h1 className="text-3xl font-bold flex items-center gap-2">
+            <Mail className="h-8 w-8" />
+            {t('emailTemplates')}
+          </h1>
+          <Button variant="outline" onClick={() => navigate('/dashboard')}>
+            {t('backToDashboard')}
+          </Button>
+        </div>
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold flex items-center gap-2">
-              <Mail className="h-8 w-8" />
-              {t('emailTemplates')}
-            </h1>
-            <p className="text-muted-foreground mt-1">{t('emailTemplatesDescription')}</p>
-          </div>
+          <p className="text-muted-foreground">{t('emailTemplatesDescription')}</p>
           <Button onClick={handleCreate}>
             <Plus className={`h-4 w-4 ${isRTL ? 'ml-2' : 'mr-2'}`} />
             {t('addTemplate')}
