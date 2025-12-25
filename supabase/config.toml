@@ -14,3 +14,6 @@ verify_jwt = false
 
 [functions.verify-turnstile]
 verify_jwt = false
+
+[functions.send-templated-email]
+verify_jwt = false
