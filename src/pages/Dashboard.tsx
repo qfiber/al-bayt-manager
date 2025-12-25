@@ -105,6 +105,8 @@ const Dashboard = () => {
     { title: t('settings'), icon: Settings, path: '/settings', color: 'bg-gray-500' },
     { title: t('apiKeys'), icon: Key, path: '/api-keys', color: 'bg-orange-500' },
     { title: t('auditLogs'), icon: Shield, path: '/audit-logs', color: 'bg-pink-500' },
+    { title: t('emailTemplates'), icon: FileText, path: '/email-templates', color: 'bg-teal-500' },
+    { title: t('emailLogs'), icon: FileText, path: '/email-logs', color: 'bg-cyan-500' },
   ];
 
   const userCards = [
