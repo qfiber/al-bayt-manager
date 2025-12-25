@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Mail, ArrowLeft, CheckCircle, XCircle, SkipForward, RefreshCw } from 'lucide-react';
+import { Mail, CheckCircle, XCircle, SkipForward, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface EmailLog {
@@ -144,18 +144,17 @@ const EmailLogs = () => {
   return (
     <div className="container mx-auto p-6 max-w-7xl" dir={isRTL ? 'rtl' : 'ltr'}>
       <div className="mb-6">
-        <Button variant="ghost" onClick={() => navigate('/settings')} className="mb-4">
-          <ArrowLeft className={`h-4 w-4 ${isRTL ? 'ml-2 rotate-180' : 'mr-2'}`} />
-          {t('backToSettings')}
-        </Button>
+        <div className="flex justify-between items-center mb-4">
+          <h1 className="text-3xl font-bold flex items-center gap-2">
+            <Mail className="h-8 w-8" />
+            {t('emailLogs')}
+          </h1>
+          <Button variant="outline" onClick={() => navigate('/dashboard')}>
+            {t('backToDashboard')}
+          </Button>
+        </div>
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold flex items-center gap-2">
-              <Mail className="h-8 w-8" />
-              {t('emailLogs')}
-            </h1>
-            <p className="text-muted-foreground mt-1">{t('emailLogsDescription')}</p>
-          </div>
+          <p className="text-muted-foreground">{t('emailLogsDescription')}</p>
           <Button variant="outline" onClick={fetchLogs}>
             <RefreshCw className={`h-4 w-4 ${isRTL ? 'ml-2' : 'mr-2'}`} />
             {t('refresh')}
