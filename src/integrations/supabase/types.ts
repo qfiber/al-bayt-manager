@@ -228,6 +228,121 @@ export type Database = {
         }
         Relationships: []
       }
+      email_logs: {
+        Row: {
+          created_at: string | null
+          failure_reason: string | null
+          id: string
+          language_used: string | null
+          metadata: Json | null
+          recipient_email: string
+          status: string
+          subject_sent: string | null
+          template_identifier: string
+          user_id: string | null
+          user_preferred_language: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          failure_reason?: string | null
+          id?: string
+          language_used?: string | null
+          metadata?: Json | null
+          recipient_email: string
+          status: string
+          subject_sent?: string | null
+          template_identifier: string
+          user_id?: string | null
+          user_preferred_language?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          failure_reason?: string | null
+          id?: string
+          language_used?: string | null
+          metadata?: Json | null
+          recipient_email?: string
+          status?: string
+          subject_sent?: string | null
+          template_identifier?: string
+          user_id?: string | null
+          user_preferred_language?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_template_translations: {
+        Row: {
+          created_at: string | null
+          html_body: string
+          id: string
+          language: string
+          subject: string
+          template_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          html_body: string
+          id?: string
+          language: string
+          subject: string
+          template_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          html_body?: string
+          id?: string
+          language?: string
+          subject?: string
+          template_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_template_translations_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "email_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_templates: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          identifier: string
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          identifier: string
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          identifier?: string
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       expenses: {
         Row: {
           amount: number
@@ -404,6 +519,7 @@ export type Database = {
           id: string
           name: string
           phone: string | null
+          preferred_language: string | null
           updated_at: string | null
         }
         Insert: {
@@ -411,6 +527,7 @@ export type Database = {
           id: string
           name: string
           phone?: string | null
+          preferred_language?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -418,6 +535,7 @@ export type Database = {
           id?: string
           name?: string
           phone?: string | null
+          preferred_language?: string | null
           updated_at?: string | null
         }
         Relationships: []

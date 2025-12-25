@@ -21,6 +21,8 @@ import UserManagement from "./pages/UserManagement";
 import MyApartments from "./pages/MyApartments";
 import ApiKeys from "./pages/ApiKeys";
 import AuditLogs from "./pages/AuditLogs";
+import EmailTemplates from "./pages/EmailTemplates";
+import EmailLogs from "./pages/EmailLogs";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -60,6 +62,8 @@ const App = () => (
               <Route path="/my-apartments" element={<MyApartments />} />
               <Route path="/api-keys" element={<ApiKeys />} />
               <Route path="/audit-logs" element={<AuditLogs />} />
+              <Route path="/email-templates" element={<EmailTemplates />} />
+              <Route path="/email-logs" element={<EmailLogs />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

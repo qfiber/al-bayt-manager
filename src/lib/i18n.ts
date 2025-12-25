@@ -394,6 +394,35 @@ export const translations = {
     actionDetails: "פרטי פעולה",
     noLogsFound: "לא נמצאו יומנים",
     system: "מערכת",
+
+    // Email Templates
+    emailTemplates: "תבניות אימייל",
+    emailTemplatesDescription: "נהל תבניות להתראות אימייל",
+    addTemplate: "הוסף תבנית",
+    editTemplate: "ערוך תבנית",
+    templateIdentifier: "מזהה",
+    templateName: "שם התבנית",
+    translations: "תרגומים",
+    noTemplatesFound: "לא נמצאו תבניות",
+    deleteTemplateConfirm: "פעולה זו תמחק לצמיתות את התבנית הזו ואת כל התרגומים שלה.",
+    availablePlaceholders: "מציינים זמינים",
+    emailSubject: "נושא",
+    emailBody: "גוף ההודעה",
+    preview: "תצוגה מקדימה",
+
+    // Email Logs
+    emailLogs: "יומני אימייל",
+    emailLogsDescription: "צפה בניסיונות שליחת אימייל והסטטוס שלהם",
+    recipientEmail: "נמען",
+    template: "תבנית",
+    preferredLanguage: "שפה מועדפת",
+    languageUsed: "שפה בשימוש",
+    failureReason: "סיבת כשלון",
+    sent: "נשלח",
+    failed: "נכשל",
+    skipped: "דולג",
+    refresh: "רענן",
+    all: "הכל",
   },
   ar: {
     // Site
@@ -790,6 +819,35 @@ export const translations = {
     actionDetails: "تفاصيل الإجراء",
     noLogsFound: "لم يتم العثور على سجلات",
     system: "النظام",
+
+    // Email Templates
+    emailTemplates: "قوالب البريد الإلكتروني",
+    emailTemplatesDescription: "إدارة قوالب إشعارات البريد الإلكتروني",
+    addTemplate: "إضافة قالب",
+    editTemplate: "تعديل القالب",
+    templateIdentifier: "المعرف",
+    templateName: "اسم القالب",
+    translations: "الترجمات",
+    noTemplatesFound: "لم يتم العثور على قوالب",
+    deleteTemplateConfirm: "سيؤدي هذا إلى حذف هذا القالب وجميع ترجماته نهائياً.",
+    availablePlaceholders: "العناصر النائبة المتاحة",
+    emailSubject: "الموضوع",
+    emailBody: "نص الرسالة",
+    preview: "معاينة",
+
+    // Email Logs
+    emailLogs: "سجلات البريد الإلكتروني",
+    emailLogsDescription: "عرض محاولات إرسال البريد الإلكتروني وحالتها",
+    recipientEmail: "المستلم",
+    template: "القالب",
+    preferredLanguage: "اللغة المفضلة",
+    languageUsed: "اللغة المستخدمة",
+    failureReason: "سبب الفشل",
+    sent: "مُرسل",
+    failed: "فشل",
+    skipped: "تم التخطي",
+    refresh: "تحديث",
+    all: "الكل",
   },
   en: {
     // Site
@@ -1192,6 +1250,35 @@ export const translations = {
     password_change: "Password Change",
     api_key_created: "API Key Created",
     api_key_deleted: "API Key Deleted",
+
+    // Email Templates
+    emailTemplates: "Email Templates",
+    emailTemplatesDescription: "Manage email notification templates",
+    addTemplate: "Add Template",
+    editTemplate: "Edit Template",
+    templateIdentifier: "Identifier",
+    templateName: "Template Name",
+    translations: "Translations",
+    noTemplatesFound: "No templates found",
+    deleteTemplateConfirm: "This will permanently delete this template and all its translations.",
+    availablePlaceholders: "Available Placeholders",
+    emailSubject: "Subject",
+    emailBody: "Body",
+    preview: "Preview",
+
+    // Email Logs
+    emailLogs: "Email Logs",
+    emailLogsDescription: "View email send attempts and their status",
+    recipientEmail: "Recipient",
+    template: "Template",
+    preferredLanguage: "Preferred Language",
+    languageUsed: "Language Used",
+    failureReason: "Failure Reason",
+    sent: "Sent",
+    failed: "Failed",
+    skipped: "Skipped",
+    refresh: "Refresh",
+    all: "All",
   },
 };
 
