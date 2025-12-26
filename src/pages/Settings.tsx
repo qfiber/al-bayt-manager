@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { Switch } from '@/components/ui/switch';
-import { Settings as SettingsIcon, Save, DollarSign, Globe, Upload, Shield } from 'lucide-react';
+import { Settings as SettingsIcon, Save, DollarSign, Globe, Upload, Shield, Mail } from 'lucide-react';
 
 interface SettingsData {
   id: string;
@@ -19,6 +19,10 @@ interface SettingsData {
   logo_url: string | null;
   turnstile_enabled: boolean;
   turnstile_site_key: string | null;
+  smtp_enabled?: boolean;
+  smtp_from_email?: string | null;
+  smtp_from_name?: string | null;
+  resend_api_key?: string | null;
 }
 
 interface LogoFile {
@@ -42,6 +46,10 @@ const Settings = () => {
   const [checking2FA, setChecking2FA] = useState(true);
   const [turnstileEnabled, setTurnstileEnabled] = useState(false);
   const [turnstileSiteKey, setTurnstileSiteKey] = useState('');
+  const [smtpEnabled, setSmtpEnabled] = useState(false);
+  const [smtpFromEmail, setSmtpFromEmail] = useState('');
+  const [smtpFromName, setSmtpFromName] = useState('');
+  const [resendApiKey, setResendApiKey] = useState('');
 
   useEffect(() => {
     if (!loading && !user) {
@@ -96,6 +104,10 @@ const Settings = () => {
       setSystemLanguage(data.system_language);
       setTurnstileEnabled(data.turnstile_enabled || false);
       setTurnstileSiteKey(data.turnstile_site_key || '');
+      setSmtpEnabled((data as any).smtp_enabled || false);
+      setSmtpFromEmail((data as any).smtp_from_email || '');
+      setSmtpFromName((data as any).smtp_from_name || '');
+      setResendApiKey((data as any).resend_api_key || '');
     } else {
       // Create initial settings if none exist
       const { data: newSettings, error: createError } = await supabase
@@ -170,12 +182,16 @@ const Settings = () => {
         logoUrl = await uploadLogo();
       }
 
-      // Update settings (monthly fee, language, and turnstile)
-      const settingsUpdateData = {
+      // Update settings (monthly fee, language, turnstile, and email)
+      const settingsUpdateData: any = {
         monthly_fee: parseFloat(monthlyFee),
         system_language: systemLanguage,
         turnstile_enabled: turnstileEnabled,
         turnstile_site_key: turnstileSiteKey || null,
+        smtp_enabled: smtpEnabled,
+        smtp_from_email: smtpFromEmail || null,
+        smtp_from_name: smtpFromName || null,
+        resend_api_key: resendApiKey || null,
       };
 
       const { error: settingsError } = await supabase
@@ -428,6 +444,77 @@ const Settings = () => {
                   )}
                 </div>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Email Settings */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Mail className="w-5 h-5" />
+                {t('emailSettings')}
+              </CardTitle>
+              <CardDescription>
+                {t('emailSettingsDesc')}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/20">
+                <div>
+                  <Label htmlFor="smtp-enabled">{t('enableEmailSending')}</Label>
+                  <p className="text-sm text-muted-foreground">
+                    {t('enableEmailSendingDesc')}
+                  </p>
+                </div>
+                <Switch
+                  id="smtp-enabled"
+                  checked={smtpEnabled}
+                  onCheckedChange={setSmtpEnabled}
+                />
+              </div>
+
+              {smtpEnabled && (
+                <div className="space-y-4 pt-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="resend-api-key">{t('resendApiKey')}</Label>
+                    <Input
+                      id="resend-api-key"
+                      type="password"
+                      placeholder="re_..."
+                      value={resendApiKey}
+                      onChange={(e) => setResendApiKey(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      {t('resendApiKeyHelp')}
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="smtp-from-email">{t('fromEmail')}</Label>
+                    <Input
+                      id="smtp-from-email"
+                      type="email"
+                      placeholder="noreply@yourdomain.com"
+                      value={smtpFromEmail}
+                      onChange={(e) => setSmtpFromEmail(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      {t('fromEmailHelp')}
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="smtp-from-name">{t('fromName')}</Label>
+                    <Input
+                      id="smtp-from-name"
+                      type="text"
+                      placeholder="Building Management"
+                      value={smtpFromName}
+                      onChange={(e) => setSmtpFromName(e.target.value)}
+                    />
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 

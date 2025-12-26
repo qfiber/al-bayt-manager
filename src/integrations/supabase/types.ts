@@ -576,6 +576,10 @@ export type Database = {
           id: string
           logo_url: string | null
           monthly_fee: number
+          resend_api_key: string | null
+          smtp_enabled: boolean
+          smtp_from_email: string | null
+          smtp_from_name: string | null
           system_language: string
           turnstile_enabled: boolean
           turnstile_site_key: string | null
@@ -586,6 +590,10 @@ export type Database = {
           id?: string
           logo_url?: string | null
           monthly_fee?: number
+          resend_api_key?: string | null
+          smtp_enabled?: boolean
+          smtp_from_email?: string | null
+          smtp_from_name?: string | null
           system_language?: string
           turnstile_enabled?: boolean
           turnstile_site_key?: string | null
@@ -596,6 +604,10 @@ export type Database = {
           id?: string
           logo_url?: string | null
           monthly_fee?: number
+          resend_api_key?: string | null
+          smtp_enabled?: boolean
+          smtp_from_email?: string | null
+          smtp_from_name?: string | null
           system_language?: string
           turnstile_enabled?: boolean
           turnstile_site_key?: string | null
