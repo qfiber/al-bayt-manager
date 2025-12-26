@@ -423,6 +423,17 @@ export const translations = {
     skipped: "דולג",
     refresh: "רענן",
     all: "הכל",
+
+    // Email Settings
+    emailSettings: "הגדרות אימייל",
+    emailSettingsDesc: "הגדר שליחת אימייל עם Resend",
+    enableEmailSending: "הפעל שליחת אימייל",
+    enableEmailSendingDesc: "אפשר למערכת לשלוח התראות באימייל",
+    resendApiKey: "מפתח API של Resend",
+    resendApiKeyHelp: "קבל את מפתח ה-API שלך מ-resend.com/api-keys",
+    fromEmail: "אימייל שולח",
+    fromEmailHelp: "הדומיין חייב להיות מאומת ב-Resend",
+    fromName: "שם שולח",
   },
   ar: {
     // Site
@@ -848,6 +859,17 @@ export const translations = {
     skipped: "تم التخطي",
     refresh: "تحديث",
     all: "الكل",
+
+    // Email Settings
+    emailSettings: "إعدادات البريد الإلكتروني",
+    emailSettingsDesc: "تكوين إرسال البريد الإلكتروني باستخدام Resend",
+    enableEmailSending: "تفعيل إرسال البريد الإلكتروني",
+    enableEmailSendingDesc: "السماح للنظام بإرسال إشعارات البريد الإلكتروني",
+    resendApiKey: "مفتاح Resend API",
+    resendApiKeyHelp: "احصل على مفتاح API الخاص بك من resend.com/api-keys",
+    fromEmail: "بريد المرسل",
+    fromEmailHelp: "يجب التحقق من النطاق في Resend",
+    fromName: "اسم المرسل",
   },
   en: {
     // Site
@@ -1279,6 +1301,17 @@ export const translations = {
     skipped: "Skipped",
     refresh: "Refresh",
     all: "All",
+
+    // Email Settings
+    emailSettings: "Email Settings",
+    emailSettingsDesc: "Configure email sending with Resend",
+    enableEmailSending: "Enable Email Sending",
+    enableEmailSendingDesc: "Allow the system to send email notifications",
+    resendApiKey: "Resend API Key",
+    resendApiKeyHelp: "Get your API key from resend.com/api-keys",
+    fromEmail: "From Email",
+    fromEmailHelp: "Domain must be verified in Resend",
+    fromName: "From Name",
   },
 };
 
