@@ -1,24 +1,111 @@
 import { supabase } from '@/integrations/supabase/client';
 
-interface Apartment {
-  id: string;
-  building_id: string;
-  occupancy_start: string | null;
-  status: string;
-  credit: number;
-}
+/**
+ * SIMPLIFIED CREDIT/DEBIT CALCULATION SYSTEM
+ * 
+ * Core Principle: Balance = Total Payments - Total Obligations
+ * 
+ * Where:
+ * - Total Payments = sum of all payments.amount (active only)
+ * - Total Obligations = sum of apartment_expenses.amount + subscription_amount
+ * 
+ * Positive balance = credit (overpaid)
+ * Negative balance = debt (owes money)
+ */
 
-interface ApartmentExpense {
-  id: string;
-  apartment_id: string;
-  expense_id: string;
-  amount: number;
-  is_canceled: boolean;
+/**
+ * Recalculate an apartment's balance from scratch.
+ * This is THE single source of truth for apartment balance.
+ * 
+ * Formula: balance = totalPayments - totalExpenses - subscriptionAmount
+ */
+export async function recalculateApartmentBalance(apartmentId: string): Promise<{
+  success: boolean;
+  message: string;
+  newCredit: number;
+  newStatus: string;
+}> {
+  try {
+    // Get apartment details
+    const { data: apartment, error: aptError } = await supabase
+      .from('apartments')
+      .select('id, building_id, subscription_amount, status')
+      .eq('id', apartmentId)
+      .single();
+
+    if (aptError || !apartment) {
+      return { success: false, message: 'Apartment not found', newCredit: 0, newStatus: 'due' };
+    }
+
+    // Get all ACTIVE payments for this apartment (not canceled)
+    const { data: payments, error: payError } = await supabase
+      .from('payments')
+      .select('amount')
+      .eq('apartment_id', apartmentId)
+      .eq('is_canceled', false);
+
+    if (payError) {
+      return { success: false, message: payError.message, newCredit: 0, newStatus: 'due' };
+    }
+
+    // Get all ACTIVE apartment expenses (not canceled)
+    const { data: expenses, error: expError } = await supabase
+      .from('apartment_expenses')
+      .select('amount')
+      .eq('apartment_id', apartmentId)
+      .eq('is_canceled', false);
+
+    if (expError) {
+      return { success: false, message: expError.message, newCredit: 0, newStatus: 'due' };
+    }
+
+    // Simple calculation:
+    // 1. Total what was paid
+    const totalPayments = payments?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
+    
+    // 2. Total what is owed (expenses + subscription)
+    const totalExpenses = expenses?.reduce((sum, e) => sum + (e.amount || 0), 0) || 0;
+    const subscriptionAmount = apartment.status === 'occupied' ? (apartment.subscription_amount || 0) : 0;
+    const totalOwed = totalExpenses + subscriptionAmount;
+    
+    // 3. Balance = paid - owed
+    // Positive = credit (overpaid), Negative = debt (owes money)
+    const newCredit = totalPayments - totalOwed;
+
+    // Determine subscription status
+    let newStatus = 'due';
+    if (apartment.status !== 'occupied') {
+      newStatus = 'due';
+    } else if (newCredit >= 0) {
+      newStatus = 'paid';
+    } else if (totalPayments > 0) {
+      newStatus = 'partial';
+    }
+
+    // Update the apartment
+    const { error: updateError } = await supabase
+      .from('apartments')
+      .update({
+        credit: newCredit,
+        subscription_status: newStatus
+      })
+      .eq('id', apartmentId);
+
+    if (updateError) {
+      return { success: false, message: updateError.message, newCredit, newStatus };
+    }
+
+    console.log(`Apartment ${apartmentId} recalculated: payments=${totalPayments}, expenses=${totalExpenses}, subscription=${subscriptionAmount}, balance=${newCredit}`);
+
+    return { success: true, message: 'Balance recalculated', newCredit, newStatus };
+  } catch (error: any) {
+    return { success: false, message: error.message, newCredit: 0, newStatus: 'due' };
+  }
 }
 
 /**
- * Recalculates expense distribution for a building when an apartment's occupancy changes.
- * This considers occupancy_start dates to determine which apartments should share each expense.
+ * Recalculates expense distribution for a building.
+ * After redistribution, recalculates all apartment balances.
  */
 export async function recalculateBuildingExpenses(buildingId: string): Promise<{
   success: boolean;
@@ -50,6 +137,10 @@ export async function recalculateBuildingExpenses(buildingId: string): Promise<{
 
     // Fetch all apartment_expenses for apartments in this building
     const apartmentIds = apartments.map(a => a.id);
+    if (apartmentIds.length === 0) {
+      return { success: true, message: 'No apartments in building', adjustments };
+    }
+
     const { data: apartmentExpenses, error: aeError } = await supabase
       .from('apartment_expenses')
       .select('*')
@@ -68,11 +159,6 @@ export async function recalculateBuildingExpenses(buildingId: string): Promise<{
       
       // Find apartments that were occupied during this expense's month
       const eligibleApartments = apartments.filter(apt => {
-        if (apt.status !== 'occupied' || !apt.occupancy_start) {
-          // Check if they were occupied during that month
-          // If currently vacant but was occupied during the expense month, still include
-        }
-        
         if (!apt.occupancy_start) return false;
         
         const occupancyStart = new Date(apt.occupancy_start);
@@ -80,10 +166,8 @@ export async function recalculateBuildingExpenses(buildingId: string): Promise<{
         const occupancyYear = occupancyStart.getFullYear();
         
         // Apartment is eligible if occupancy started on or before the expense date
-        // More specifically: if occupancy started in the same month or earlier
         if (occupancyYear < expenseYear) return true;
         if (occupancyYear === expenseYear && occupancyMonth <= expenseMonth) {
-          // Check if occupancy started on first day of month
           const firstDayOfExpenseMonth = new Date(expenseYear, expenseMonth, 1);
           return occupancyStart <= firstDayOfExpenseMonth || 
                  (occupancyStart.getMonth() === expenseMonth && occupancyStart.getDate() === 1);
@@ -98,7 +182,7 @@ export async function recalculateBuildingExpenses(buildingId: string): Promise<{
       // Get current apartment_expenses for this expense
       const currentExpenseRecords = (apartmentExpenses || []).filter(ae => ae.expense_id === expense.id);
 
-      // Calculate what each apartment should have vs what they currently have
+      // Update each apartment's expense allocation
       for (const apt of apartments) {
         const isEligible = eligibleApartments.some(ea => ea.id === apt.id);
         const currentRecord = currentExpenseRecords.find(r => r.apartment_id === apt.id);
@@ -106,10 +190,8 @@ export async function recalculateBuildingExpenses(buildingId: string): Promise<{
         const targetAmount = isEligible ? correctAmountPerApartment : 0;
 
         if (Math.abs(currentAmount - targetAmount) > 0.01) {
-          const creditChange = currentAmount - targetAmount;
-          
           if (isEligible && !currentRecord) {
-            // Need to create a new record for this apartment
+            // Create a new record
             await supabase
               .from('apartment_expenses')
               .insert({
@@ -118,7 +200,7 @@ export async function recalculateBuildingExpenses(buildingId: string): Promise<{
                 amount: targetAmount
               });
           } else if (!isEligible && currentRecord) {
-            // This apartment shouldn't have this expense, mark as canceled
+            // Mark as canceled
             await supabase
               .from('apartment_expenses')
               .update({ is_canceled: true })
@@ -131,24 +213,14 @@ export async function recalculateBuildingExpenses(buildingId: string): Promise<{
               .eq('id', currentRecord.id);
           }
 
-          // Update apartment credit
-          const { data: currentApt } = await supabase
-            .from('apartments')
-            .select('credit')
-            .eq('id', apt.id)
-            .single();
-
-          if (currentApt) {
-            const newCredit = currentApt.credit + creditChange;
-            await supabase
-              .from('apartments')
-              .update({ credit: newCredit })
-              .eq('id', apt.id);
-            
-            adjustments.push({ apartmentId: apt.id, creditChange });
-          }
+          adjustments.push({ apartmentId: apt.id, creditChange: currentAmount - targetAmount });
         }
       }
+    }
+
+    // After redistributing expenses, recalculate ALL apartment balances in the building
+    for (const apt of apartments) {
+      await recalculateApartmentBalance(apt.id);
     }
 
     return { success: true, message: 'Expenses recalculated successfully', adjustments };
@@ -158,8 +230,8 @@ export async function recalculateBuildingExpenses(buildingId: string): Promise<{
 }
 
 /**
- * Get unpaid expenses for an apartment with their remaining balances
- * Includes the monthly subscription if it's due
+ * Get unpaid expenses for an apartment with their remaining balances.
+ * Used for the payment allocation UI.
  */
 export async function getUnpaidExpensesForApartment(apartmentId: string): Promise<{
   id: string;
@@ -184,22 +256,39 @@ export async function getUnpaidExpensesForApartment(apartmentId: string): Promis
     isSubscription?: boolean;
   }[] = [];
 
-  // First, check if the apartment has an unpaid subscription
-  const { data: apartment, error: aptError } = await supabase
+  // Get apartment details for subscription info
+  const { data: apartment } = await supabase
     .from('apartments')
-    .select('id, subscription_amount, credit, subscription_status')
+    .select('id, subscription_amount, credit, subscription_status, status')
     .eq('id', apartmentId)
     .maybeSingle();
 
-  if (apartment && apartment.subscription_amount > 0) {
-    // Calculate if subscription is due based on credit
-    // If credit is negative or zero, subscription is due
-    const subscriptionDue = apartment.credit < apartment.subscription_amount;
-    const amountDue = apartment.subscription_amount;
-    const amountPaidTowardsSubscription = Math.max(0, apartment.credit);
-    const remaining = amountDue - amountPaidTowardsSubscription;
+  // Add subscription as an expense if apartment is occupied and owes money
+  if (apartment && apartment.status === 'occupied' && apartment.subscription_amount > 0) {
+    // Calculate how much of subscription is unpaid
+    // Get all payments and expenses to see the breakdown
+    const { data: payments } = await supabase
+      .from('payments')
+      .select('amount')
+      .eq('apartment_id', apartmentId)
+      .eq('is_canceled', false);
+    
+    const { data: expenses } = await supabase
+      .from('apartment_expenses')
+      .select('amount, amount_paid')
+      .eq('apartment_id', apartmentId)
+      .eq('is_canceled', false);
 
-    if (remaining > 0 && apartment.subscription_status !== 'paid') {
+    const totalPayments = payments?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
+    const totalExpenses = expenses?.reduce((sum, e) => sum + (e.amount || 0), 0) || 0;
+    const totalPaidToExpenses = expenses?.reduce((sum, e) => sum + (e.amount_paid || 0), 0) || 0;
+    
+    // What's left after paying expenses goes to subscription
+    const availableForSubscription = Math.max(0, totalPayments - totalExpenses);
+    const paidTowardSubscription = Math.min(availableForSubscription, apartment.subscription_amount);
+    const subscriptionRemaining = apartment.subscription_amount - paidTowardSubscription;
+
+    if (subscriptionRemaining > 0) {
       const now = new Date();
       results.push({
         id: `subscription_${apartmentId}`,
@@ -207,15 +296,15 @@ export async function getUnpaidExpensesForApartment(apartmentId: string): Promis
         description: 'Monthly Subscription',
         category: 'subscription',
         expense_date: now.toISOString().split('T')[0],
-        amount: amountDue,
-        amount_paid: amountPaidTowardsSubscription,
-        remaining: remaining,
+        amount: apartment.subscription_amount,
+        amount_paid: paidTowardSubscription,
+        remaining: subscriptionRemaining,
         isSubscription: true
       });
     }
   }
 
-  // Then fetch regular apartment expenses
+  // Fetch regular apartment expenses
   const { data, error } = await supabase
     .from('apartment_expenses')
     .select(`
@@ -231,7 +320,7 @@ export async function getUnpaidExpensesForApartment(apartmentId: string): Promis
     .order('created_at', { ascending: true });
 
   if (!error && data) {
-    const expenses = data
+    const expensesList = data
       .filter(ae => ae.amount > (ae.amount_paid || 0))
       .map(ae => ({
         id: ae.id,
@@ -245,100 +334,15 @@ export async function getUnpaidExpensesForApartment(apartmentId: string): Promis
         isSubscription: false
       }));
     
-    results.push(...expenses);
+    results.push(...expensesList);
   }
 
   return results;
 }
 
 /**
- * Recalculate an apartment's credit/debit balance based on all payments and expenses.
- * This is the single source of truth for apartment balance calculation.
- */
-export async function recalculateApartmentBalance(apartmentId: string): Promise<{
-  success: boolean;
-  message: string;
-  newCredit: number;
-  newStatus: string;
-}> {
-  try {
-    // Get apartment details
-    const { data: apartment, error: aptError } = await supabase
-      .from('apartments')
-      .select('id, building_id, subscription_amount, status')
-      .eq('id', apartmentId)
-      .single();
-
-    if (aptError || !apartment) {
-      return { success: false, message: 'Apartment not found', newCredit: 0, newStatus: 'due' };
-    }
-
-    // Get all active payments for this apartment
-    const { data: payments, error: payError } = await supabase
-      .from('payments')
-      .select('amount')
-      .eq('apartment_id', apartmentId)
-      .eq('is_canceled', false);
-
-    if (payError) {
-      return { success: false, message: payError.message, newCredit: 0, newStatus: 'due' };
-    }
-
-    // Get all active apartment expenses
-    const { data: expenses, error: expError } = await supabase
-      .from('apartment_expenses')
-      .select('amount, amount_paid')
-      .eq('apartment_id', apartmentId)
-      .eq('is_canceled', false);
-
-    if (expError) {
-      return { success: false, message: expError.message, newCredit: 0, newStatus: 'due' };
-    }
-
-    // Calculate totals
-    const totalPayments = payments?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
-    const totalExpenseDebt = expenses?.reduce((sum, e) => sum + (e.amount || 0), 0) || 0;
-    const totalExpensePaid = expenses?.reduce((sum, e) => sum + (e.amount_paid || 0), 0) || 0;
-
-    // Credit = Total Payments - Total Expenses (unpaid portion)
-    // If apartment is occupied, also consider subscription
-    const subscriptionAmount = apartment.status === 'occupied' ? (apartment.subscription_amount || 0) : 0;
-    
-    // Net credit: payments received minus expenses owed
-    // Positive = credit (overpaid), Negative = debit (owes money)
-    const newCredit = totalPayments - totalExpenseDebt - subscriptionAmount + totalExpensePaid;
-
-    // Determine subscription status
-    let newStatus = 'due';
-    if (apartment.status !== 'occupied') {
-      newStatus = 'due'; // Vacant apartments don't have subscription status
-    } else if (newCredit >= 0) {
-      newStatus = 'paid';
-    } else if (totalPayments > 0) {
-      newStatus = 'partial';
-    }
-
-    // Update the apartment
-    const { error: updateError } = await supabase
-      .from('apartments')
-      .update({
-        credit: newCredit,
-        subscription_status: newStatus
-      })
-      .eq('id', apartmentId);
-
-    if (updateError) {
-      return { success: false, message: updateError.message, newCredit, newStatus };
-    }
-
-    return { success: true, message: 'Balance recalculated', newCredit, newStatus };
-  } catch (error: any) {
-    return { success: false, message: error.message, newCredit: 0, newStatus: 'due' };
-  }
-}
-
-/**
- * Apply a payment to specific expenses (including subscription)
+ * Apply a payment to specific expenses (updates amount_paid for display purposes).
+ * Then recalculates the apartment balance.
  */
 export async function applyPaymentToExpenses(
   paymentId: string,
@@ -346,12 +350,10 @@ export async function applyPaymentToExpenses(
   allocations: Array<{ apartmentExpenseId: string; amount: number }>
 ): Promise<{ success: boolean; message: string; creditRemaining: number }> {
   try {
-    let totalAllocated = 0;
-
     for (const alloc of allocations) {
-      // Skip subscription allocations (handled via credit)
+      // Skip subscription allocations (these don't have actual records)
       if (alloc.apartmentExpenseId.startsWith('subscription_')) {
-        totalAllocated += alloc.amount;
+        // Create a payment allocation record for tracking only
         continue;
       }
 
@@ -368,13 +370,13 @@ export async function applyPaymentToExpenses(
 
       const newAmountPaid = (expenseRecord.amount_paid || 0) + alloc.amount;
 
-      // Update the apartment_expense amount_paid
+      // Update the apartment_expense amount_paid (for display only)
       await supabase
         .from('apartment_expenses')
         .update({ amount_paid: newAmountPaid })
         .eq('id', alloc.apartmentExpenseId);
 
-      // Create payment allocation record
+      // Create payment allocation record for audit trail
       await supabase
         .from('payment_allocations')
         .insert({
@@ -382,31 +384,20 @@ export async function applyPaymentToExpenses(
           apartment_expense_id: alloc.apartmentExpenseId,
           amount_allocated: alloc.amount
         });
-
-      totalAllocated += alloc.amount;
     }
 
-    // Get the payment amount for calculating remaining
-    const { data: payment } = await supabase
-      .from('payments')
-      .select('amount')
-      .eq('id', paymentId)
-      .single();
+    // Recalculate apartment balance (this is what actually matters)
+    const result = await recalculateApartmentBalance(apartmentId);
 
-    const paymentAmount = payment?.amount || 0;
-    const creditRemaining = paymentAmount - totalAllocated;
-
-    // Recalculate apartment balance (this is the key change - centralized recalculation)
-    await recalculateApartmentBalance(apartmentId);
-
-    return { success: true, message: 'Payment applied successfully', creditRemaining };
+    return { success: true, message: 'Payment applied successfully', creditRemaining: Math.max(0, result.newCredit) };
   } catch (error: any) {
     return { success: false, message: error.message, creditRemaining: 0 };
   }
 }
 
 /**
- * Cancel a payment and reverse all its allocations, then recalculate balances
+ * Cancel a payment and recalculate balances.
+ * This marks the payment as canceled and reverses allocation tracking.
  */
 export async function cancelPaymentAndRecalculate(
   paymentId: string,
@@ -423,7 +414,7 @@ export async function cancelPaymentAndRecalculate(
       return { success: false, message: allocError.message };
     }
 
-    // Reverse each allocation by reducing amount_paid on apartment_expenses
+    // Reverse each allocation's amount_paid (for display purposes)
     for (const alloc of paymentAllocations || []) {
       const { data: expenseRecord } = await supabase
         .from('apartment_expenses')
@@ -446,7 +437,7 @@ export async function cancelPaymentAndRecalculate(
       .delete()
       .eq('payment_id', paymentId);
 
-    // Cancel the payment (soft delete)
+    // Mark the payment as canceled
     const { error: cancelError } = await supabase
       .from('payments')
       .update({ is_canceled: true })
@@ -456,22 +447,66 @@ export async function cancelPaymentAndRecalculate(
       return { success: false, message: cancelError.message };
     }
 
-    // Recalculate apartment balance
+    // Recalculate apartment balance (this is what matters)
     const result = await recalculateApartmentBalance(apartmentId);
-    
-    // Get apartment to find building_id for building recalculation
-    const { data: apartment } = await supabase
-      .from('apartments')
-      .select('building_id')
-      .eq('id', apartmentId)
-      .single();
 
-    // Optionally recalculate building expenses if needed
-    if (apartment?.building_id) {
-      await recalculateBuildingExpenses(apartment.building_id);
+    return { success: result.success, message: result.success ? 'Payment canceled and balance recalculated' : result.message };
+  } catch (error: any) {
+    return { success: false, message: error.message };
+  }
+}
+
+/**
+ * Delete a payment completely (hard delete) and recalculate.
+ */
+export async function deletePaymentAndRecalculate(
+  paymentId: string,
+  apartmentId: string
+): Promise<{ success: boolean; message: string }> {
+  try {
+    // Get all payment allocations for this payment
+    const { data: paymentAllocations } = await supabase
+      .from('payment_allocations')
+      .select('apartment_expense_id, amount_allocated')
+      .eq('payment_id', paymentId);
+
+    // Reverse each allocation's amount_paid
+    for (const alloc of paymentAllocations || []) {
+      const { data: expenseRecord } = await supabase
+        .from('apartment_expenses')
+        .select('amount_paid')
+        .eq('id', alloc.apartment_expense_id)
+        .single();
+
+      if (expenseRecord) {
+        const newAmountPaid = Math.max(0, (expenseRecord.amount_paid || 0) - alloc.amount_allocated);
+        await supabase
+          .from('apartment_expenses')
+          .update({ amount_paid: newAmountPaid })
+          .eq('id', alloc.apartment_expense_id);
+      }
     }
 
-    return { success: result.success, message: result.success ? 'Payment canceled and balances recalculated' : result.message };
+    // Delete the payment allocations
+    await supabase
+      .from('payment_allocations')
+      .delete()
+      .eq('payment_id', paymentId);
+
+    // Delete the payment
+    const { error: deleteError } = await supabase
+      .from('payments')
+      .delete()
+      .eq('id', paymentId);
+
+    if (deleteError) {
+      return { success: false, message: deleteError.message };
+    }
+
+    // Recalculate apartment balance
+    const result = await recalculateApartmentBalance(apartmentId);
+
+    return { success: result.success, message: result.success ? 'Payment deleted and balance recalculated' : result.message };
   } catch (error: any) {
     return { success: false, message: error.message };
   }

@@ -182,17 +182,6 @@ const Expenses = () => {
         // Check if single apartment mode
         if (formData.is_single_apartment && formData.apartment_id) {
           // Apply expense to single apartment
-          const { data: targetApartment, error: aptError } = await supabase
-            .from('apartments')
-            .select('id, credit')
-            .eq('id', formData.apartment_id)
-            .single();
-
-          if (aptError || !targetApartment) {
-            toast({ title: 'Error', description: aptError?.message || 'Apartment not found', variant: 'destructive' });
-            return;
-          }
-
           const expenseAmount = parseFloat(formData.amount);
 
           // Create single apartment_expense record
@@ -209,11 +198,9 @@ const Expenses = () => {
             return;
           }
 
-          // Update apartment credit
-          await supabase
-            .from('apartments')
-            .update({ credit: targetApartment.credit - expenseAmount })
-            .eq('id', formData.apartment_id);
+          // Recalculate apartment balance (no direct credit manipulation)
+          const { recalculateApartmentBalance } = await import('@/hooks/useExpenseRecalculation');
+          await recalculateApartmentBalance(formData.apartment_id);
 
           toast({ 
             title: t('success'), 
@@ -223,7 +210,7 @@ const Expenses = () => {
           // Fetch all apartments for this building to split the expense
           const { data: buildingApartments, error: apartmentsError } = await supabase
             .from('apartments')
-            .select('id, credit')
+            .select('id')
             .eq('building_id', formData.building_id);
 
           if (!apartmentsError && buildingApartments && buildingApartments.length > 0) {
@@ -231,7 +218,7 @@ const Expenses = () => {
             const totalAmount = parseFloat(formData.amount);
             const perApartmentAmount = totalAmount / buildingApartments.length;
 
-            // Create apartment_expenses records and update credits
+            // Create apartment_expenses records
             const apartmentExpensesRecords = buildingApartments.map(apt => ({
               apartment_id: apt.id,
               expense_id: createdExpense.id,
@@ -247,12 +234,10 @@ const Expenses = () => {
               return;
             }
 
-            // Update each apartment's credit by deducting their share
+            // Recalculate each apartment's balance (no direct credit manipulation)
+            const { recalculateApartmentBalance } = await import('@/hooks/useExpenseRecalculation');
             for (const apt of buildingApartments) {
-              await supabase
-                .from('apartments')
-                .update({ credit: apt.credit - perApartmentAmount })
-                .eq('id', apt.id);
+              await recalculateApartmentBalance(apt.id);
             }
 
             toast({ 
@@ -273,10 +258,10 @@ const Expenses = () => {
   const handleDelete = async (id: string) => {
     if (!confirm(t('deleteExpenseConfirm'))) return;
 
-    // First, fetch apartment_expenses to restore credits
+    // First, fetch apartment_expenses to know which apartments to recalculate
     const { data: apartmentExpenses, error: fetchError } = await supabase
       .from('apartment_expenses')
-      .select('apartment_id, amount')
+      .select('apartment_id')
       .eq('expense_id', id);
 
     if (fetchError) {
@@ -284,23 +269,8 @@ const Expenses = () => {
       return;
     }
 
-    // Restore credits to apartments
-    if (apartmentExpenses && apartmentExpenses.length > 0) {
-      for (const expenseRecord of apartmentExpenses) {
-        const { data: apartment } = await supabase
-          .from('apartments')
-          .select('credit')
-          .eq('id', expenseRecord.apartment_id)
-          .single();
-
-        if (apartment) {
-          await supabase
-            .from('apartments')
-            .update({ credit: apartment.credit + expenseRecord.amount })
-            .eq('id', expenseRecord.apartment_id);
-        }
-      }
-    }
+    // Get unique apartment IDs
+    const apartmentIds = [...new Set(apartmentExpenses?.map(ae => ae.apartment_id) || [])];
 
     // Delete the expense (apartment_expenses will cascade delete)
     const { error } = await supabase
@@ -311,6 +281,12 @@ const Expenses = () => {
     if (error) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
     } else {
+      // Recalculate balances for affected apartments
+      const { recalculateApartmentBalance } = await import('@/hooks/useExpenseRecalculation');
+      for (const aptId of apartmentIds) {
+        await recalculateApartmentBalance(aptId);
+      }
+
       toast({ title: 'Success', description: t('expenseDeletedAndRestored') });
       fetchExpenses();
     }

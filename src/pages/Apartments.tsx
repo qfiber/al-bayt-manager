@@ -230,10 +230,10 @@ const Apartments = () => {
         resetForm();
       }
     } else {
-      // For new apartments, set initial credit as negative of subscription amount
+      // For new apartments, create with zero credit - recalculation will set correct balance
       const { error, data: newApartment } = await supabase
         .from('apartments')
-        .insert([{ ...apartmentData, credit: -subscriptionAmount }])
+        .insert([{ ...apartmentData, credit: 0 }])
         .select()
         .single();
 
@@ -242,12 +242,18 @@ const Apartments = () => {
       } else {
         toast({ title: 'Success', description: 'Apartment created successfully' });
         
-        // Recalculate building expenses if new apartment is occupied from the 1st
+        // Recalculate building expenses and apartment balance
         if (formData.status === 'occupied' && dbDate) {
           const result = await recalculateBuildingExpenses(formData.building_id);
           if (result.success && result.adjustments.length > 0) {
             toast({ title: t('success'), description: t('expensesRecalculated') });
           }
+        }
+        
+        // Always recalculate the new apartment's balance
+        if (newApartment) {
+          const { recalculateApartmentBalance } = await import('@/hooks/useExpenseRecalculation');
+          await recalculateApartmentBalance(newApartment.id);
         }
         
         fetchApartments();
