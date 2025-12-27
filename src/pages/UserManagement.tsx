@@ -21,6 +21,7 @@ interface UserProfile {
   phone: string | null;
   email?: string;
   role?: string;
+  has2FA?: boolean;
 }
 
 interface Apartment {
@@ -72,6 +73,7 @@ const UserManagement = () => {
   const [isDisable2FADialogOpen, setIsDisable2FADialogOpen] = useState(false);
   const [disable2FAUser, setDisable2FAUser] = useState<UserProfile | null>(null);
   const [isDisabling2FA, setIsDisabling2FA] = useState(false);
+  const [users2FAStatus, setUsers2FAStatus] = useState<Map<string, boolean>>(new Map());
 
   useEffect(() => {
     if (!loading && !user) {
@@ -86,8 +88,32 @@ const UserManagement = () => {
       fetchBuildings();
       fetchApartments();
       fetchUsers();
+      fetchUsers2FAStatus();
     }
   }, [user, isAdmin]);
+
+  const fetchUsers2FAStatus = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke('disable-user-2fa', {
+        body: { action: 'list-status' },
+      });
+
+      if (error) {
+        console.error('Error fetching 2FA status:', error);
+        return;
+      }
+
+      if (data.users2FAStatus) {
+        const statusMap = new Map<string, boolean>();
+        Object.entries(data.users2FAStatus).forEach(([userId, has2FA]) => {
+          statusMap.set(userId, has2FA as boolean);
+        });
+        setUsers2FAStatus(statusMap);
+      }
+    } catch (error) {
+      console.error('Error fetching 2FA status:', error);
+    }
+  };
 
   const fetchBuildings = async () => {
     const { data, error } = await supabase
@@ -599,6 +625,8 @@ const UserManagement = () => {
 
       if (data.success) {
         toast({ title: t('success'), description: t('twoFactorDisabledForUser') });
+        // Refresh 2FA status after disabling
+        fetchUsers2FAStatus();
       } else {
         throw new Error(data.error || t('failedToDisable2FAForUser'));
       }
@@ -745,7 +773,9 @@ const UserManagement = () => {
                               size="sm"
                               variant="outline"
                               onClick={() => handleDisable2FA(userProfile)}
-                              title={t('adminDisable2FA')}
+                              title={users2FAStatus.get(userProfile.id) ? t('adminDisable2FA') : t('userHasNo2FA')}
+                              disabled={!users2FAStatus.get(userProfile.id)}
+                              className={!users2FAStatus.get(userProfile.id) ? 'opacity-50 cursor-not-allowed' : ''}
                             >
                               <ShieldOff className="w-4 h-4" />
                             </Button>
