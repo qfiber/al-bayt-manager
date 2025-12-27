@@ -825,9 +825,11 @@ const Apartments = () => {
                                   <div className="text-muted-foreground">{t('beneficiary')}: {getProfileName(apartment.beneficiary_id)}</div>
                                 </div>
                               </TableCell>
-                              <TableCell className="text-right">₪{apartment.subscription_amount.toFixed(2)}</TableCell>
-                              <TableCell className="text-right">
-                                {calculateMonthsOccupied(apartment.occupancy_start)}
+                              <TableCell className={`text-right ${apartment.status !== 'occupied' ? 'text-muted-foreground/50' : ''}`}>
+                                {apartment.status === 'occupied' ? `₪${apartment.subscription_amount.toFixed(2)}` : '-'}
+                              </TableCell>
+                              <TableCell className={`text-right ${apartment.status !== 'occupied' ? 'text-muted-foreground/50' : ''}`}>
+                                {apartment.status === 'occupied' ? calculateMonthsOccupied(apartment.occupancy_start) : '-'}
                               </TableCell>
                               <TableCell className={`text-right font-semibold ${calculateTotalDebt(apartment) > 0 ? 'text-red-600' : 'text-green-600'}`}>
                                 ₪{Math.abs(calculateTotalDebt(apartment)).toFixed(2)}
