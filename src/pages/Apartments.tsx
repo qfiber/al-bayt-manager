@@ -321,11 +321,30 @@ const Apartments = () => {
     return profiles.find(p => p.id === profileId)?.name || t('unknown');
   };
 
+  // Helper function to get ordinal suffix for a number
+  const getOrdinalSuffix = (num: number): string => {
+    const lastTwo = num % 100;
+    if (lastTwo >= 11 && lastTwo <= 13) return 'th';
+    switch (num % 10) {
+      case 1: return 'st';
+      case 2: return 'nd';
+      case 3: return 'rd';
+      default: return 'th';
+    }
+  };
+
   // Helper function to get floor display name
   const getFloorDisplayName = (floorValue: string): string => {
     if (floorValue === 'Ground') return t('groundFloor');
     const num = parseInt(floorValue);
     if (num < 0) return `${t('parkingFloor')} ${num}`;
+    
+    // For languages that use ordinal suffixes (English)
+    if (language === 'en') {
+      return `${num}${getOrdinalSuffix(num)} Floor`;
+    }
+    
+    // For Hebrew and Arabic, use translated floor names
     if (num === 1) return t('firstFloor');
     if (num === 2) return t('secondFloor');
     if (num === 3) return t('thirdFloor');
