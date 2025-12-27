@@ -59,9 +59,50 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Get the target user ID from the request body
-    const { targetUserId } = await req.json();
+    // Get the request body
+    const body = await req.json();
+    const { action, targetUserId } = body;
 
+    // Handle list-status action - returns 2FA status for all non-admin users
+    if (action === 'list-status') {
+      // Get all non-admin users
+      const { data: userRoles, error: rolesError } = await supabaseAdmin
+        .from('user_roles')
+        .select('user_id, role')
+        .neq('role', 'admin');
+
+      if (rolesError) {
+        console.error('Error fetching user roles:', rolesError);
+        return new Response(
+          JSON.stringify({ error: 'Failed to fetch users' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const users2FAStatus: Record<string, boolean> = {};
+
+      // Check 2FA status for each user
+      for (const userRole of userRoles || []) {
+        try {
+          const { data: factorsData } = await supabaseAdmin.auth.admin.mfa.listFactors({
+            userId: userRole.user_id,
+          });
+
+          const totpFactors = factorsData?.factors?.filter(f => f.factor_type === 'totp' && f.status === 'verified') || [];
+          users2FAStatus[userRole.user_id] = totpFactors.length > 0;
+        } catch (error) {
+          console.error(`Error checking 2FA for user ${userRole.user_id}:`, error);
+          users2FAStatus[userRole.user_id] = false;
+        }
+      }
+
+      return new Response(
+        JSON.stringify({ success: true, users2FAStatus }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Default action: disable 2FA for a specific user
     if (!targetUserId) {
       return new Response(
         JSON.stringify({ error: 'Target user ID is required' }),
