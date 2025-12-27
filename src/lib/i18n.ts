@@ -434,6 +434,19 @@ export const translations = {
     fromEmail: "אימייל שולח",
     fromEmailHelp: "הדומיין חייב להיות מאומת ב-Resend",
     fromName: "שם שולח",
+
+    // Payment Expense Allocation
+    selectExpenses: "בחר הוצאות לתשלום",
+    unpaidExpenses: "הוצאות לא משולמות",
+    remainingAmount: "סכום שנותר",
+    allocatePayment: "הקצה תשלום",
+    noUnpaidExpenses: "אין הוצאות לא משולמות",
+    paymentAllocated: "התשלום הוקצה להוצאות בהצלחה",
+    creditFromPayment: "הזיכוי מהתשלום",
+    partiallyPaid: "שולם חלקית",
+    fullyPaid: "שולם במלואו",
+    expensesRecalculated: "ההוצאות חושבו מחדש בהתאם לשינויים באכלוס",
+    recalculatingExpenses: "מחשב מחדש הוצאות...",
   },
   ar: {
     // Site
@@ -870,6 +883,19 @@ export const translations = {
     fromEmail: "بريد المرسل",
     fromEmailHelp: "يجب التحقق من النطاق في Resend",
     fromName: "اسم المرسل",
+
+    // Payment Expense Allocation
+    selectExpenses: "اختر المصروفات للدفع",
+    unpaidExpenses: "المصروفات غير المدفوعة",
+    remainingAmount: "المبلغ المتبقي",
+    allocatePayment: "تخصيص الدفع",
+    noUnpaidExpenses: "لا توجد مصروفات غير مدفوعة",
+    paymentAllocated: "تم تخصيص الدفع للمصروفات بنجاح",
+    creditFromPayment: "الرصيد من الدفع",
+    partiallyPaid: "مدفوع جزئياً",
+    fullyPaid: "مدفوع بالكامل",
+    expensesRecalculated: "تم إعادة حساب المصروفات بناءً على تغييرات الإشغال",
+    recalculatingExpenses: "جاري إعادة حساب المصروفات...",
   },
   en: {
     // Site
@@ -1312,6 +1338,19 @@ export const translations = {
     fromEmail: "From Email",
     fromEmailHelp: "Domain must be verified in Resend",
     fromName: "From Name",
+
+    // Payment Expense Allocation
+    selectExpenses: "Select expenses to pay",
+    unpaidExpenses: "Unpaid Expenses",
+    remainingAmount: "Remaining Amount",
+    allocatePayment: "Allocate Payment",
+    noUnpaidExpenses: "No unpaid expenses",
+    paymentAllocated: "Payment allocated to expenses successfully",
+    creditFromPayment: "Credit from payment",
+    partiallyPaid: "Partially Paid",
+    fullyPaid: "Fully Paid",
+    expensesRecalculated: "Expenses recalculated based on occupancy changes",
+    recalculatingExpenses: "Recalculating expenses...",
   },
 };
 

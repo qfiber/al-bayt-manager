@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Home, Plus, Pencil, Trash2, Eye, XCircle } from 'lucide-react';
+import { recalculateBuildingExpenses } from '@/hooks/useExpenseRecalculation';
 
 interface Apartment {
   id: string;
@@ -200,6 +201,11 @@ const Apartments = () => {
     };
 
     if (editingApartment) {
+      // Check if occupancy is being set and occupancy_start is on the 1st of the month
+      const wasVacant = editingApartment.status === 'vacant';
+      const isNowOccupied = formData.status === 'occupied';
+      const shouldRecalculate = wasVacant && isNowOccupied && dbDate;
+
       const { error } = await supabase
         .from('apartments')
         .update(apartmentData)
@@ -209,19 +215,40 @@ const Apartments = () => {
         toast({ title: 'Error', description: error.message, variant: 'destructive' });
       } else {
         toast({ title: 'Success', description: 'Apartment updated successfully' });
+        
+        // Recalculate building expenses if apartment became occupied
+        if (shouldRecalculate) {
+          toast({ title: t('recalculatingExpenses'), description: '' });
+          const result = await recalculateBuildingExpenses(formData.building_id);
+          if (result.success && result.adjustments.length > 0) {
+            toast({ title: t('success'), description: t('expensesRecalculated') });
+          }
+        }
+        
         fetchApartments();
         resetForm();
       }
     } else {
       // For new apartments, set initial credit as negative of subscription amount
-      const { error } = await supabase
+      const { error, data: newApartment } = await supabase
         .from('apartments')
-        .insert([{ ...apartmentData, credit: -subscriptionAmount }]);
+        .insert([{ ...apartmentData, credit: -subscriptionAmount }])
+        .select()
+        .single();
 
       if (error) {
         toast({ title: 'Error', description: error.message, variant: 'destructive' });
       } else {
         toast({ title: 'Success', description: 'Apartment created successfully' });
+        
+        // Recalculate building expenses if new apartment is occupied from the 1st
+        if (formData.status === 'occupied' && dbDate) {
+          const result = await recalculateBuildingExpenses(formData.building_id);
+          if (result.success && result.adjustments.length > 0) {
+            toast({ title: t('success'), description: t('expensesRecalculated') });
+          }
+        }
+        
         fetchApartments();
         resetForm();
       }
