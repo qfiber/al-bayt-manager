@@ -93,7 +93,7 @@ export async function recalculateBuildingExpenses(buildingId: string): Promise<{
 
       if (eligibleApartments.length === 0) continue;
 
-      const correctAmountPerApartment = expense.amount / eligibleApartments.length;
+      const correctAmountPerApartment = Math.round(expense.amount / eligibleApartments.length);
       
       // Get current apartment_expenses for this expense
       const currentExpenseRecords = (apartmentExpenses || []).filter(ae => ae.expense_id === expense.id);
