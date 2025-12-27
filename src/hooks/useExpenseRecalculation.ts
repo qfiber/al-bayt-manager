@@ -252,6 +252,92 @@ export async function getUnpaidExpensesForApartment(apartmentId: string): Promis
 }
 
 /**
+ * Recalculate an apartment's credit/debit balance based on all payments and expenses.
+ * This is the single source of truth for apartment balance calculation.
+ */
+export async function recalculateApartmentBalance(apartmentId: string): Promise<{
+  success: boolean;
+  message: string;
+  newCredit: number;
+  newStatus: string;
+}> {
+  try {
+    // Get apartment details
+    const { data: apartment, error: aptError } = await supabase
+      .from('apartments')
+      .select('id, building_id, subscription_amount, status')
+      .eq('id', apartmentId)
+      .single();
+
+    if (aptError || !apartment) {
+      return { success: false, message: 'Apartment not found', newCredit: 0, newStatus: 'due' };
+    }
+
+    // Get all active payments for this apartment
+    const { data: payments, error: payError } = await supabase
+      .from('payments')
+      .select('amount')
+      .eq('apartment_id', apartmentId)
+      .eq('is_canceled', false);
+
+    if (payError) {
+      return { success: false, message: payError.message, newCredit: 0, newStatus: 'due' };
+    }
+
+    // Get all active apartment expenses
+    const { data: expenses, error: expError } = await supabase
+      .from('apartment_expenses')
+      .select('amount, amount_paid')
+      .eq('apartment_id', apartmentId)
+      .eq('is_canceled', false);
+
+    if (expError) {
+      return { success: false, message: expError.message, newCredit: 0, newStatus: 'due' };
+    }
+
+    // Calculate totals
+    const totalPayments = payments?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
+    const totalExpenseDebt = expenses?.reduce((sum, e) => sum + (e.amount || 0), 0) || 0;
+    const totalExpensePaid = expenses?.reduce((sum, e) => sum + (e.amount_paid || 0), 0) || 0;
+
+    // Credit = Total Payments - Total Expenses (unpaid portion)
+    // If apartment is occupied, also consider subscription
+    const subscriptionAmount = apartment.status === 'occupied' ? (apartment.subscription_amount || 0) : 0;
+    
+    // Net credit: payments received minus expenses owed
+    // Positive = credit (overpaid), Negative = debit (owes money)
+    const newCredit = totalPayments - totalExpenseDebt - subscriptionAmount + totalExpensePaid;
+
+    // Determine subscription status
+    let newStatus = 'due';
+    if (apartment.status !== 'occupied') {
+      newStatus = 'due'; // Vacant apartments don't have subscription status
+    } else if (newCredit >= 0) {
+      newStatus = 'paid';
+    } else if (totalPayments > 0) {
+      newStatus = 'partial';
+    }
+
+    // Update the apartment
+    const { error: updateError } = await supabase
+      .from('apartments')
+      .update({
+        credit: newCredit,
+        subscription_status: newStatus
+      })
+      .eq('id', apartmentId);
+
+    if (updateError) {
+      return { success: false, message: updateError.message, newCredit, newStatus };
+    }
+
+    return { success: true, message: 'Balance recalculated', newCredit, newStatus };
+  } catch (error: any) {
+    return { success: false, message: error.message, newCredit: 0, newStatus: 'due' };
+  }
+}
+
+/**
  * Apply a payment to specific expenses (including subscription)
  */
 export async function applyPaymentToExpenses(
@@ -261,13 +347,10 @@ export async function applyPaymentToExpenses(
 ): Promise<{ success: boolean; message: string; creditRemaining: number }> {
   try {
     let totalAllocated = 0;
-    let subscriptionAllocation = 0;
-    let expenseAllocation = 0;
 
     for (const alloc of allocations) {
-      // Check if this is a subscription allocation
+      // Skip subscription allocations (handled via credit)
       if (alloc.apartmentExpenseId.startsWith('subscription_')) {
-        subscriptionAllocation += alloc.amount;
         totalAllocated += alloc.amount;
         continue;
       }
@@ -300,11 +383,10 @@ export async function applyPaymentToExpenses(
           amount_allocated: alloc.amount
         });
 
-      expenseAllocation += alloc.amount;
       totalAllocated += alloc.amount;
     }
 
-    // Get the payment amount
+    // Get the payment amount for calculating remaining
     const { data: payment } = await supabase
       .from('payments')
       .select('amount')
@@ -314,40 +396,83 @@ export async function applyPaymentToExpenses(
     const paymentAmount = payment?.amount || 0;
     const creditRemaining = paymentAmount - totalAllocated;
 
-    // Always update apartment credit:
-    // - The full payment amount increases credit (money received)
-    // - Expense allocations reduce the debt owed, so credit should increase by the payment amount
-    const { data: apt } = await supabase
-      .from('apartments')
-      .select('credit, subscription_amount')
-      .eq('id', apartmentId)
-      .single();
-
-    if (apt) {
-      // Credit increases by the full payment amount
-      // The expense allocations track what the payment was used for, 
-      // but the payment itself adds to the apartment's balance
-      const newCredit = apt.credit + paymentAmount;
-      
-      // Determine new subscription status
-      let newStatus = 'due';
-      if (newCredit >= apt.subscription_amount) {
-        newStatus = 'paid';
-      } else if (newCredit > 0) {
-        newStatus = 'partial';
-      }
-
-      await supabase
-        .from('apartments')
-        .update({ 
-          credit: newCredit,
-          subscription_status: newStatus
-        })
-        .eq('id', apartmentId);
-    }
+    // Recalculate apartment balance (this is the key change - centralized recalculation)
+    await recalculateApartmentBalance(apartmentId);
 
     return { success: true, message: 'Payment applied successfully', creditRemaining };
   } catch (error: any) {
     return { success: false, message: error.message, creditRemaining: 0 };
+  }
+}
+
+/**
+ * Cancel a payment and reverse all its allocations, then recalculate balances
+ */
+export async function cancelPaymentAndRecalculate(
+  paymentId: string,
+  apartmentId: string
+): Promise<{ success: boolean; message: string }> {
+  try {
+    // Get all payment allocations for this payment
+    const { data: paymentAllocations, error: allocError } = await supabase
+      .from('payment_allocations')
+      .select('apartment_expense_id, amount_allocated')
+      .eq('payment_id', paymentId);
+
+    if (allocError) {
+      return { success: false, message: allocError.message };
+    }
+
+    // Reverse each allocation by reducing amount_paid on apartment_expenses
+    for (const alloc of paymentAllocations || []) {
+      const { data: expenseRecord } = await supabase
+        .from('apartment_expenses')
+        .select('amount_paid')
+        .eq('id', alloc.apartment_expense_id)
+        .single();
+
+      if (expenseRecord) {
+        const newAmountPaid = Math.max(0, (expenseRecord.amount_paid || 0) - alloc.amount_allocated);
+        await supabase
+          .from('apartment_expenses')
+          .update({ amount_paid: newAmountPaid })
+          .eq('id', alloc.apartment_expense_id);
+      }
+    }
+
+    // Delete the payment allocations
+    await supabase
+      .from('payment_allocations')
+      .delete()
+      .eq('payment_id', paymentId);
+
+    // Cancel the payment (soft delete)
+    const { error: cancelError } = await supabase
+      .from('payments')
+      .update({ is_canceled: true })
+      .eq('id', paymentId);
+
+    if (cancelError) {
+      return { success: false, message: cancelError.message };
+    }
+
+    // Recalculate apartment balance
+    const result = await recalculateApartmentBalance(apartmentId);
+    
+    // Get apartment to find building_id for building recalculation
+    const { data: apartment } = await supabase
+      .from('apartments')
+      .select('building_id')
+      .eq('id', apartmentId)
+      .single();
+
+    // Optionally recalculate building expenses if needed
+    if (apartment?.building_id) {
+      await recalculateBuildingExpenses(apartment.building_id);
+    }
+
+    return { success: result.success, message: result.success ? 'Payment canceled and balances recalculated' : result.message };
+  } catch (error: any) {
+    return { success: false, message: error.message };
   }
 }
