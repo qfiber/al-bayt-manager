@@ -262,6 +262,7 @@ export async function applyPaymentToExpenses(
   try {
     let totalAllocated = 0;
     let subscriptionAllocation = 0;
+    let expenseAllocation = 0;
 
     for (const alloc of allocations) {
       // Check if this is a subscription allocation
@@ -299,6 +300,7 @@ export async function applyPaymentToExpenses(
           amount_allocated: alloc.amount
         });
 
+      expenseAllocation += alloc.amount;
       totalAllocated += alloc.amount;
     }
 
@@ -312,34 +314,36 @@ export async function applyPaymentToExpenses(
     const paymentAmount = payment?.amount || 0;
     const creditRemaining = paymentAmount - totalAllocated;
 
-    // Update apartment credit with subscription allocation + any remaining amount
-    const creditToAdd = subscriptionAllocation + creditRemaining;
-    if (creditToAdd !== 0) {
-      const { data: apt } = await supabase
-        .from('apartments')
-        .select('credit, subscription_amount')
-        .eq('id', apartmentId)
-        .single();
+    // Always update apartment credit:
+    // - The full payment amount increases credit (money received)
+    // - Expense allocations reduce the debt owed, so credit should increase by the payment amount
+    const { data: apt } = await supabase
+      .from('apartments')
+      .select('credit, subscription_amount')
+      .eq('id', apartmentId)
+      .single();
 
-      if (apt) {
-        const newCredit = apt.credit + creditToAdd;
-        
-        // Determine new subscription status
-        let newStatus = 'due';
-        if (newCredit >= apt.subscription_amount) {
-          newStatus = 'paid';
-        } else if (newCredit > 0) {
-          newStatus = 'partial';
-        }
-
-        await supabase
-          .from('apartments')
-          .update({ 
-            credit: newCredit,
-            subscription_status: newStatus
-          })
-          .eq('id', apartmentId);
+    if (apt) {
+      // Credit increases by the full payment amount
+      // The expense allocations track what the payment was used for, 
+      // but the payment itself adds to the apartment's balance
+      const newCredit = apt.credit + paymentAmount;
+      
+      // Determine new subscription status
+      let newStatus = 'due';
+      if (newCredit >= apt.subscription_amount) {
+        newStatus = 'paid';
+      } else if (newCredit > 0) {
+        newStatus = 'partial';
       }
+
+      await supabase
+        .from('apartments')
+        .update({ 
+          credit: newCredit,
+          subscription_status: newStatus
+        })
+        .eq('id', apartmentId);
     }
 
     return { success: true, message: 'Payment applied successfully', creditRemaining };
