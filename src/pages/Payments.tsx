@@ -226,25 +226,55 @@ const Payments = () => {
     const paymentAmount = parseFloat(formData.amount);
     const totalAllocated = getTotalAllocated();
 
-    // Create the payment first
+    // Create or reactivate the payment
     const now = new Date();
     const monthStr = `${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
 
-    const paymentData = {
-      apartment_id: formData.apartment_id,
-      amount: paymentAmount,
-      month: monthStr,
-    };
-
-    const { data: createdPayment, error } = await supabase
+    // Check if there's an existing (possibly canceled) payment for this apartment/month
+    const { data: existingPayment } = await supabase
       .from('payments')
-      .insert([paymentData])
-      .select()
-      .single();
+      .select('*')
+      .eq('apartment_id', formData.apartment_id)
+      .eq('month', monthStr)
+      .maybeSingle();
 
-    if (error || !createdPayment) {
-      toast({ title: 'Error', description: error?.message || 'Failed to create payment', variant: 'destructive' });
-      return;
+    let createdPayment;
+    
+    if (existingPayment) {
+      // Update the existing payment (reactivate if canceled)
+      const { data, error } = await supabase
+        .from('payments')
+        .update({ 
+          amount: paymentAmount, 
+          is_canceled: false,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', existingPayment.id)
+        .select()
+        .single();
+
+      if (error || !data) {
+        toast({ title: 'Error', description: error?.message || 'Failed to update payment', variant: 'destructive' });
+        return;
+      }
+      createdPayment = data;
+    } else {
+      // Create a new payment
+      const { data, error } = await supabase
+        .from('payments')
+        .insert([{
+          apartment_id: formData.apartment_id,
+          amount: paymentAmount,
+          month: monthStr,
+        }])
+        .select()
+        .single();
+
+      if (error || !data) {
+        toast({ title: 'Error', description: error?.message || 'Failed to create payment', variant: 'destructive' });
+        return;
+      }
+      createdPayment = data;
     }
 
     // Apply allocations to expenses
