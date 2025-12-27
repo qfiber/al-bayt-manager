@@ -14,7 +14,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { CreditCard, Plus, Pencil, Trash2 } from 'lucide-react';
-import { getUnpaidExpensesForApartment, applyPaymentToExpenses } from '@/hooks/useExpenseRecalculation';
+import { getUnpaidExpensesForApartment, applyPaymentToExpenses, cancelPaymentAndRecalculate, recalculateApartmentBalance, recalculateBuildingExpenses } from '@/hooks/useExpenseRecalculation';
 import { formatDate } from '@/lib/utils';
 
 interface Payment {
@@ -149,34 +149,6 @@ const Payments = () => {
     }
   };
 
-  const updateApartmentCredit = async (apartmentId: string, paymentAmount: number) => {
-    const apartment = apartments.find(a => a.id === apartmentId);
-    if (!apartment) return;
-
-    const newCredit = apartment.credit + paymentAmount;
-    
-    let newStatus = 'due';
-    if (newCredit >= 0) {
-      newStatus = 'paid';
-    } else if (newCredit < 0 && newCredit > apartment.credit) {
-      newStatus = 'partial';
-    }
-
-    const { error } = await supabase
-      .from('apartments')
-      .update({ 
-        credit: newCredit,
-        subscription_status: newStatus
-      })
-      .eq('id', apartmentId);
-
-    if (error) {
-      toast({ title: 'Error', description: 'Failed to update apartment credit', variant: 'destructive' });
-    } else {
-      fetchApartments();
-    }
-  };
-
   const getTotalAllocated = () => {
     return Object.values(allocations).reduce((sum, amount) => sum + (amount || 0), 0);
   };
@@ -245,7 +217,7 @@ const Payments = () => {
       return;
     }
 
-    // Apply allocations to expenses
+    // Apply allocations to expenses (or just recalculate if no allocations)
     if (totalAllocated > 0) {
       const allocationsList: ExpenseAllocation[] = Object.entries(allocations)
         .filter(([_, amount]) => amount > 0)
@@ -255,24 +227,22 @@ const Payments = () => {
       
       if (!result.success) {
         toast({ title: 'Error', description: result.message, variant: 'destructive' });
-      }
-
-      // Update apartment credit with only the remaining unallocated amount
-      if (result.creditRemaining > 0) {
-        toast({ 
-          title: t('success'), 
-          description: `${t('paymentAllocated')}. ${t('creditFromPayment')}: ₪${result.creditRemaining.toFixed(2)}`
-        });
       } else {
         toast({ title: t('success'), description: t('paymentAllocated') });
       }
     } else {
-      // No allocations - all goes to credit
-      await updateApartmentCredit(formData.apartment_id, paymentAmount);
-      toast({ title: 'Success', description: `Payment of ₪${paymentAmount.toFixed(2)} added to credit` });
+      // No allocations - just recalculate the apartment balance
+      await recalculateApartmentBalance(formData.apartment_id);
+      toast({ title: t('success'), description: `Payment of ₪${paymentAmount.toFixed(2)} recorded` });
+    }
+
+    // Also trigger building recalculation (apartment already defined above)
+    if (apartment.building_id) {
+      await recalculateBuildingExpenses(apartment.building_id);
     }
 
     fetchPayments();
+    fetchApartments();
     resetForm();
   };
 
@@ -283,86 +253,12 @@ const Payments = () => {
     const payment = payments.find(p => p.id === id);
     if (!payment || payment.is_canceled) return;
 
-    // First, get all payment allocations for this payment and reverse them
-    const { data: paymentAllocations, error: allocError } = await supabase
-      .from('payment_allocations')
-      .select('apartment_expense_id, amount_allocated')
-      .eq('payment_id', id);
+    // Use centralized cancel function
+    const result = await cancelPaymentAndRecalculate(id, payment.apartment_id);
 
-    if (allocError) {
-      toast({ title: 'Error', description: allocError.message, variant: 'destructive' });
-      return;
-    }
-
-    // Reverse each allocation by reducing amount_paid on apartment_expenses
-    for (const alloc of paymentAllocations || []) {
-      const { data: expenseRecord } = await supabase
-        .from('apartment_expenses')
-        .select('amount_paid')
-        .eq('id', alloc.apartment_expense_id)
-        .single();
-
-      if (expenseRecord) {
-        const newAmountPaid = Math.max(0, (expenseRecord.amount_paid || 0) - alloc.amount_allocated);
-        await supabase
-          .from('apartment_expenses')
-          .update({ amount_paid: newAmountPaid })
-          .eq('id', alloc.apartment_expense_id);
-      }
-    }
-
-    // Delete the payment allocations
-    await supabase
-      .from('payment_allocations')
-      .delete()
-      .eq('payment_id', id);
-
-    // Now cancel the payment
-    const { error } = await supabase
-      .from('payments')
-      .update({ is_canceled: true })
-      .eq('id', id);
-
-    if (error) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    if (!result.success) {
+      toast({ title: 'Error', description: result.message, variant: 'destructive' });
     } else {
-      // Recalculate apartment credit and status after cancellation (only active payments)
-      const { data: remainingPayments, error: remainingError } = await supabase
-        .from('payments')
-        .select('amount')
-        .eq('apartment_id', payment.apartment_id)
-        .eq('is_canceled', false);
-
-      if (remainingError) {
-        toast({ title: 'Error', description: remainingError.message, variant: 'destructive' });
-      } else {
-        const totalPaid = remainingPayments?.reduce((sum, p) => sum + p.amount, 0) || 0;
-        const apartment = apartments.find(a => a.id === payment.apartment_id);
-
-        if (apartment) {
-          const newCredit = totalPaid - apartment.subscription_amount;
-          let newStatus = 'due';
-
-          if (newCredit >= 0) {
-            newStatus = 'paid';
-          } else if (totalPaid > 0) {
-            newStatus = 'partial';
-          }
-
-          const { error: updateError } = await supabase
-            .from('apartments')
-            .update({
-              credit: newCredit,
-              subscription_status: newStatus,
-            })
-            .eq('id', payment.apartment_id);
-
-          if (updateError) {
-            toast({ title: 'Error', description: updateError.message, variant: 'destructive' });
-          }
-        }
-      }
-
       toast({ title: t('success'), description: t('paymentCanceled') });
       fetchPayments();
       fetchApartments();
