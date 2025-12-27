@@ -48,6 +48,7 @@ interface UnpaidExpense {
   amount: number;
   amount_paid: number;
   remaining: number;
+  isSubscription?: boolean;
 }
 
 interface ExpenseAllocation {
@@ -439,11 +440,15 @@ const Payments = () => {
                           {unpaidExpenses.map((expense) => {
                             const status = getExpensePaymentStatus(expense);
                             return (
-                              <div key={expense.id} className="flex items-center gap-3 p-3 border rounded-lg">
+                              <div key={expense.id} className={`flex items-center gap-3 p-3 border rounded-lg ${expense.isSubscription ? 'bg-primary/5 border-primary/20' : ''}`}>
                                 <div className="flex-1">
                                   <div className="flex items-center gap-2">
-                                    <span className="font-medium">{expense.description}</span>
-                                    {expense.category && (
+                                    <span className="font-medium">
+                                      {expense.isSubscription ? t('monthlySubscription').replace(' (₪)', '') : expense.description}
+                                    </span>
+                                    {expense.isSubscription ? (
+                                      <Badge variant="default" className="text-xs">{t('subscriptionStatus')}</Badge>
+                                    ) : expense.category && (
                                       <Badge variant="outline" className="text-xs">{expense.category}</Badge>
                                     )}
                                     {status === 'partial' && (
@@ -451,7 +456,7 @@ const Payments = () => {
                                     )}
                                   </div>
                                   <p className="text-sm text-muted-foreground">
-                                    {formatDate(expense.expense_date)} • {t('remainingAmount')}: ₪{expense.remaining.toFixed(2)}
+                                    {expense.isSubscription ? t('due') : formatDate(expense.expense_date)} • {t('remainingAmount')}: ₪{expense.remaining.toFixed(2)}
                                   </p>
                                 </div>
                                 <div className="flex items-center gap-2">

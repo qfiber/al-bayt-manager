@@ -159,6 +159,7 @@ export async function recalculateBuildingExpenses(buildingId: string): Promise<{
 
 /**
  * Get unpaid expenses for an apartment with their remaining balances
+ * Includes the monthly subscription if it's due
  */
 export async function getUnpaidExpensesForApartment(apartmentId: string): Promise<{
   id: string;
@@ -169,7 +170,52 @@ export async function getUnpaidExpensesForApartment(apartmentId: string): Promis
   amount: number;
   amount_paid: number;
   remaining: number;
+  isSubscription?: boolean;
 }[]> {
+  const results: {
+    id: string;
+    expense_id: string;
+    description: string;
+    category: string | null;
+    expense_date: string;
+    amount: number;
+    amount_paid: number;
+    remaining: number;
+    isSubscription?: boolean;
+  }[] = [];
+
+  // First, check if the apartment has an unpaid subscription
+  const { data: apartment, error: aptError } = await supabase
+    .from('apartments')
+    .select('id, subscription_amount, credit, subscription_status')
+    .eq('id', apartmentId)
+    .maybeSingle();
+
+  if (apartment && apartment.subscription_amount > 0) {
+    // Calculate if subscription is due based on credit
+    // If credit is negative or zero, subscription is due
+    const subscriptionDue = apartment.credit < apartment.subscription_amount;
+    const amountDue = apartment.subscription_amount;
+    const amountPaidTowardsSubscription = Math.max(0, apartment.credit);
+    const remaining = amountDue - amountPaidTowardsSubscription;
+
+    if (remaining > 0 && apartment.subscription_status !== 'paid') {
+      const now = new Date();
+      results.push({
+        id: `subscription_${apartmentId}`,
+        expense_id: `subscription_${apartmentId}`,
+        description: 'Monthly Subscription',
+        category: 'subscription',
+        expense_date: now.toISOString().split('T')[0],
+        amount: amountDue,
+        amount_paid: amountPaidTowardsSubscription,
+        remaining: remaining,
+        isSubscription: true
+      });
+    }
+  }
+
+  // Then fetch regular apartment expenses
   const { data, error } = await supabase
     .from('apartment_expenses')
     .select(`
@@ -184,24 +230,29 @@ export async function getUnpaidExpensesForApartment(apartmentId: string): Promis
     .eq('is_canceled', false)
     .order('created_at', { ascending: true });
 
-  if (error || !data) return [];
+  if (!error && data) {
+    const expenses = data
+      .filter(ae => ae.amount > (ae.amount_paid || 0))
+      .map(ae => ({
+        id: ae.id,
+        expense_id: ae.expense_id,
+        description: (ae.expense as any)?.description || 'Unknown',
+        category: (ae.expense as any)?.category || null,
+        expense_date: (ae.expense as any)?.expense_date || '',
+        amount: ae.amount,
+        amount_paid: ae.amount_paid || 0,
+        remaining: ae.amount - (ae.amount_paid || 0),
+        isSubscription: false
+      }));
+    
+    results.push(...expenses);
+  }
 
-  return data
-    .filter(ae => ae.amount > (ae.amount_paid || 0))
-    .map(ae => ({
-      id: ae.id,
-      expense_id: ae.expense_id,
-      description: (ae.expense as any)?.description || 'Unknown',
-      category: (ae.expense as any)?.category || null,
-      expense_date: (ae.expense as any)?.expense_date || '',
-      amount: ae.amount,
-      amount_paid: ae.amount_paid || 0,
-      remaining: ae.amount - (ae.amount_paid || 0)
-    }));
+  return results;
 }
 
 /**
- * Apply a payment to specific expenses
+ * Apply a payment to specific expenses (including subscription)
  */
 export async function applyPaymentToExpenses(
   paymentId: string,
@@ -210,8 +261,16 @@ export async function applyPaymentToExpenses(
 ): Promise<{ success: boolean; message: string; creditRemaining: number }> {
   try {
     let totalAllocated = 0;
+    let subscriptionAllocation = 0;
 
     for (const alloc of allocations) {
+      // Check if this is a subscription allocation
+      if (alloc.apartmentExpenseId.startsWith('subscription_')) {
+        subscriptionAllocation += alloc.amount;
+        totalAllocated += alloc.amount;
+        continue;
+      }
+
       // Get current expense record
       const { data: expenseRecord, error: fetchError } = await supabase
         .from('apartment_expenses')
@@ -253,18 +312,32 @@ export async function applyPaymentToExpenses(
     const paymentAmount = payment?.amount || 0;
     const creditRemaining = paymentAmount - totalAllocated;
 
-    // Update apartment credit with any remaining amount
-    if (creditRemaining > 0) {
+    // Update apartment credit with subscription allocation + any remaining amount
+    const creditToAdd = subscriptionAllocation + creditRemaining;
+    if (creditToAdd !== 0) {
       const { data: apt } = await supabase
         .from('apartments')
-        .select('credit')
+        .select('credit, subscription_amount')
         .eq('id', apartmentId)
         .single();
 
       if (apt) {
+        const newCredit = apt.credit + creditToAdd;
+        
+        // Determine new subscription status
+        let newStatus = 'due';
+        if (newCredit >= apt.subscription_amount) {
+          newStatus = 'paid';
+        } else if (newCredit > 0) {
+          newStatus = 'partial';
+        }
+
         await supabase
           .from('apartments')
-          .update({ credit: apt.credit + creditRemaining })
+          .update({ 
+            credit: newCredit,
+            subscription_status: newStatus
+          })
           .eq('id', apartmentId);
       }
     }
