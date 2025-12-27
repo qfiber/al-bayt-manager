@@ -17,6 +17,7 @@ export type Database = {
       apartment_expenses: {
         Row: {
           amount: number
+          amount_paid: number
           apartment_id: string
           created_at: string
           expense_id: string
@@ -25,6 +26,7 @@ export type Database = {
         }
         Insert: {
           amount: number
+          amount_paid?: number
           apartment_id: string
           created_at?: string
           expense_id: string
@@ -33,6 +35,7 @@ export type Database = {
         }
         Update: {
           amount?: number
+          amount_paid?: number
           apartment_id?: string
           created_at?: string
           expense_id?: string
@@ -471,6 +474,45 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payment_allocations: {
+        Row: {
+          amount_allocated: number
+          apartment_expense_id: string
+          created_at: string
+          id: string
+          payment_id: string
+        }
+        Insert: {
+          amount_allocated: number
+          apartment_expense_id: string
+          created_at?: string
+          id?: string
+          payment_id: string
+        }
+        Update: {
+          amount_allocated?: number
+          apartment_expense_id?: string
+          created_at?: string
+          id?: string
+          payment_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_allocations_apartment_expense_id_fkey"
+            columns: ["apartment_expense_id"]
+            isOneToOne: false
+            referencedRelation: "apartment_expenses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_allocations_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
             referencedColumns: ["id"]
           },
         ]

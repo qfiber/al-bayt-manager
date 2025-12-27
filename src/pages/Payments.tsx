@@ -10,8 +10,12 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { CreditCard, Plus, Pencil, Trash2 } from 'lucide-react';
+import { getUnpaidExpensesForApartment, applyPaymentToExpenses } from '@/hooks/useExpenseRecalculation';
+import { formatDate } from '@/lib/utils';
 
 interface Payment {
   id: string;
@@ -35,6 +39,22 @@ interface Building {
   name: string;
 }
 
+interface UnpaidExpense {
+  id: string;
+  expense_id: string;
+  description: string;
+  category: string | null;
+  expense_date: string;
+  amount: number;
+  amount_paid: number;
+  remaining: number;
+}
+
+interface ExpenseAllocation {
+  apartmentExpenseId: string;
+  amount: number;
+}
+
 const Payments = () => {
   const { user, isAdmin, isModerator, loading } = useAuth();
   const { t } = useLanguage();
@@ -48,8 +68,12 @@ const Payments = () => {
   const [formData, setFormData] = useState({
     apartment_id: '',
     amount: '',
-    month: '',
   });
+  
+  // Expense allocation state
+  const [unpaidExpenses, setUnpaidExpenses] = useState<UnpaidExpense[]>([]);
+  const [allocations, setAllocations] = useState<Record<string, number>>({});
+  const [loadingExpenses, setLoadingExpenses] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -66,6 +90,24 @@ const Payments = () => {
       fetchPayments();
     }
   }, [user, isAdmin, isModerator]);
+
+  // Fetch unpaid expenses when apartment changes
+  useEffect(() => {
+    if (formData.apartment_id) {
+      loadUnpaidExpenses(formData.apartment_id);
+    } else {
+      setUnpaidExpenses([]);
+      setAllocations({});
+    }
+  }, [formData.apartment_id]);
+
+  const loadUnpaidExpenses = async (apartmentId: string) => {
+    setLoadingExpenses(true);
+    const expenses = await getUnpaidExpensesForApartment(apartmentId);
+    setUnpaidExpenses(expenses);
+    setAllocations({});
+    setLoadingExpenses(false);
+  };
 
   const fetchBuildings = async () => {
     const { data, error } = await supabase
@@ -134,6 +176,43 @@ const Payments = () => {
     }
   };
 
+  const getTotalAllocated = () => {
+    return Object.values(allocations).reduce((sum, amount) => sum + (amount || 0), 0);
+  };
+
+  const getRemainingToAllocate = () => {
+    const paymentAmount = parseFloat(formData.amount) || 0;
+    return paymentAmount - getTotalAllocated();
+  };
+
+  const handleAllocationChange = (expenseId: string, value: string) => {
+    const amount = parseFloat(value) || 0;
+    const expense = unpaidExpenses.find(e => e.id === expenseId);
+    if (!expense) return;
+
+    // Cap at the remaining amount for this expense
+    const maxAmount = expense.remaining;
+    const cappedAmount = Math.min(amount, maxAmount);
+
+    setAllocations(prev => ({
+      ...prev,
+      [expenseId]: cappedAmount
+    }));
+  };
+
+  const handlePayFullAmount = (expenseId: string) => {
+    const expense = unpaidExpenses.find(e => e.id === expenseId);
+    if (!expense) return;
+
+    const remaining = getRemainingToAllocate() + (allocations[expenseId] || 0);
+    const amountToPay = Math.min(expense.remaining, remaining);
+
+    setAllocations(prev => ({
+      ...prev,
+      [expenseId]: amountToPay
+    }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -143,60 +222,59 @@ const Payments = () => {
       return;
     }
 
-    // Calculate earliest unpaid month
-    if (!apartment.occupancy_start) {
-      toast({ title: 'Error', description: 'Apartment has no occupancy start date', variant: 'destructive' });
-      return;
-    }
-
-    const startDate = new Date(apartment.occupancy_start);
-    const now = new Date();
-    const monthsOccupied = (now.getFullYear() - startDate.getFullYear()) * 12 + 
-                          (now.getMonth() - startDate.getMonth()) + 1;
-
-    // Find the first unpaid month
-    let earliestUnpaidMonth = null;
-    for (let i = 0; i < monthsOccupied; i++) {
-      const monthDate = new Date(startDate.getFullYear(), startDate.getMonth() + i, 1);
-      const monthStr = `${String(monthDate.getMonth() + 1).padStart(2, '0')}/${monthDate.getFullYear()}`;
-      
-      const { data: existingPayment } = await supabase
-        .from('payments')
-        .select('amount, is_canceled')
-        .eq('apartment_id', formData.apartment_id)
-        .eq('month', monthStr)
-        .maybeSingle();
-
-      if (!existingPayment || existingPayment.is_canceled || existingPayment.amount < apartment.subscription_amount) {
-        earliestUnpaidMonth = monthStr;
-        break;
-      }
-    }
-
-    if (!earliestUnpaidMonth) {
-      // All months are paid, the payment will go to credit
-      earliestUnpaidMonth = `${String(now.getMonth() + 2).padStart(2, '0')}/${now.getFullYear()}`;
-    }
-
     const paymentAmount = parseFloat(formData.amount);
+    const totalAllocated = getTotalAllocated();
+
+    // Create the payment first
+    const now = new Date();
+    const monthStr = `${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
+
     const paymentData = {
       apartment_id: formData.apartment_id,
       amount: paymentAmount,
-      month: earliestUnpaidMonth,
+      month: monthStr,
     };
 
-    const { error } = await supabase
+    const { data: createdPayment, error } = await supabase
       .from('payments')
-      .insert([paymentData]);
+      .insert([paymentData])
+      .select()
+      .single();
 
-    if (error) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    } else {
-      toast({ title: 'Success', description: `Payment of ₪${paymentAmount.toFixed(2)} applied to ${earliestUnpaidMonth}` });
-      await updateApartmentCredit(formData.apartment_id, paymentAmount);
-      fetchPayments();
-      resetForm();
+    if (error || !createdPayment) {
+      toast({ title: 'Error', description: error?.message || 'Failed to create payment', variant: 'destructive' });
+      return;
     }
+
+    // Apply allocations to expenses
+    if (totalAllocated > 0) {
+      const allocationsList: ExpenseAllocation[] = Object.entries(allocations)
+        .filter(([_, amount]) => amount > 0)
+        .map(([apartmentExpenseId, amount]) => ({ apartmentExpenseId, amount }));
+
+      const result = await applyPaymentToExpenses(createdPayment.id, formData.apartment_id, allocationsList);
+      
+      if (!result.success) {
+        toast({ title: 'Error', description: result.message, variant: 'destructive' });
+      }
+
+      // Update apartment credit with only the remaining unallocated amount
+      if (result.creditRemaining > 0) {
+        toast({ 
+          title: t('success'), 
+          description: `${t('paymentAllocated')}. ${t('creditFromPayment')}: ₪${result.creditRemaining.toFixed(2)}`
+        });
+      } else {
+        toast({ title: t('success'), description: t('paymentAllocated') });
+      }
+    } else {
+      // No allocations - all goes to credit
+      await updateApartmentCredit(formData.apartment_id, paymentAmount);
+      toast({ title: 'Success', description: `Payment of ₪${paymentAmount.toFixed(2)} added to credit` });
+    }
+
+    fetchPayments();
+    resetForm();
   };
 
   const handleDelete = async (id: string) => {
@@ -262,7 +340,6 @@ const Payments = () => {
     setFormData({
       apartment_id: payment.apartment_id,
       amount: payment.amount.toString(),
-      month: payment.month,
     });
     setIsDialogOpen(true);
   };
@@ -271,9 +348,10 @@ const Payments = () => {
     setFormData({
       apartment_id: '',
       amount: '',
-      month: '',
     });
     setEditingPayment(null);
+    setAllocations({});
+    setUnpaidExpenses([]);
     setIsDialogOpen(false);
   };
 
@@ -282,6 +360,12 @@ const Payments = () => {
     if (!apartment) return t('unknown');
     const building = buildings.find(b => b.id === apartment.building_id);
     return `${building?.name || t('unknown')} - ${t('apt')} ${apartment.apartment_number}`;
+  };
+
+  const getExpensePaymentStatus = (expense: UnpaidExpense) => {
+    if (expense.amount_paid === 0) return null;
+    if (expense.amount_paid >= expense.amount) return 'paid';
+    return 'partial';
   };
 
   if (loading) {
@@ -306,7 +390,7 @@ const Payments = () => {
                   {t('addPayment')}
                 </Button>
               </DialogTrigger>
-              <DialogContent>
+              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>{editingPayment ? t('editPayment') : t('addPayment')}</DialogTitle>
                 </DialogHeader>
@@ -336,10 +420,74 @@ const Payments = () => {
                       onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
                       required
                     />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {t('paymentWillCoverEarliestMonth') || 'Payment will automatically cover the earliest unpaid month'}
-                    </p>
                   </div>
+                  
+                  {/* Expense Allocation Section */}
+                  {formData.apartment_id && !editingPayment && (
+                    <div className="border-t pt-4">
+                      <Label className="text-base font-semibold">{t('selectExpenses')}</Label>
+                      <p className="text-sm text-muted-foreground mb-3">
+                        {t('remainingAmount')}: ₪{getRemainingToAllocate().toFixed(2)}
+                      </p>
+                      
+                      {loadingExpenses ? (
+                        <p className="text-muted-foreground">{t('loading')}</p>
+                      ) : unpaidExpenses.length === 0 ? (
+                        <p className="text-muted-foreground">{t('noUnpaidExpenses')}</p>
+                      ) : (
+                        <div className="space-y-3">
+                          {unpaidExpenses.map((expense) => {
+                            const status = getExpensePaymentStatus(expense);
+                            return (
+                              <div key={expense.id} className="flex items-center gap-3 p-3 border rounded-lg">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-medium">{expense.description}</span>
+                                    {expense.category && (
+                                      <Badge variant="outline" className="text-xs">{expense.category}</Badge>
+                                    )}
+                                    {status === 'partial' && (
+                                      <Badge variant="secondary" className="text-xs">{t('partiallyPaid')}</Badge>
+                                    )}
+                                  </div>
+                                  <p className="text-sm text-muted-foreground">
+                                    {formatDate(expense.expense_date)} • {t('remainingAmount')}: ₪{expense.remaining.toFixed(2)}
+                                  </p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <Input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    max={expense.remaining}
+                                    value={allocations[expense.id] || ''}
+                                    onChange={(e) => handleAllocationChange(expense.id, e.target.value)}
+                                    className="w-24"
+                                    placeholder="₪0"
+                                  />
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handlePayFullAmount(expense.id)}
+                                  >
+                                    {t('paid')}
+                                  </Button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                      
+                      {getRemainingToAllocate() > 0 && unpaidExpenses.length > 0 && (
+                        <p className="text-sm text-muted-foreground mt-3">
+                          {t('creditFromPayment')}: ₪{getRemainingToAllocate().toFixed(2)}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
                   <div className="flex gap-2">
                     <Button type="submit" className="flex-1">
                       {editingPayment ? t('update') : t('create')}
@@ -380,17 +528,20 @@ const Payments = () => {
                   </TableRow>
                 ) : (
                   payments.map((payment) => (
-                    <TableRow key={payment.id}>
+                    <TableRow key={payment.id} className={payment.is_canceled ? 'opacity-50' : ''}>
                       <TableCell className="font-medium text-right">{getApartmentInfo(payment.apartment_id)}</TableCell>
                       <TableCell className="text-right">₪{payment.amount.toFixed(2)}</TableCell>
-                      <TableCell className="text-right">{payment.month}</TableCell>
+                      <TableCell className="text-right">
+                        {payment.month}
+                        {payment.is_canceled && <Badge variant="destructive" className="mr-2">{t('canceled')}</Badge>}
+                      </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
-                          <Button size="sm" variant="outline" onClick={() => handleEdit(payment)}>
+                          <Button size="sm" variant="outline" onClick={() => handleEdit(payment)} disabled={payment.is_canceled}>
                             <Pencil className="w-4 h-4" />
                           </Button>
                           {isAdmin && (
-                            <Button size="sm" variant="destructive" onClick={() => handleDelete(payment.id)}>
+                            <Button size="sm" variant="destructive" onClick={() => handleDelete(payment.id)} disabled={payment.is_canceled}>
                               <Trash2 className="w-4 h-4" />
                             </Button>
                           )}
