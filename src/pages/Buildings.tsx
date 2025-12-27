@@ -17,6 +17,7 @@ interface Building {
   name: string;
   address: string;
   number_of_floors: number | null;
+  underground_floors: number | null;
   logo_url: string | null;
   created_at: string | null;
 }
@@ -29,7 +30,7 @@ const Buildings = () => {
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingBuilding, setEditingBuilding] = useState<Building | null>(null);
-  const [formData, setFormData] = useState({ name: '', address: '', number_of_floors: '' });
+  const [formData, setFormData] = useState({ name: '', address: '', number_of_floors: '', underground_floors: '' });
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
 
@@ -103,7 +104,8 @@ const Buildings = () => {
         const updateData: any = { 
           name: formData.name, 
           address: formData.address,
-          number_of_floors: formData.number_of_floors ? parseInt(formData.number_of_floors) : null
+          number_of_floors: formData.number_of_floors ? parseInt(formData.number_of_floors) : null,
+          underground_floors: formData.underground_floors ? parseInt(formData.underground_floors) : 0
         };
         if (logoUrl) {
           updateData.logo_url = logoUrl;
@@ -121,6 +123,7 @@ const Buildings = () => {
           name: formData.name, 
           address: formData.address,
           number_of_floors: formData.number_of_floors ? parseInt(formData.number_of_floors) : null,
+          underground_floors: formData.underground_floors ? parseInt(formData.underground_floors) : 0,
           logo_url: logoUrl
         };
 
@@ -160,7 +163,8 @@ const Buildings = () => {
     setFormData({ 
       name: building.name, 
       address: building.address,
-      number_of_floors: building.number_of_floors?.toString() || ''
+      number_of_floors: building.number_of_floors?.toString() || '',
+      underground_floors: building.underground_floors?.toString() || ''
     });
     if (building.logo_url) {
       setLogoPreview(building.logo_url);
@@ -169,7 +173,7 @@ const Buildings = () => {
   };
 
   const resetForm = () => {
-    setFormData({ name: '', address: '', number_of_floors: '' });
+    setFormData({ name: '', address: '', number_of_floors: '', underground_floors: '' });
     setLogoFile(null);
     setLogoPreview(null);
     setEditingBuilding(null);
@@ -231,6 +235,18 @@ const Buildings = () => {
                       onChange={(e) => setFormData({ ...formData, number_of_floors: e.target.value })}
                       placeholder={t('optional')}
                     />
+                  </div>
+                  <div>
+                    <Label htmlFor="underground_floors">{t('undergroundFloors')}</Label>
+                    <Input
+                      id="underground_floors"
+                      type="number"
+                      min="0"
+                      value={formData.underground_floors}
+                      onChange={(e) => setFormData({ ...formData, underground_floors: e.target.value })}
+                      placeholder="0"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">{t('undergroundFloorsHelp')}</p>
                   </div>
                   <div>
                     <Label htmlFor="logo">{t('logoOptional')}</Label>

@@ -33,6 +33,7 @@ interface Building {
   id: string;
   name: string;
   number_of_floors: number | null;
+  underground_floors: number | null;
 }
 
 interface Settings {
@@ -139,7 +140,7 @@ const Apartments = () => {
   const fetchBuildings = async () => {
     const { data, error } = await supabase
       .from('buildings')
-      .select('id, name, number_of_floors')
+      .select('id, name, number_of_floors, underground_floors')
       .order('name');
 
     if (error) {
@@ -318,6 +319,36 @@ const Apartments = () => {
   const getProfileName = (profileId: string | null) => {
     if (!profileId) return '-';
     return profiles.find(p => p.id === profileId)?.name || t('unknown');
+  };
+
+  // Helper function to get floor display name
+  const getFloorDisplayName = (floorValue: string): string => {
+    if (floorValue === 'Ground') return t('groundFloor');
+    const num = parseInt(floorValue);
+    if (num < 0) return `${t('parkingFloor')} ${num}`;
+    if (num === 1) return t('firstFloor');
+    if (num === 2) return t('secondFloor');
+    if (num === 3) return t('thirdFloor');
+    return t('floorNumber').replace('{num}', floorValue);
+  };
+
+  // Get floor options for a building (excludes parking floors for apartment assignment)
+  const getFloorOptions = (buildingId: string) => {
+    const building = buildings.find(b => b.id === buildingId);
+    if (!building) return [];
+    
+    const floors: { value: string; label: string }[] = [];
+    
+    // Add ground floor first
+    floors.push({ value: 'Ground', label: t('groundFloor') });
+    
+    // Add above-ground floors
+    const numFloors = building.number_of_floors || 0;
+    for (let i = 1; i <= numFloors; i++) {
+      floors.push({ value: i.toString(), label: getFloorDisplayName(i.toString()) });
+    }
+    
+    return floors;
   };
 
   const calculateMonthsOccupied = (occupancyStart: string | null) => {
@@ -643,14 +674,11 @@ const Apartments = () => {
                         <SelectValue placeholder={t('selectFloor')} />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="Ground">{t('groundFloor')}</SelectItem>
-                        {formData.building_id && buildings.find(b => b.id === formData.building_id)?.number_of_floors && 
-                          Array.from({ length: buildings.find(b => b.id === formData.building_id)!.number_of_floors! }, (_, i) => i + 1).map((floor) => (
-                            <SelectItem key={floor} value={floor.toString()}>
-                              {floor}
-                            </SelectItem>
-                          ))
-                        }
+                        {formData.building_id && getFloorOptions(formData.building_id).map((floor) => (
+                          <SelectItem key={floor.value} value={floor.value}>
+                            {floor.label}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -764,7 +792,7 @@ const Apartments = () => {
                             <TableRow key={apartment.id}>
                               <TableCell className="font-medium text-right">{apartment.apartment_number}</TableCell>
                               <TableCell className="text-right">
-                                {apartment.floor === 'Ground' ? t('groundFloor') : apartment.floor || '-'}
+                                {apartment.floor ? getFloorDisplayName(apartment.floor) : '-'}
                               </TableCell>
                               <TableCell className="text-right">
                                 <span className={`px-2 py-1 rounded text-xs ${apartment.status === 'vacant' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
