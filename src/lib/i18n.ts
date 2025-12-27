@@ -320,6 +320,11 @@ export const translations = {
     failedToStart2FASetup: "התחלת הגדרת אימות דו-שלבי נכשלה",
     scanQRWithApp: "סרוק את קוד ה-QR עם אפליקציית האימות שלך",
     no2FAFactorFound: "לא נמצא גורם אימות דו-שלבי",
+    adminDisable2FA: "השבת 2FA",
+    adminDisable2FAConfirm: "האם אתה בטוח שברצונך להשבית אימות דו-שלבי עבור משתמש זה?",
+    userHasNo2FA: "למשתמש אין אימות דו-שלבי מופעל",
+    twoFactorDisabledForUser: "אימות דו-שלבי הושבת עבור המשתמש",
+    failedToDisable2FAForUser: "השבתת אימות דו-שלבי עבור המשתמש נכשלה",
 
     // Register
     createNewAccount: "צור חשבון חדש",
@@ -776,6 +781,11 @@ export const translations = {
     failedToStart2FASetup: "فشل في بدء إعداد المصادقة الثنائية",
     scanQRWithApp: "امسح رمز QR باستخدام تطبيق المصادقة",
     no2FAFactorFound: "لم يتم العثور على عامل المصادقة الثنائية",
+    adminDisable2FA: "تعطيل 2FA",
+    adminDisable2FAConfirm: "هل أنت متأكد أنك تريد تعطيل المصادقة الثنائية لهذا المستخدم؟",
+    userHasNo2FA: "المستخدم ليس لديه مصادقة ثنائية مفعلة",
+    twoFactorDisabledForUser: "تم تعطيل المصادقة الثنائية للمستخدم",
+    failedToDisable2FAForUser: "فشل في تعطيل المصادقة الثنائية للمستخدم",
 
     // Register
     createNewAccount: "إنشاء حساب جديد",
@@ -1233,6 +1243,11 @@ export const translations = {
     failedToStart2FASetup: "Failed to start 2FA setup",
     scanQRWithApp: "Scan the QR code with your authenticator app",
     no2FAFactorFound: "No 2FA factor found",
+    adminDisable2FA: "Disable 2FA",
+    adminDisable2FAConfirm: "Are you sure you want to disable 2FA for this user?",
+    userHasNo2FA: "User does not have 2FA enabled",
+    twoFactorDisabledForUser: "2FA disabled for user",
+    failedToDisable2FAForUser: "Failed to disable 2FA for user",
 
     // Register
     createNewAccount: "Create a new account",

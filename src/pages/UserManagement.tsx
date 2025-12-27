@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Users, Pencil, Trash2, UserPlus, Key, Building2 } from 'lucide-react';
+import { Users, Pencil, Trash2, UserPlus, Key, Building2, ShieldOff } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 interface UserProfile {
@@ -68,6 +68,10 @@ const UserManagement = () => {
   const [assigningBuildingsUser, setAssigningBuildingsUser] = useState<UserProfile | null>(null);
   const [selectedBuildings, setSelectedBuildings] = useState<string[]>([]);
   const [moderatorBuildings, setModeratorBuildings] = useState<Map<string, string[]>>(new Map());
+
+  const [isDisable2FADialogOpen, setIsDisable2FADialogOpen] = useState(false);
+  const [disable2FAUser, setDisable2FAUser] = useState<UserProfile | null>(null);
+  const [isDisabling2FA, setIsDisabling2FA] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -567,6 +571,52 @@ const UserManagement = () => {
     );
   };
 
+  const handleDisable2FA = (userProfile: UserProfile) => {
+    // Only allow for users and moderators, not admins
+    if (userProfile.role === 'admin') {
+      toast({ 
+        title: t('error'), 
+        description: 'Cannot disable 2FA for admin users', 
+        variant: 'destructive' 
+      });
+      return;
+    }
+    setDisable2FAUser(userProfile);
+    setIsDisable2FADialogOpen(true);
+  };
+
+  const confirmDisable2FA = async () => {
+    if (!disable2FAUser) return;
+    
+    setIsDisabling2FA(true);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('disable-user-2fa', {
+        body: { targetUserId: disable2FAUser.id },
+      });
+
+      if (error) throw error;
+
+      if (data.success) {
+        toast({ title: t('success'), description: t('twoFactorDisabledForUser') });
+      } else {
+        throw new Error(data.error || t('failedToDisable2FAForUser'));
+      }
+    } catch (error: any) {
+      const errorMessage = error.message || t('failedToDisable2FAForUser');
+      // Check if user doesn't have 2FA
+      if (errorMessage.includes('does not have 2FA')) {
+        toast({ title: t('error'), description: t('userHasNo2FA'), variant: 'destructive' });
+      } else {
+        toast({ title: t('error'), description: errorMessage, variant: 'destructive' });
+      }
+    } finally {
+      setIsDisabling2FA(false);
+      setIsDisable2FADialogOpen(false);
+      setDisable2FAUser(null);
+    }
+  };
+
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center">{t('loading')}</div>;
   }
@@ -690,6 +740,16 @@ const UserManagement = () => {
                           >
                             ⭐
                           </Button>
+                          {userProfile.role !== 'admin' && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleDisable2FA(userProfile)}
+                              title={t('adminDisable2FA')}
+                            >
+                              <ShieldOff className="w-4 h-4" />
+                            </Button>
+                          )}
                           <Button
                             size="sm"
                             variant="destructive"
@@ -1085,6 +1145,30 @@ const UserManagement = () => {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Disable 2FA Confirmation Dialog */}
+        <AlertDialog open={isDisable2FADialogOpen} onOpenChange={setIsDisable2FADialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{t('adminDisable2FA')}</AlertDialogTitle>
+              <AlertDialogDescription>
+                {t('adminDisable2FAConfirm')}
+                <br />
+                <strong>{disable2FAUser?.name}</strong>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isDisabling2FA}>{t('cancel')}</AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={confirmDisable2FA}
+                disabled={isDisabling2FA}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {isDisabling2FA ? t('disabling') : t('adminDisable2FA')}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   );

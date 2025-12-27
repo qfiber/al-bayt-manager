@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.send-templated-email]
 verify_jwt = false
+
+[functions.disable-user-2fa]
+verify_jwt = false
