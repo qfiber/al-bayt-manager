@@ -352,6 +352,7 @@ const Apartments = () => {
   };
 
   // Get floor options for a building (excludes parking floors for apartment assignment)
+  // number_of_floors includes ground floor, so if 4 floors: Ground, 1st, 2nd, 3rd
   const getFloorOptions = (buildingId: string) => {
     const building = buildings.find(b => b.id === buildingId);
     if (!building) return [];
@@ -361,9 +362,9 @@ const Apartments = () => {
     // Add ground floor first
     floors.push({ value: 'Ground', label: t('groundFloor') });
     
-    // Add above-ground floors
+    // Add above-ground floors (numFloors - 1 because ground floor is included in the count)
     const numFloors = building.number_of_floors || 0;
-    for (let i = 1; i <= numFloors; i++) {
+    for (let i = 1; i < numFloors; i++) {
       floors.push({ value: i.toString(), label: getFloorDisplayName(i.toString()) });
     }
     
