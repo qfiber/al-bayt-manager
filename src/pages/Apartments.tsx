@@ -714,38 +714,44 @@ const Apartments = () => {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div>
+                  <div className={formData.status !== 'occupied' ? 'opacity-50' : ''}>
                     <Label htmlFor="occupancy_start">{t('occupancyStart')}</Label>
                     <Input
                       id="occupancy_start"
                       type="text"
                       placeholder="dd/mm/yyyy"
-                      value={formData.occupancy_start}
+                      value={formData.status === 'occupied' ? formData.occupancy_start : ''}
                       onChange={(e) => {
                         const value = e.target.value.replace(/[^\d/]/g, '');
                         if (value.length <= 10) {
                           setFormData({ ...formData, occupancy_start: value });
                         }
                       }}
+                      disabled={formData.status !== 'occupied'}
                     />
                   </div>
-                  <div>
+                  <div className={formData.status !== 'occupied' ? 'opacity-50' : ''}>
                     <Label htmlFor="subscription_amount">{t('monthlySubscription')}</Label>
                     <Input
                       id="subscription_amount"
                       type="number"
                       step="0.01"
-                      value={formData.subscription_amount}
+                      value={formData.status === 'occupied' ? formData.subscription_amount : ''}
                       onChange={(e) => setFormData({ ...formData, subscription_amount: e.target.value })}
-                      required
+                      required={formData.status === 'occupied'}
+                      disabled={formData.status !== 'occupied'}
                     />
                     <p className="text-xs text-muted-foreground mt-1">
                       {t('autoCalculated').replace('{fee}', String(settings?.monthly_fee || 0))}
                     </p>
                   </div>
-                  <div>
+                  <div className={formData.status !== 'occupied' ? 'opacity-50' : ''}>
                     <Label htmlFor="subscription_status">{t('subscriptionStatus')}</Label>
-                    <Select value={formData.subscription_status} onValueChange={(value) => setFormData({ ...formData, subscription_status: value })}>
+                    <Select 
+                      value={formData.status === 'occupied' ? formData.subscription_status : ''} 
+                      onValueChange={(value) => setFormData({ ...formData, subscription_status: value })}
+                      disabled={formData.status !== 'occupied'}
+                    >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
