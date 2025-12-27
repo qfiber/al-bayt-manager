@@ -315,6 +315,41 @@ const Payments = () => {
     const payment = payments.find(p => p.id === id);
     if (!payment || payment.is_canceled) return;
 
+    // First, get all payment allocations for this payment and reverse them
+    const { data: paymentAllocations, error: allocError } = await supabase
+      .from('payment_allocations')
+      .select('apartment_expense_id, amount_allocated')
+      .eq('payment_id', id);
+
+    if (allocError) {
+      toast({ title: 'Error', description: allocError.message, variant: 'destructive' });
+      return;
+    }
+
+    // Reverse each allocation by reducing amount_paid on apartment_expenses
+    for (const alloc of paymentAllocations || []) {
+      const { data: expenseRecord } = await supabase
+        .from('apartment_expenses')
+        .select('amount_paid')
+        .eq('id', alloc.apartment_expense_id)
+        .single();
+
+      if (expenseRecord) {
+        const newAmountPaid = Math.max(0, (expenseRecord.amount_paid || 0) - alloc.amount_allocated);
+        await supabase
+          .from('apartment_expenses')
+          .update({ amount_paid: newAmountPaid })
+          .eq('id', alloc.apartment_expense_id);
+      }
+    }
+
+    // Delete the payment allocations
+    await supabase
+      .from('payment_allocations')
+      .delete()
+      .eq('payment_id', id);
+
+    // Now cancel the payment
     const { error } = await supabase
       .from('payments')
       .update({ is_canceled: true })
