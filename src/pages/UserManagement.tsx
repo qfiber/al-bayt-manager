@@ -232,11 +232,18 @@ const UserManagement = () => {
       return;
     }
 
-    // Update role
+    // Update role using delete + insert pattern to ensure it works even if no record exists
+    await supabase
+      .from('user_roles')
+      .delete()
+      .eq('user_id', editingUser.id);
+
     const { error: roleError } = await supabase
       .from('user_roles')
-      .update({ role: formData.role as 'admin' | 'user' })
-      .eq('user_id', editingUser.id);
+      .insert({ 
+        user_id: editingUser.id, 
+        role: formData.role as 'admin' | 'moderator' | 'user' 
+      });
 
     if (roleError) {
       toast({ title: 'Error', description: roleError.message, variant: 'destructive' });
