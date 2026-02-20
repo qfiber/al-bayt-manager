@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -17,9 +17,9 @@ import { formatDateTime } from "@/lib/utils";
 interface ApiKey {
   id: string;
   name: string;
-  is_active: boolean;
-  last_used_at: string | null;
-  created_at: string;
+  isActive: boolean;
+  lastUsedAt: string | null;
+  createdAt: string;
 }
 
 export default function ApiKeys() {
@@ -48,20 +48,10 @@ export default function ApiKeys() {
 
   const fetchApiKeys = async () => {
     try {
-      const { data, error } = await supabase
-        .from('api_keys')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
+      const data = await api.get('/api-keys');
       setApiKeys(data || []);
     } catch (error: any) {
-      console.error('Error fetching API keys:', error);
-      toast({
-        title: t('error'),
-        description: error.message,
-        variant: "destructive",
-      });
+      toast({ title: t('error'), description: error.message, variant: "destructive" });
     } finally {
       setIsLoading(false);
     }
@@ -78,29 +68,10 @@ export default function ApiKeys() {
     }
 
     try {
-      // Generate a secure random API key
-      const key = `sk_${crypto.randomUUID().replace(/-/g, '')}${crypto.randomUUID().replace(/-/g, '').substring(0, 16)}`;
-      
-      // Hash the key for storage
-      const encoder = new TextEncoder();
-      const data = encoder.encode(key);
-      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-      const hashArray = Array.from(new Uint8Array(hashBuffer));
-      const keyHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+      // Server generates and hashes the key
+      const result = await api.post('/api-keys', { name: newKeyName });
 
-      // Store the hashed key
-      const { error } = await supabase
-        .from('api_keys')
-        .insert({
-          user_id: user!.id,
-          name: newKeyName,
-          key_hash: keyHash,
-          is_active: true
-        });
-
-      if (error) throw error;
-
-      setGeneratedKey(key);
+      setGeneratedKey(result.key);
       setShowKeyDialog(true);
       setIsDialogOpen(false);
       setNewKeyName("");
@@ -111,12 +82,7 @@ export default function ApiKeys() {
         description: language === 'ar' ? 'تم إنشاء مفتاح API بنجاح' : 'API key created successfully',
       });
     } catch (error: any) {
-      console.error('Error generating API key:', error);
-      toast({
-        title: t('error'),
-        description: error.message,
-        variant: "destructive",
-      });
+      toast({ title: t('error'), description: error.message, variant: "destructive" });
     }
   };
 
@@ -130,27 +96,16 @@ export default function ApiKeys() {
 
   const toggleKeyStatus = async (id: string, currentStatus: boolean) => {
     try {
-      const { error } = await supabase
-        .from('api_keys')
-        .update({ is_active: !currentStatus })
-        .eq('id', id);
-
-      if (error) throw error;
-
+      await api.put(`/api-keys/${id}`, { isActive: !currentStatus });
       fetchApiKeys();
       toast({
         title: t('success'),
-        description: language === 'ar' 
+        description: language === 'ar'
           ? (currentStatus ? 'تم تعطيل المفتاح' : 'تم تفعيل المفتاح')
           : (currentStatus ? 'Key disabled' : 'Key enabled'),
       });
     } catch (error: any) {
-      console.error('Error updating API key:', error);
-      toast({
-        title: t('error'),
-        description: error.message,
-        variant: "destructive",
-      });
+      toast({ title: t('error'), description: error.message, variant: "destructive" });
     }
   };
 
@@ -160,40 +115,24 @@ export default function ApiKeys() {
     }
 
     try {
-      const { error } = await supabase
-        .from('api_keys')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-
+      await api.delete(`/api-keys/${id}`);
       fetchApiKeys();
       toast({
         title: t('success'),
         description: language === 'ar' ? 'تم حذف المفتاح' : 'Key deleted',
       });
     } catch (error: any) {
-      console.error('Error deleting API key:', error);
-      toast({
-        title: t('error'),
-        description: error.message,
-        variant: "destructive",
-      });
+      toast({ title: t('error'), description: error.message, variant: "destructive" });
     }
   };
 
   if (loading || isLoading) {
-    return <div className="flex items-center justify-center min-h-screen">
-      {t('loading')}...
-    </div>;
+    return <div className="flex items-center justify-center min-h-screen">{t('loading')}...</div>;
   }
 
-  if (!user || !isAdmin) {
-    return null;
-  }
+  if (!user || !isAdmin) return null;
 
-  const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-  const apiBaseUrl = `https://${projectId}.supabase.co/functions/v1/api`;
+  const apiBaseUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:3000/api'}/v1`;
 
   return (
     <div className="container mx-auto p-6 space-y-6" dir={language === 'ar' ? 'rtl' : 'ltr'}>
@@ -201,16 +140,13 @@ export default function ApiKeys() {
         <h1 className="text-3xl font-bold">
           {language === 'ar' ? 'مفاتيح API' : 'API Keys'}
         </h1>
-        <Button variant="outline" onClick={() => navigate('/dashboard')}>
-          {language === 'ar' ? 'العودة إلى لوحة التحكم' : 'Back to Dashboard'}
-        </Button>
       </div>
 
       <Card>
         <CardHeader>
           <CardTitle>{language === 'ar' ? 'معلومات API' : 'API Information'}</CardTitle>
           <CardDescription>
-            {language === 'ar' 
+            {language === 'ar'
               ? 'استخدم مفاتيح API للوصول إلى البيانات من التطبيقات الخارجية'
               : 'Use API keys to access data from external applications'}
           </CardDescription>
@@ -231,7 +167,7 @@ export default function ApiKeys() {
               <div className="space-y-1">
                 <p className="font-mono text-sm font-semibold text-left">/apartments</p>
                 <p className="text-xs text-muted-foreground text-left">
-                  {language === 'ar' 
+                  {language === 'ar'
                     ? 'جميع الشقق مع اسم المستخدم ورقم الهاتف والرصيد الإجمالي'
                     : 'All apartments with user name, phone, and total credit'}
                 </p>
@@ -239,7 +175,7 @@ export default function ApiKeys() {
               <div className="space-y-1">
                 <p className="font-mono text-sm font-semibold text-left">/apartments/{'{id}'}</p>
                 <p className="text-xs text-muted-foreground text-left">
-                  {language === 'ar' 
+                  {language === 'ar'
                     ? 'شقة محددة مع أشهر الإشغال، الديون الإجمالية، وتفاصيل الديون لكل شهر'
                     : 'Specific apartment with months occupied, total debt, and month-by-month debt details'}
                 </p>
@@ -338,28 +274,28 @@ export default function ApiKeys() {
                   <TableRow key={key.id}>
                     <TableCell className="font-medium text-right">{key.name}</TableCell>
                     <TableCell className="text-right">
-                      <Badge variant={key.is_active ? "default" : "secondary"}>
-                        {key.is_active 
+                      <Badge variant={key.isActive ? "default" : "secondary"}>
+                        {key.isActive
                           ? (language === 'ar' ? 'نشط' : 'Active')
                           : (language === 'ar' ? 'معطل' : 'Disabled')}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      {key.last_used_at 
-                        ? formatDateTime(key.last_used_at)
+                      {key.lastUsedAt
+                        ? formatDateTime(key.lastUsedAt)
                         : (language === 'ar' ? 'لم يستخدم' : 'Never')}
                     </TableCell>
                     <TableCell className="text-right">
-                      {formatDateTime(key.created_at)}
+                      {formatDateTime(key.createdAt)}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex gap-2 justify-end">
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => toggleKeyStatus(key.id, key.is_active)}
+                          onClick={() => toggleKeyStatus(key.id, key.isActive)}
                         >
-                          {key.is_active 
+                          {key.isActive
                             ? (language === 'ar' ? 'تعطيل' : 'Disable')
                             : (language === 'ar' ? 'تفعيل' : 'Enable')}
                         </Button>
@@ -387,7 +323,7 @@ export default function ApiKeys() {
               {language === 'ar' ? 'إنشاء مفتاح API جديد' : 'Create New API Key'}
             </DialogTitle>
             <DialogDescription>
-              {language === 'ar' 
+              {language === 'ar'
                 ? 'أدخل اسماً وصفياً لهذا المفتاح'
                 : 'Enter a descriptive name for this key'}
             </DialogDescription>
@@ -419,7 +355,7 @@ export default function ApiKeys() {
               {language === 'ar' ? 'مفتاح API الخاص بك' : 'Your API Key'}
             </DialogTitle>
             <DialogDescription>
-              {language === 'ar' 
+              {language === 'ar'
                 ? 'احفظ هذا المفتاح الآن. لن تتمكن من رؤيته مرة أخرى!'
                 : 'Save this key now. You will not be able to see it again!'}
             </DialogDescription>
@@ -428,8 +364,8 @@ export default function ApiKeys() {
             <div className="bg-muted p-4 rounded-lg">
               <code className="text-sm break-all">{generatedKey}</code>
             </div>
-            <Button 
-              onClick={() => copyToClipboard(generatedKey!)} 
+            <Button
+              onClick={() => copyToClipboard(generatedKey!)}
               className="w-full"
               variant="outline"
             >

@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api';
 import { toast } from 'sonner';
 
 interface GeneralInformationDialogProps {
@@ -28,38 +28,35 @@ export const GeneralInformationDialog = ({
   const [isDirty, setIsDirty] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
-    text_1: '',
-    text_2: '',
-    text_3: '',
+    text1: '',
+    text2: '',
+    text3: '',
   });
 
   useEffect(() => {
     if (informationId && open) {
       fetchInformation();
     } else if (!open) {
-      setFormData({ title: '', text_1: '', text_2: '', text_3: '' });
+      setFormData({ title: '', text1: '', text2: '', text3: '' });
       setIsDirty(false);
     }
   }, [informationId, open]);
 
   const fetchInformation = async () => {
-    const { data, error } = await supabase
-      .from('general_information')
-      .select('*')
-      .eq('id', informationId)
-      .single();
-
-    if (error) {
+    try {
+      const items = await api.get('/general-info');
+      const data = items.find((item: any) => item.id === informationId);
+      if (data) {
+        setFormData({
+          title: data.title || '',
+          text1: data.text1 || '',
+          text2: data.text2 || '',
+          text3: data.text3 || '',
+        });
+      }
+    } catch {
       toast.error(t('error'));
-      return;
     }
-
-    setFormData({
-      title: data.title || '',
-      text_1: data.text_1 || '',
-      text_2: data.text_2 || '',
-      text_3: data.text_3 || '',
-    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -68,26 +65,17 @@ export const GeneralInformationDialog = ({
 
     try {
       if (informationId) {
-        const { error } = await supabase
-          .from('general_information')
-          .update(formData)
-          .eq('id', informationId);
-
-        if (error) throw error;
+        await api.put(`/general-info/${informationId}`, formData);
         toast.success(t('updateSuccess'));
       } else {
-        const { error } = await supabase
-          .from('general_information')
-          .insert([formData]);
-
-        if (error) throw error;
+        await api.post('/general-info', formData);
         toast.success(t('addSuccess'));
       }
 
       setIsDirty(false);
       onSuccess();
       onOpenChange(false);
-    } catch (error) {
+    } catch {
       toast.error(t('error'));
     } finally {
       setLoading(false);
@@ -133,29 +121,29 @@ export const GeneralInformationDialog = ({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="text_1">{t('informationText1')}</Label>
+              <Label htmlFor="text1">{t('informationText1')}</Label>
               <Textarea
-                id="text_1"
-                value={formData.text_1}
-                onChange={(e) => handleInputChange('text_1', e.target.value)}
+                id="text1"
+                value={formData.text1}
+                onChange={(e) => handleInputChange('text1', e.target.value)}
                 rows={2}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="text_2">{t('informationText2')}</Label>
+              <Label htmlFor="text2">{t('informationText2')}</Label>
               <Textarea
-                id="text_2"
-                value={formData.text_2}
-                onChange={(e) => handleInputChange('text_2', e.target.value)}
+                id="text2"
+                value={formData.text2}
+                onChange={(e) => handleInputChange('text2', e.target.value)}
                 rows={2}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="text_3">{t('informationText3')}</Label>
+              <Label htmlFor="text3">{t('informationText3')}</Label>
               <Textarea
-                id="text_3"
-                value={formData.text_3}
-                onChange={(e) => handleInputChange('text_3', e.target.value)}
+                id="text3"
+                value={formData.text3}
+                onChange={(e) => handleInputChange('text3', e.target.value)}
                 rows={2}
               />
             </div>

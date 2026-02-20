@@ -2,13 +2,20 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { QrCode, Shield } from 'lucide-react';
+
+interface Factor {
+  id: string;
+  friendlyName: string;
+  status: 'unverified' | 'verified';
+  createdAt: string;
+}
 
 const Setup2FA = () => {
   const [qrCode, setQrCode] = useState<string>('');
@@ -18,7 +25,7 @@ const Setup2FA = () => {
   const [factorId, setFactorId] = useState<string>('');
   const [has2FA, setHas2FA] = useState(false);
   const [showDisableVerification, setShowDisableVerification] = useState(false);
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const { t } = useLanguage();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -34,8 +41,8 @@ const Setup2FA = () => {
 
   const checkExisting2FA = async () => {
     try {
-      const { data: factors } = await supabase.auth.mfa.listFactors();
-      if (factors && factors.totp && factors.totp.length > 0) {
+      const factors = await api.get<Factor[]>('/auth/2fa/factors');
+      if (factors && factors.some((f) => f.status === 'verified')) {
         setHas2FA(true);
       }
     } catch (error) {
@@ -46,16 +53,16 @@ const Setup2FA = () => {
   const handleEnroll = async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase.auth.mfa.enroll({
-        factorType: 'totp',
-        friendlyName: 'Authenticator App',
-      });
+      const data = await api.post<{
+        factorId: string;
+        qrCode: string;
+        secret: string;
+        uri: string;
+      }>('/auth/2fa/enroll');
 
-      if (error) throw error;
-
-      setQrCode(data.totp.qr_code);
-      setSecret(data.totp.secret);
-      setFactorId(data.id);
+      setQrCode(data.qrCode);
+      setSecret(data.secret);
+      setFactorId(data.factorId);
 
       toast({
         title: t('success'),
@@ -77,36 +84,23 @@ const Setup2FA = () => {
     setIsLoading(true);
 
     try {
-      const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({
+      await api.post('/auth/2fa/verify', {
         factorId,
-      });
-
-      if (challengeError) throw challengeError;
-
-      const { error } = await supabase.auth.mfa.verify({
-        factorId,
-        challengeId: challengeData.id,
         code: verificationCode,
       });
 
-      if (error) {
-        toast({
-          title: t('error'),
-          description: t('invalidVerificationCode'),
-          variant: 'destructive',
-        });
-      } else {
-        toast({
-          title: t('success'),
-          description: t('twoFactorEnabledSuccess'),
-        });
-        navigate('/settings');
-      }
+      await refreshUser();
+
+      toast({
+        title: t('success'),
+        description: t('twoFactorEnabledSuccess'),
+      });
+      navigate('/settings');
     } catch (error) {
       console.error('Verification error:', error);
       toast({
         title: t('error'),
-        description: t('failedToVerifyCode'),
+        description: t('invalidVerificationCode'),
         variant: 'destructive',
       });
     }
@@ -118,42 +112,19 @@ const Setup2FA = () => {
     e.preventDefault();
     setIsLoading(true);
     try {
-      const { data: factors } = await supabase.auth.mfa.listFactors();
-      const totpFactor = factors?.totp?.[0];
+      const factors = await api.get<Factor[]>('/auth/2fa/factors');
+      const totpFactor = factors?.find((f) => f.status === 'verified');
 
       if (!totpFactor) {
         throw new Error(t('no2FAFactorFound'));
       }
 
-      // First, verify with 2FA to get AAL2
-      const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({
+      await api.post('/auth/2fa/unenroll', {
         factorId: totpFactor.id,
-      });
-
-      if (challengeError) throw challengeError;
-
-      const { error: verifyError } = await supabase.auth.mfa.verify({
-        factorId: totpFactor.id,
-        challengeId: challengeData.id,
         code: verificationCode,
       });
 
-      if (verifyError) {
-        toast({
-          title: t('error'),
-          description: t('invalidVerificationCode'),
-          variant: 'destructive',
-        });
-        setIsLoading(false);
-        return;
-      }
-
-      // Now unenroll with AAL2 authentication
-      const { error } = await supabase.auth.mfa.unenroll({
-        factorId: totpFactor.id,
-      });
-
-      if (error) throw error;
+      await refreshUser();
 
       toast({
         title: t('success'),
@@ -189,7 +160,7 @@ const Setup2FA = () => {
           </div>
           <CardTitle className="text-2xl font-bold">{t('twoFactorAuth')}</CardTitle>
           <CardDescription>
-            {has2FA 
+            {has2FA
               ? t('accountProtectedWith2FA')
               : t('addExtraSecurityLayer')}
           </CardDescription>
@@ -202,7 +173,7 @@ const Setup2FA = () => {
                   {t('twoFactorCurrentlyEnabled')}
                 </p>
               </div>
-              
+
               {showDisableVerification ? (
                 <form onSubmit={handleDisable2FA} className="space-y-4">
                   <div className="space-y-2">
@@ -222,7 +193,7 @@ const Setup2FA = () => {
                       {t('enterCodeToConfirm')}
                     </p>
                   </div>
-                  <Button 
+                  <Button
                     type="submit"
                     variant="destructive"
                     className="w-full"
@@ -230,10 +201,10 @@ const Setup2FA = () => {
                   >
                     {isLoading ? t('disabling') : t('confirmDisable2FA')}
                   </Button>
-                  <Button 
+                  <Button
                     type="button"
                     variant="outline"
-                    className="w-full" 
+                    className="w-full"
                     onClick={() => {
                       setShowDisableVerification(false);
                       setVerificationCode('');
@@ -245,17 +216,17 @@ const Setup2FA = () => {
                 </form>
               ) : (
                 <>
-                  <Button 
+                  <Button
                     variant="destructive"
-                    className="w-full" 
+                    className="w-full"
                     onClick={() => setShowDisableVerification(true)}
                     disabled={isLoading}
                   >
                     {t('disable2FA')}
                   </Button>
-                  <Button 
+                  <Button
                     variant="outline"
-                    className="w-full" 
+                    className="w-full"
                     onClick={() => navigate('/settings')}
                   >
                     {t('backToSettings')}
@@ -269,7 +240,7 @@ const Setup2FA = () => {
                 <div className="flex justify-center p-4 bg-white rounded-lg">
                   <img src={qrCode} alt="QR Code" className="w-48 h-48" />
                 </div>
-                
+
                 <div className="space-y-2">
                   <Label className="text-sm font-medium">{t('manualEntryCode')}</Label>
                   <Input
@@ -302,9 +273,9 @@ const Setup2FA = () => {
                 </div>
               </div>
 
-              <Button 
-                type="submit" 
-                className="w-full" 
+              <Button
+                type="submit"
+                className="w-full"
                 disabled={isLoading}
               >
                 {isLoading ? t('verifying') : t('enable2FA')}
@@ -322,8 +293,8 @@ const Setup2FA = () => {
                 </ol>
               </div>
 
-              <Button 
-                className="w-full" 
+              <Button
+                className="w-full"
                 onClick={handleEnroll}
                 disabled={isLoading}
               >
@@ -331,9 +302,9 @@ const Setup2FA = () => {
                 {isLoading ? t('settingUp') : t('startSetup')}
               </Button>
 
-              <Button 
+              <Button
                 variant="outline"
-                className="w-full" 
+                className="w-full"
                 onClick={() => navigate('/settings')}
               >
                 {t('cancel')}

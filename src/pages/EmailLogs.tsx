@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -14,17 +14,25 @@ import { format } from 'date-fns';
 
 interface EmailLog {
   id: string;
-  created_at: string;
-  user_id: string | null;
-  recipient_email: string;
-  template_identifier: string;
-  user_preferred_language: string | null;
-  language_used: string | null;
-  subject_sent: string | null;
+  createdAt: string;
+  userId: string | null;
+  recipientEmail: string;
+  templateIdentifier: string;
+  userPreferredLanguage: string | null;
+  languageUsed: string | null;
+  subjectSent: string | null;
   status: 'sent' | 'failed' | 'skipped';
-  failure_reason: string | null;
+  failureReason: string | null;
   metadata: any;
 }
+
+interface EmailTemplate {
+  id: string;
+  identifier: string;
+  name: string;
+}
+
+const PAGE_SIZE = 50;
 
 const EmailLogs = () => {
   const { user, isAdmin, loading } = useAuth();
@@ -36,7 +44,9 @@ const EmailLogs = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [templateFilter, setTemplateFilter] = useState<string>('all');
-  const [templates, setTemplates] = useState<string[]>([]);
+  const [templates, setTemplates] = useState<EmailTemplate[]>([]);
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
 
   const isRTL = language === 'ar' || language === 'he';
 
@@ -48,44 +58,63 @@ const EmailLogs = () => {
     }
   }, [user, isAdmin, loading, navigate]);
 
+  // Fetch template list for the filter dropdown
   useEffect(() => {
     if (user && isAdmin) {
-      fetchLogs();
+      api.get<EmailTemplate[]>('/email/templates')
+        .then((data) => setTemplates(data || []))
+        .catch(() => {
+          // Silently fail — filter dropdown will just be empty
+        });
     }
-  }, [user, isAdmin, statusFilter, templateFilter]);
+  }, [user, isAdmin]);
 
-  const fetchLogs = async () => {
+  const fetchLogs = useCallback(async () => {
     setIsLoading(true);
     try {
-      let query = supabase
-        .from('email_logs')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(200);
+      const params = new URLSearchParams();
 
       if (statusFilter !== 'all') {
-        query = query.eq('status', statusFilter);
+        params.set('status', statusFilter);
       }
-
       if (templateFilter !== 'all') {
-        query = query.eq('template_identifier', templateFilter);
+        params.set('templateIdentifier', templateFilter);
       }
 
-      const { data, error } = await query;
+      params.set('limit', String(PAGE_SIZE + 1));
+      params.set('offset', String(offset));
 
-      if (error) throw error;
+      const queryString = params.toString();
+      const path = `/email/logs${queryString ? `?${queryString}` : ''}`;
+      const data = await api.get<EmailLog[]>(path);
+      const allResults = data || [];
 
-      setLogs((data || []) as EmailLog[]);
-
-      // Get unique templates for filter
-      const uniqueTemplates = [...new Set(data?.map(l => l.template_identifier) || [])];
-      setTemplates(uniqueTemplates);
+      // If we got more than PAGE_SIZE results, there are more pages
+      if (allResults.length > PAGE_SIZE) {
+        setHasMore(true);
+        setLogs(allResults.slice(0, PAGE_SIZE));
+      } else {
+        setHasMore(false);
+        setLogs(allResults);
+      }
     } catch (error: any) {
       toast({ title: t('error'), description: error.message, variant: 'destructive' });
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [statusFilter, templateFilter, offset, toast, t]);
+
+  // Fetch logs when filters or offset change
+  useEffect(() => {
+    if (user && isAdmin) {
+      fetchLogs();
+    }
+  }, [user, isAdmin, fetchLogs]);
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setOffset(0);
+  }, [statusFilter, templateFilter]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -133,6 +162,16 @@ const EmailLogs = () => {
     setTemplateFilter('all');
   };
 
+  const currentPage = Math.floor(offset / PAGE_SIZE) + 1;
+
+  const goToPreviousPage = () => {
+    setOffset((prev) => Math.max(0, prev - PAGE_SIZE));
+  };
+
+  const goToNextPage = () => {
+    setOffset((prev) => prev + PAGE_SIZE);
+  };
+
   if (loading || isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -149,9 +188,6 @@ const EmailLogs = () => {
             <Mail className="h-8 w-8" />
             {t('emailLogs')}
           </h1>
-          <Button variant="outline" onClick={() => navigate('/dashboard')}>
-            {t('backToDashboard')}
-          </Button>
         </div>
         <div className="flex items-center justify-between">
           <p className="text-muted-foreground">{t('emailLogsDescription')}</p>
@@ -190,8 +226,8 @@ const EmailLogs = () => {
                 <SelectContent>
                   <SelectItem value="all">{t('all')}</SelectItem>
                   {templates.map((template) => (
-                    <SelectItem key={template} value={template}>
-                      {template}
+                    <SelectItem key={template.identifier} value={template.identifier}>
+                      {template.identifier}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -235,15 +271,15 @@ const EmailLogs = () => {
                 logs.map((log) => (
                   <TableRow key={log.id}>
                     <TableCell className="whitespace-nowrap">
-                      {format(new Date(log.created_at), 'yyyy-MM-dd HH:mm:ss')}
+                      {format(new Date(log.createdAt), 'yyyy-MM-dd HH:mm:ss')}
                     </TableCell>
-                    <TableCell>{log.recipient_email}</TableCell>
-                    <TableCell className="font-mono text-sm">{log.template_identifier}</TableCell>
-                    <TableCell>{getLanguageLabel(log.user_preferred_language)}</TableCell>
-                    <TableCell>{getLanguageLabel(log.language_used)}</TableCell>
+                    <TableCell>{log.recipientEmail}</TableCell>
+                    <TableCell className="font-mono text-sm">{log.templateIdentifier}</TableCell>
+                    <TableCell>{getLanguageLabel(log.userPreferredLanguage)}</TableCell>
+                    <TableCell>{getLanguageLabel(log.languageUsed)}</TableCell>
                     <TableCell>{getStatusBadge(log.status)}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {log.failure_reason || '-'}
+                      {log.failureReason || '-'}
                     </TableCell>
                   </TableRow>
                 ))
@@ -252,6 +288,29 @@ const EmailLogs = () => {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Pagination */}
+      <div className="flex items-center justify-between mt-4">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={goToPreviousPage}
+          disabled={offset === 0}
+        >
+          {t('previous')}
+        </Button>
+        <span className="text-sm text-muted-foreground">
+          {t('page')} {currentPage}
+        </span>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={goToNextPage}
+          disabled={!hasMore}
+        >
+          {t('next')}
+        </Button>
+      </div>
     </div>
   );
 };

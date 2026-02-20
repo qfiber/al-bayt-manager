@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -10,34 +10,45 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Home, Plus, Pencil, Trash2, Eye, XCircle } from 'lucide-react';
-import { recalculateBuildingExpenses } from '@/hooks/useExpenseRecalculation';
 
 interface Apartment {
   id: string;
-  apartment_number: string;
-  building_id: string;
-  floor: string | null;
+  apartmentNumber: string;
+  buildingId: string;
+  floor: number | null;
   status: string;
-  occupancy_start: string | null;
-  subscription_amount: number;
-  subscription_status: string;
-  credit: number;
-  owner_id: string | null;
-  beneficiary_id: string | null;
+  occupancyStart: string | null;
+  subscriptionAmount: string;
+  subscriptionStatus: string;
+  cachedBalance: string;
+  ownerId: string | null;
+  beneficiaryId: string | null;
+}
+
+interface ApartmentListItem {
+  apartment: Apartment;
+  buildingName: string;
+  ownerName: string | null;
+  beneficiaryName: string | null;
 }
 
 interface Building {
   id: string;
   name: string;
-  number_of_floors: number | null;
-  underground_floors: number | null;
+  numberOfFloors: number | null;
+  undergroundFloors: number | null;
 }
 
 interface Settings {
-  monthly_fee: number;
+  monthlyFee: string;
+}
+
+interface User {
+  id: string;
+  name: string;
 }
 
 const Apartments = () => {
@@ -45,10 +56,10 @@ const Apartments = () => {
   const { t, language } = useLanguage();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [apartments, setApartments] = useState<Apartment[]>([]);
+  const [apartmentItems, setApartmentItems] = useState<ApartmentListItem[]>([]);
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
-  const [profiles, setProfiles] = useState<{ id: string; name: string }[]>([]);
+  const [profiles, setProfiles] = useState<User[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingApartment, setEditingApartment] = useState<Apartment | null>(null);
   const [selectedBuildingFilter, setSelectedBuildingFilter] = useState<string>('all');
@@ -62,7 +73,7 @@ const Apartments = () => {
     status: 'vacant',
     occupancy_start: '',
     subscription_amount: '',
-    subscription_status: 'due',
+    subscription_status: 'inactive',
   });
 
   useEffect(() => {
@@ -83,15 +94,11 @@ const Apartments = () => {
   }, [user, isAdmin]);
 
   const fetchSettings = async () => {
-    const { data, error } = await supabase
-      .from('settings')
-      .select('monthly_fee')
-      .maybeSingle();
-
-    if (error) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    } else if (data) {
+    try {
+      const data = await api.get<Settings>('/settings');
       setSettings(data);
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
     }
   };
 
@@ -101,10 +108,10 @@ const Apartments = () => {
     // Convert dd/mm/yyyy to Date object
     const parts = occupancyStart.split('/');
     if (parts.length !== 3) return monthlyFee;
-    
+
     const [day, month, year] = parts.map(p => parseInt(p, 10));
     if (isNaN(day) || isNaN(month) || isNaN(year)) return monthlyFee;
-    
+
     const startDate = new Date(year, month - 1, day);
     const dayOfMonth = startDate.getDate();
 
@@ -116,11 +123,11 @@ const Apartments = () => {
     const daysRemaining = daysInMonth - dayOfMonth + 1;
 
     const proratedAmount = (monthlyFee / daysInMonth) * daysRemaining;
-    
+
     // Custom rounding: 0.01-0.5 rounds down, 0.51+ rounds up
     const wholePart = Math.floor(proratedAmount);
     const fractionalPart = proratedAmount - wholePart;
-    
+
     if (fractionalPart >= 0.51) {
       return wholePart + 1;
     } else {
@@ -129,58 +136,47 @@ const Apartments = () => {
   };
 
   useEffect(() => {
-    if (formData.occupancy_start && settings?.monthly_fee) {
-      const calculatedAmount = calculateProratedAmount(formData.occupancy_start, settings.monthly_fee);
+    const monthlyFee = parseFloat(settings?.monthlyFee || '0');
+    if (formData.occupancy_start && monthlyFee) {
+      const calculatedAmount = calculateProratedAmount(formData.occupancy_start, monthlyFee);
       setFormData(prev => ({ ...prev, subscription_amount: calculatedAmount.toString() }));
-    } else if (settings?.monthly_fee && !formData.occupancy_start) {
-      setFormData(prev => ({ ...prev, subscription_amount: settings.monthly_fee.toString() }));
+    } else if (monthlyFee && !formData.occupancy_start) {
+      setFormData(prev => ({ ...prev, subscription_amount: monthlyFee.toString() }));
     }
-  }, [formData.occupancy_start, settings?.monthly_fee]);
+  }, [formData.occupancy_start, settings?.monthlyFee]);
 
   const fetchBuildings = async () => {
-    const { data, error } = await supabase
-      .from('buildings')
-      .select('id, name, number_of_floors, underground_floors')
-      .order('name');
-
-    if (error) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    } else {
-      setBuildings(data || []);
+    try {
+      const data = await api.get<Building[]>('/buildings');
+      setBuildings(data);
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
     }
   };
 
   const fetchApartments = async () => {
-    const { data, error } = await supabase
-      .from('apartments')
-      .select('*')
-      .order('apartment_number');
-
-    if (error) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    } else {
-      setApartments(data || []);
+    try {
+      const data = await api.get<ApartmentListItem[]>('/apartments');
+      setApartmentItems(data);
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
     }
   };
 
   const fetchProfiles = async () => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('id, name')
-      .order('name');
-
-    if (error) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    } else {
-      setProfiles(data || []);
+    try {
+      const data = await api.get<User[]>('/users');
+      setProfiles(data.map(u => ({ id: u.id, name: u.name })));
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Convert dd/mm/yyyy to yyyy-mm-dd for database
-    let dbDate = null;
+
+    // Convert dd/mm/yyyy to yyyy-mm-dd for the API
+    let dbDate: string | null = null;
     if (formData.occupancy_start) {
       const parts = formData.occupancy_start.split('/');
       if (parts.length === 3) {
@@ -188,76 +184,36 @@ const Apartments = () => {
         dbDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
       }
     }
-    
+
     const subscriptionAmount = parseFloat(formData.subscription_amount) || 0;
-    
-    const apartmentData = {
-      apartment_number: formData.apartment_number,
-      building_id: formData.building_id,
-      floor: formData.floor || null,
+
+    const apartmentData: Record<string, any> = {
+      apartmentNumber: formData.apartment_number,
+      buildingId: formData.building_id,
+      floor: formData.floor ? (formData.floor === 'Ground' ? 0 : parseInt(formData.floor)) : undefined,
       status: formData.status,
-      occupancy_start: dbDate,
-      subscription_amount: subscriptionAmount,
-      subscription_status: formData.subscription_status,
+      occupancyStart: dbDate,
+      subscriptionAmount: subscriptionAmount.toString(),
+      subscriptionStatus: formData.subscription_status,
     };
 
     if (editingApartment) {
-      // Check if occupancy is being set and occupancy_start is on the 1st of the month
-      const wasVacant = editingApartment.status === 'vacant';
-      const isNowOccupied = formData.status === 'occupied';
-      const shouldRecalculate = wasVacant && isNowOccupied && dbDate;
-
-      const { error } = await supabase
-        .from('apartments')
-        .update(apartmentData)
-        .eq('id', editingApartment.id);
-
-      if (error) {
-        toast({ title: 'Error', description: error.message, variant: 'destructive' });
-      } else {
+      try {
+        await api.put(`/apartments/${editingApartment.id}`, apartmentData);
         toast({ title: 'Success', description: 'Apartment updated successfully' });
-        
-        // Recalculate building expenses if apartment became occupied
-        if (shouldRecalculate) {
-          toast({ title: t('recalculatingExpenses'), description: '' });
-          const result = await recalculateBuildingExpenses(formData.building_id);
-          if (result.success && result.adjustments.length > 0) {
-            toast({ title: t('success'), description: t('expensesRecalculated') });
-          }
-        }
-        
         fetchApartments();
         resetForm();
+      } catch (err: any) {
+        toast({ title: 'Error', description: err.message, variant: 'destructive' });
       }
     } else {
-      // For new apartments, create with zero credit - recalculation will set correct balance
-      const { error, data: newApartment } = await supabase
-        .from('apartments')
-        .insert([{ ...apartmentData, credit: 0 }])
-        .select()
-        .single();
-
-      if (error) {
-        toast({ title: 'Error', description: error.message, variant: 'destructive' });
-      } else {
+      try {
+        await api.post('/apartments', apartmentData);
         toast({ title: 'Success', description: 'Apartment created successfully' });
-        
-        // Recalculate building expenses and apartment balance
-        if (formData.status === 'occupied' && dbDate) {
-          const result = await recalculateBuildingExpenses(formData.building_id);
-          if (result.success && result.adjustments.length > 0) {
-            toast({ title: t('success'), description: t('expensesRecalculated') });
-          }
-        }
-        
-        // Always recalculate the new apartment's balance
-        if (newApartment) {
-          const { recalculateApartmentBalance } = await import('@/hooks/useExpenseRecalculation');
-          await recalculateApartmentBalance(newApartment.id);
-        }
-        
         fetchApartments();
         resetForm();
+      } catch (err: any) {
+        toast({ title: 'Error', description: err.message, variant: 'destructive' });
       }
     }
   };
@@ -265,40 +221,36 @@ const Apartments = () => {
   const handleDelete = async (id: string) => {
     if (!confirm(t('deleteApartmentConfirm'))) return;
 
-    const { error } = await supabase
-      .from('apartments')
-      .delete()
-      .eq('id', id);
-
-    if (error) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    } else {
+    try {
+      await api.delete(`/apartments/${id}`);
       toast({ title: 'Success', description: 'Apartment deleted successfully' });
       fetchApartments();
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
     }
   };
 
   const handleEdit = (apartment: Apartment) => {
     setEditingApartment(apartment);
-    // Convert yyyy-mm-dd from database to dd/mm/yyyy for display
+    // Convert ISO date from API to dd/mm/yyyy for display
     let displayDate = '';
-    if (apartment.occupancy_start) {
-      const parts = apartment.occupancy_start.split('-');
-      if (parts.length === 3) {
-        const [year, month, day] = parts;
-        displayDate = `${day}/${month}/${year}`;
-      }
+    if (apartment.occupancyStart) {
+      const date = new Date(apartment.occupancyStart);
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const year = date.getFullYear();
+      displayDate = `${day}/${month}/${year}`;
     }
-    
+
     // Temporarily disable auto-calculation for editing
     const currentFormData = {
-      apartment_number: apartment.apartment_number,
-      building_id: apartment.building_id,
-      floor: apartment.floor || '',
+      apartment_number: apartment.apartmentNumber,
+      building_id: apartment.buildingId,
+      floor: apartment.floor != null ? (apartment.floor === 0 ? 'Ground' : apartment.floor.toString()) : '',
       status: apartment.status,
       occupancy_start: displayDate,
-      subscription_amount: apartment.subscription_amount.toString(),
-      subscription_status: apartment.subscription_status,
+      subscription_amount: apartment.subscriptionAmount,
+      subscription_status: apartment.subscriptionStatus,
     };
     setFormData(currentFormData);
     setIsDialogOpen(true);
@@ -312,19 +264,26 @@ const Apartments = () => {
       status: 'vacant',
       occupancy_start: '',
       subscription_amount: '',
-      subscription_status: 'due',
+      subscription_status: 'inactive',
     });
     setEditingApartment(null);
     setIsDialogOpen(false);
   };
 
   const getBuildingName = (buildingId: string) => {
+    const item = apartmentItems.find(a => a.apartment.buildingId === buildingId);
+    if (item) return item.buildingName;
     return buildings.find(b => b.id === buildingId)?.name || t('unknown');
   };
 
-  const getProfileName = (profileId: string | null) => {
-    if (!profileId) return '-';
-    return profiles.find(p => p.id === profileId)?.name || t('unknown');
+  const getOwnerName = (apartmentId: string) => {
+    const item = apartmentItems.find(a => a.apartment.id === apartmentId);
+    return item?.ownerName || '-';
+  };
+
+  const getBeneficiaryName = (apartmentId: string) => {
+    const item = apartmentItems.find(a => a.apartment.id === apartmentId);
+    return item?.beneficiaryName || '-';
   };
 
   // Helper function to get ordinal suffix for a number
@@ -344,12 +303,12 @@ const Apartments = () => {
     if (floorValue === 'Ground') return t('groundFloor');
     const num = parseInt(floorValue);
     if (num < 0) return `${t('parkingFloor')} ${num}`;
-    
+
     // For languages that use ordinal suffixes (English)
     if (language === 'en') {
       return `${num}${getOrdinalSuffix(num)} Floor`;
     }
-    
+
     // For Hebrew and Arabic, use translated floor names
     if (num === 1) return t('firstFloor');
     if (num === 2) return t('secondFloor');
@@ -358,38 +317,39 @@ const Apartments = () => {
   };
 
   // Get floor options for a building (excludes parking floors for apartment assignment)
-  // number_of_floors includes ground floor, so if 4 floors: Ground, 1st, 2nd, 3rd
+  // numberOfFloors includes ground floor, so if 4 floors: Ground, 1st, 2nd, 3rd
   const getFloorOptions = (buildingId: string) => {
     const building = buildings.find(b => b.id === buildingId);
     if (!building) return [];
-    
+
     const floors: { value: string; label: string }[] = [];
-    
+
     // Add ground floor first
     floors.push({ value: 'Ground', label: t('groundFloor') });
-    
+
     // Add above-ground floors (numFloors - 1 because ground floor is included in the count)
-    const numFloors = building.number_of_floors || 0;
+    const numFloors = building.numberOfFloors || 0;
     for (let i = 1; i < numFloors; i++) {
       floors.push({ value: i.toString(), label: getFloorDisplayName(i.toString()) });
     }
-    
+
     return floors;
   };
 
   const calculateMonthsOccupied = (occupancyStart: string | null) => {
     if (!occupancyStart) return 0;
-    
+
     const startDate = new Date(occupancyStart);
     const now = new Date();
-    
-    return (now.getFullYear() - startDate.getFullYear()) * 12 + 
+
+    return (now.getFullYear() - startDate.getFullYear()) * 12 +
            (now.getMonth() - startDate.getMonth()) + 1;
   };
 
   const calculateTotalDebt = (apartment: Apartment) => {
-    // credit = totalPaid - totalOwed, so debt = -credit when credit is negative
-    return Math.max(0, -apartment.credit);
+    // cachedBalance: negative = debt, positive = overpayment
+    const balance = parseFloat(apartment.cachedBalance);
+    return Math.max(0, -balance);
   };
 
   const [debtDialogOpen, setDebtDialogOpen] = useState(false);
@@ -399,19 +359,20 @@ const Apartments = () => {
   const [apartmentPayments, setApartmentPayments] = useState<any[]>([]);
 
   const calculateTerminationCredit = (apartment: Apartment): number => {
-    if (!apartment.occupancy_start) return 0;
+    if (!apartment.occupancyStart) return 0;
 
     const now = new Date();
     const currentDay = now.getDate();
     const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
     const daysRemaining = daysInMonth - currentDay + 1;
 
-    const creditForRemainingDays = (apartment.subscription_amount / daysInMonth) * daysRemaining;
-    
+    const subscriptionAmount = parseFloat(apartment.subscriptionAmount);
+    const creditForRemainingDays = (subscriptionAmount / daysInMonth) * daysRemaining;
+
     // Custom rounding: 0.01-0.5 rounds down, 0.51+ rounds up
     const wholePart = Math.floor(creditForRemainingDays);
     const fractionalPart = creditForRemainingDays - wholePart;
-    
+
     if (fractionalPart >= 0.51) {
       return wholePart + 1;
     } else {
@@ -422,28 +383,17 @@ const Apartments = () => {
   const handleTerminateOccupancy = async () => {
     if (!apartmentToTerminate) return;
 
-    const creditToAdd = calculatedTerminationCredit;
-    const newCredit = apartmentToTerminate.credit + creditToAdd;
-
-    const { error } = await supabase
-      .from('apartments')
-      .update({
-        status: 'vacant',
-        occupancy_start: null,
-        credit: newCredit
-      })
-      .eq('id', apartmentToTerminate.id);
-
-    if (error) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    } else {
-      toast({ 
-        title: t('success'), 
-        description: t('occupancyTerminated').replace('{credit}', `₪${creditToAdd.toFixed(2)}`)
+    try {
+      await api.post(`/apartments/${apartmentToTerminate.id}/terminate`);
+      toast({
+        title: t('success'),
+        description: t('occupancyTerminated').replace('{credit}', `₪${calculatedTerminationCredit.toFixed(2)}`)
       });
       fetchApartments();
       setTerminateDialogOpen(false);
       setApartmentToTerminate(null);
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
     }
   };
 
@@ -456,166 +406,120 @@ const Apartments = () => {
 
   const showDebtDetails = async (apartment: Apartment) => {
     setSelectedApartment(apartment);
-    
-    // Fetch apartment expenses
-    const { data: expensesData } = await supabase
-      .from('apartment_expenses')
-      .select('*, expense:expenses(description, expense_date)')
-      .eq('apartment_id', apartment.id)
-      .order('created_at', { ascending: false });
-    
-    setApartmentExpenses(expensesData || []);
 
-    // Fetch all payments for this apartment
-    const { data: paymentsData } = await supabase
-      .from('payments')
-      .select('*')
-      .eq('apartment_id', apartment.id)
-      .order('month', { ascending: false });
-    
-    setApartmentPayments(paymentsData || []);
-    
-    if (!apartment.occupancy_start) {
-      setDebtDetails([]);
+    try {
+      const data = await api.get<{
+        apartment: Apartment;
+        balance: number;
+        expenses: any[];
+        payments: any[];
+        ledger: any[];
+      }>(`/apartments/${apartment.id}/debt-details`);
+
+      setApartmentExpenses(data.expenses || []);
+      setApartmentPayments(data.payments || []);
+
+      if (!apartment.occupancyStart) {
+        setDebtDetails([]);
+        setDebtDialogOpen(true);
+        return;
+      }
+
+      const startDate = new Date(apartment.occupancyStart);
+      const monthsOccupied = calculateMonthsOccupied(apartment.occupancyStart);
+
+      const details = [];
+      for (let i = 0; i < monthsOccupied; i++) {
+        const monthDate = new Date(startDate.getFullYear(), startDate.getMonth() + i, 1);
+        const monthStr = `${String(monthDate.getMonth() + 1).padStart(2, '0')}/${monthDate.getFullYear()}`;
+
+        // Find payment for this month
+        const payment = data.payments?.find((p: any) => p.month === monthStr);
+        const subscriptionAmount = parseFloat(apartment.subscriptionAmount);
+
+        details.push({
+          month: monthStr,
+          amount_due: subscriptionAmount,
+          amount_paid: payment && !payment.isCanceled ? parseFloat(payment.amount) : 0,
+          balance: subscriptionAmount - (payment && !payment.isCanceled ? parseFloat(payment.amount) : 0),
+          payment_id: payment?.id || null,
+          is_payment_canceled: payment?.isCanceled || false
+        });
+      }
+
+      setDebtDetails(details);
       setDebtDialogOpen(true);
-      return;
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
     }
-
-    const startDate = new Date(apartment.occupancy_start);
-    const monthsOccupied = calculateMonthsOccupied(apartment.occupancy_start);
-    
-    const details = [];
-    for (let i = 0; i < monthsOccupied; i++) {
-      const monthDate = new Date(startDate.getFullYear(), startDate.getMonth() + i, 1);
-      const monthStr = `${String(monthDate.getMonth() + 1).padStart(2, '0')}/${monthDate.getFullYear()}`;
-      
-      // Find payment for this month
-      const payment = paymentsData?.find(p => p.month === monthStr);
-
-      details.push({
-        month: monthStr,
-        amount_due: apartment.subscription_amount,
-        amount_paid: payment && !payment.is_canceled ? payment.amount : 0,
-        balance: apartment.subscription_amount - (payment && !payment.is_canceled ? payment.amount : 0),
-        payment_id: payment?.id || null,
-        is_payment_canceled: payment?.is_canceled || false
-      });
-    }
-    
-    setDebtDetails(details);
-    setDebtDialogOpen(true);
   };
 
   const handleWaiveSubscription = async (month: string, amount: number) => {
     if (!selectedApartment) return;
 
-    // Add a credit payment (waiver) for this month
-    const { error } = await supabase
-      .from('payments')
-      .insert({
-        apartment_id: selectedApartment.id,
+    try {
+      // Create a payment (waiver) for this month via the payments API
+      await api.post('/payments', {
+        apartmentId: selectedApartment.id,
         month: month,
         amount: amount,
-        is_canceled: false
       });
 
-    if (error) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
-      return;
-    }
+      toast({ title: t('success'), description: t('subscriptionWaived') });
 
-    // Update apartment credit
-    const newCredit = selectedApartment.credit + amount;
-    const newStatus = newCredit < 0 ? 'due' : 'paid';
-    
-    const { error: creditError } = await supabase
-      .from('apartments')
-      .update({ credit: newCredit, subscription_status: newStatus })
-      .eq('id', selectedApartment.id);
-
-    if (creditError) {
-      toast({ title: 'Error', description: creditError.message, variant: 'destructive' });
-      return;
-    }
-
-    toast({ title: t('success'), description: t('subscriptionWaived') });
-    
-    // Refresh data
-    await fetchApartments();
-    const updatedApartment = { ...selectedApartment, credit: newCredit };
-    await showDebtDetails(updatedApartment);
-  };
-
-  const handleCancelPayment = async (paymentId: string, apartmentId: string, paymentAmount: number) => {
-    const { error } = await supabase
-      .from('payments')
-      .update({ is_canceled: true })
-      .eq('id', paymentId);
-
-    if (error) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
-      return;
-    }
-
-    // Recalculate apartment credit
-    const apartment = apartments.find(a => a.id === apartmentId);
-    if (apartment) {
-      const newCredit = apartment.credit - paymentAmount;
-      const newStatus = newCredit < 0 ? 'due' : 'paid';
-      
-      const { error: creditError } = await supabase
-        .from('apartments')
-        .update({ credit: newCredit, subscription_status: newStatus })
-        .eq('id', apartmentId);
-
-      if (creditError) {
-        toast({ title: 'Error', description: creditError.message, variant: 'destructive' });
-        return;
+      // Refresh data
+      await fetchApartments();
+      // Re-fetch debt details with updated apartment data
+      const updatedItems = await api.get<ApartmentListItem[]>('/apartments');
+      const updatedItem = updatedItems.find(a => a.apartment.id === selectedApartment.id);
+      if (updatedItem) {
+        await showDebtDetails(updatedItem.apartment);
       }
-    }
-
-    toast({ title: t('success'), description: t('paymentCanceled') });
-    
-    // Refresh data
-    await fetchApartments();
-    if (selectedApartment) {
-      const updatedApartment = { ...selectedApartment, credit: (apartment?.credit || 0) - paymentAmount };
-      await showDebtDetails(updatedApartment);
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
     }
   };
 
-  const handleCancelExpense = async (expenseId: string, apartmentId: string, amount: number) => {
-    const { error } = await supabase
-      .from('apartment_expenses')
-      .update({ is_canceled: true })
-      .eq('id', expenseId);
+  const handleCancelPayment = async (paymentId: string, apartmentId: string, _paymentAmount: number) => {
+    try {
+      await api.post(`/payments/${paymentId}/cancel`);
 
-    if (error) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
-      return;
-    }
+      toast({ title: t('success'), description: t('paymentCanceled') });
 
-    // Restore credit to apartment
-    const apartment = apartments.find(a => a.id === apartmentId);
-    if (apartment) {
-      const { error: creditError } = await supabase
-        .from('apartments')
-        .update({ credit: apartment.credit + amount })
-        .eq('id', apartmentId);
-
-      if (creditError) {
-        toast({ title: 'Error', description: creditError.message, variant: 'destructive' });
-        return;
+      // Refresh data
+      await fetchApartments();
+      if (selectedApartment) {
+        // Re-fetch debt details with updated apartment data
+        const updatedItems = await api.get<ApartmentListItem[]>('/apartments');
+        const updatedItem = updatedItems.find(a => a.apartment.id === apartmentId);
+        if (updatedItem) {
+          await showDebtDetails(updatedItem.apartment);
+        }
       }
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
     }
+  };
 
-    toast({ title: t('success'), description: t('expenseCanceled') });
-    
-    // Refresh data
-    if (selectedApartment) {
-      await showDebtDetails(selectedApartment);
+  const handleCancelExpense = async (expenseId: string, apartmentId: string, _amount: number) => {
+    try {
+      await api.post(`/apartment-expenses/${expenseId}/cancel`);
+
+      toast({ title: t('success'), description: t('expenseCanceled') });
+
+      // Refresh data
+      await fetchApartments();
+      if (selectedApartment) {
+        // Re-fetch debt details with updated apartment data
+        const updatedItems = await api.get<ApartmentListItem[]>('/apartments');
+        const updatedItem = updatedItems.find(a => a.apartment.id === apartmentId);
+        if (updatedItem) {
+          await showDebtDetails(updatedItem.apartment);
+        }
+      }
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
     }
-    await fetchApartments();
   };
 
   if (loading) {
@@ -624,13 +528,17 @@ const Apartments = () => {
 
   if (!user || !isAdmin) return null;
 
-  const filteredBuildings = selectedBuildingFilter === 'all' 
-    ? buildings 
+  const filteredBuildings = selectedBuildingFilter === 'all'
+    ? buildings
     : buildings.filter(b => b.id === selectedBuildingFilter);
 
   const getApartmentsForBuilding = (buildingId: string) => {
-    return apartments.filter(a => a.building_id === buildingId);
+    return apartmentItems
+      .filter(a => a.apartment.buildingId === buildingId)
+      .map(a => a.apartment);
   };
+
+  const monthlyFee = parseFloat(settings?.monthlyFee || '0');
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/10">
@@ -692,8 +600,8 @@ const Apartments = () => {
                   </div>
                   <div>
                     <Label htmlFor="floor">{t('floor')}</Label>
-                    <Select 
-                      value={formData.floor} 
+                    <Select
+                      value={formData.floor}
                       onValueChange={(value) => setFormData({ ...formData, floor: value })}
                     >
                       <SelectTrigger>
@@ -748,13 +656,13 @@ const Apartments = () => {
                       disabled={formData.status !== 'occupied'}
                     />
                     <p className="text-xs text-muted-foreground mt-1">
-                      {t('autoCalculated').replace('{fee}', String(settings?.monthly_fee || 0))}
+                      {t('autoCalculated').replace('{fee}', String(monthlyFee))}
                     </p>
                   </div>
                   <div className={formData.status !== 'occupied' ? 'opacity-50' : ''}>
                     <Label htmlFor="subscription_status">{t('subscriptionStatus')}</Label>
-                    <Select 
-                      value={formData.status === 'occupied' ? formData.subscription_status : ''} 
+                    <Select
+                      value={formData.status === 'occupied' ? formData.subscription_status : ''}
                       onValueChange={(value) => setFormData({ ...formData, subscription_status: value })}
                       disabled={formData.status !== 'occupied'}
                     >
@@ -762,9 +670,8 @@ const Apartments = () => {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="due">{t('due')}</SelectItem>
-                        <SelectItem value="paid">{t('paid')}</SelectItem>
-                        <SelectItem value="partial">{t('partial')}</SelectItem>
+                        <SelectItem value="active">{t('active')}</SelectItem>
+                        <SelectItem value="inactive">{t('inactive')}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -779,9 +686,6 @@ const Apartments = () => {
                 </form>
               </DialogContent>
             </Dialog>
-            <Button variant="outline" onClick={() => navigate('/dashboard')}>
-              {t('backToDashboard')}
-            </Button>
           </div>
         </div>
 
@@ -795,7 +699,7 @@ const Apartments = () => {
           <div className="space-y-6">
             {filteredBuildings.map((building) => {
               const buildingApartments = getApartmentsForBuilding(building.id);
-              
+
               return (
                 <Card key={building.id}>
                   <CardHeader>
@@ -820,60 +724,64 @@ const Apartments = () => {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {buildingApartments.map((apartment) => (
-                            <TableRow key={apartment.id}>
-                              <TableCell className="font-medium text-right">{apartment.apartment_number}</TableCell>
-                              <TableCell className="text-right">
-                                {apartment.floor ? getFloorDisplayName(apartment.floor) : '-'}
-                              </TableCell>
-                              <TableCell className="text-right">
-                                <span className={`px-2 py-1 rounded text-xs ${apartment.status === 'vacant' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                                  {t(apartment.status as 'vacant' | 'occupied')}
-                                </span>
-                              </TableCell>
-                              <TableCell className={`text-right ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>
-                                <div className="text-sm">
-                                  <div>{t('owner')}: {getProfileName(apartment.owner_id)}</div>
-                                  <div className="text-muted-foreground">{t('beneficiary')}: {getProfileName(apartment.beneficiary_id)}</div>
-                                </div>
-                              </TableCell>
-                              <TableCell className={`text-right ${apartment.status !== 'occupied' ? 'text-muted-foreground/50' : ''}`}>
-                                {apartment.status === 'occupied' ? `₪${apartment.subscription_amount.toFixed(2)}` : '-'}
-                              </TableCell>
-                              <TableCell className={`text-right ${apartment.status !== 'occupied' ? 'text-muted-foreground/50' : ''}`}>
-                                {apartment.status === 'occupied' ? calculateMonthsOccupied(apartment.occupancy_start) : '-'}
-                              </TableCell>
-                              <TableCell className={`text-right font-semibold ${calculateTotalDebt(apartment) > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                                ₪{Math.abs(calculateTotalDebt(apartment)).toFixed(2)}
-                              </TableCell>
-                              <TableCell className={`text-right ${apartment.credit > 0 ? 'text-green-600 font-semibold' : apartment.credit < 0 ? 'text-red-600 font-semibold' : ''}`}>
-                                ₪{apartment.credit.toFixed(2)}
-                              </TableCell>
-                              <TableCell className="text-right">
-                                <div className="flex justify-end gap-2">
-                                  <Button size="sm" variant="outline" onClick={() => showDebtDetails(apartment)}>
-                                    <Eye className="w-4 h-4" />
-                                  </Button>
-                                  {apartment.status === 'occupied' && apartment.occupancy_start && (isAdmin || isModerator) && (
-                                    <Button 
-                                      size="sm" 
-                                      variant="outline" 
-                                      onClick={() => openTerminateDialog(apartment)}
-                                      className="text-orange-600 hover:text-orange-700"
-                                    >
-                                      <XCircle className="w-4 h-4" />
+                          {buildingApartments.map((apartment) => {
+                            const balance = parseFloat(apartment.cachedBalance);
+                            const subscriptionAmount = parseFloat(apartment.subscriptionAmount);
+                            return (
+                              <TableRow key={apartment.id}>
+                                <TableCell className="font-medium text-right">{apartment.apartmentNumber}</TableCell>
+                                <TableCell className="text-right">
+                                  {apartment.floor != null ? getFloorDisplayName(apartment.floor === 0 ? 'Ground' : apartment.floor.toString()) : '-'}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <span className={`px-2 py-1 rounded text-xs ${apartment.status === 'vacant' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                                    {t(apartment.status as 'vacant' | 'occupied')}
+                                  </span>
+                                </TableCell>
+                                <TableCell className={`text-right ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>
+                                  <div className="text-sm">
+                                    <div>{t('owner')}: {getOwnerName(apartment.id)}</div>
+                                    <div className="text-muted-foreground">{t('beneficiary')}: {getBeneficiaryName(apartment.id)}</div>
+                                  </div>
+                                </TableCell>
+                                <TableCell className={`text-right ${apartment.status !== 'occupied' ? 'text-muted-foreground/50' : ''}`}>
+                                  {apartment.status === 'occupied' ? `₪${subscriptionAmount.toFixed(2)}` : '-'}
+                                </TableCell>
+                                <TableCell className={`text-right ${apartment.status !== 'occupied' ? 'text-muted-foreground/50' : ''}`}>
+                                  {apartment.status === 'occupied' ? calculateMonthsOccupied(apartment.occupancyStart) : '-'}
+                                </TableCell>
+                                <TableCell className={`text-right font-semibold ${calculateTotalDebt(apartment) > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                  ₪{Math.abs(calculateTotalDebt(apartment)).toFixed(2)}
+                                </TableCell>
+                                <TableCell className={`text-right ${balance > 0 ? 'text-green-600 font-semibold' : balance < 0 ? 'text-red-600 font-semibold' : ''}`}>
+                                  ₪{balance.toFixed(2)}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <div className="flex justify-end gap-2">
+                                    <Button size="sm" variant="outline" onClick={() => showDebtDetails(apartment)}>
+                                      <Eye className="w-4 h-4" />
                                     </Button>
-                                  )}
-                                  <Button size="sm" variant="outline" onClick={() => handleEdit(apartment)}>
-                                    <Pencil className="w-4 h-4" />
-                                  </Button>
-                                  <Button size="sm" variant="destructive" onClick={() => handleDelete(apartment.id)}>
-                                    <Trash2 className="w-4 h-4" />
-                                  </Button>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          ))}
+                                    {apartment.status === 'occupied' && apartment.occupancyStart && (isAdmin || isModerator) && (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => openTerminateDialog(apartment)}
+                                        className="text-orange-600 hover:text-orange-700"
+                                      >
+                                        <XCircle className="w-4 h-4" />
+                                      </Button>
+                                    )}
+                                    <Button size="sm" variant="outline" onClick={() => handleEdit(apartment)}>
+                                      <Pencil className="w-4 h-4" />
+                                    </Button>
+                                    <Button size="sm" variant="destructive" onClick={() => handleDelete(apartment.id)}>
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
                         </TableBody>
                       </Table>
                     )}
@@ -888,7 +796,7 @@ const Apartments = () => {
           <AlertDialogContent className="max-w-4xl">
             <AlertDialogHeader>
               <AlertDialogTitle>
-                {t('debtDetails')} - {selectedApartment ? `${t('apt')} ${selectedApartment.apartment_number}` : ''}
+                {t('debtDetails')} - {selectedApartment ? `${t('apt')} ${selectedApartment.apartmentNumber}` : ''}
               </AlertDialogTitle>
             </AlertDialogHeader>
             <div className="max-h-96 overflow-y-auto space-y-6">
@@ -913,25 +821,25 @@ const Apartments = () => {
                       </TableRow>
                     ) : (
                       apartmentPayments.map((payment) => (
-                        <TableRow key={payment.id} className={payment.is_canceled ? 'opacity-50' : ''}>
+                        <TableRow key={payment.id} className={payment.isCanceled ? 'opacity-50' : ''}>
                           <TableCell className="text-right font-medium">{payment.month}</TableCell>
-                          <TableCell className="text-right text-green-600">₪{payment.amount.toFixed(2)}</TableCell>
+                          <TableCell className="text-right text-green-600">₪{parseFloat(payment.amount).toFixed(2)}</TableCell>
                           <TableCell className="text-right">
                             <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                              payment.is_canceled 
-                                ? 'bg-gray-100 text-gray-800' 
+                              payment.isCanceled
+                                ? 'bg-gray-100 text-gray-800'
                                 : 'bg-green-100 text-green-800'
                             }`}>
-                              {payment.is_canceled ? t('canceled') : t('active')}
+                              {payment.isCanceled ? t('canceled') : t('active')}
                             </span>
                           </TableCell>
                           {(isAdmin || isModerator) && (
                             <TableCell className="text-right">
-                              {!payment.is_canceled && (
-                                <Button 
-                                  size="sm" 
-                                  variant="outline" 
-                                  onClick={() => handleCancelPayment(payment.id, payment.apartment_id, payment.amount)}
+                              {!payment.isCanceled && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleCancelPayment(payment.id, payment.apartmentId, parseFloat(payment.amount))}
                                   className="text-orange-600 hover:text-orange-700"
                                 >
                                   <XCircle className="w-4 h-4 mr-1" />
@@ -979,9 +887,9 @@ const Apartments = () => {
                           {(isAdmin || isModerator) && (
                             <TableCell className="text-right">
                               {detail.balance > 0 && !detail.payment_id && (
-                                <Button 
-                                  size="sm" 
-                                  variant="outline" 
+                                <Button
+                                  size="sm"
+                                  variant="outline"
                                   onClick={() => handleWaiveSubscription(detail.month, detail.amount_due)}
                                   className="text-orange-600 hover:text-orange-700"
                                 >
@@ -990,9 +898,9 @@ const Apartments = () => {
                                 </Button>
                               )}
                               {detail.payment_id && !detail.is_payment_canceled && (
-                                <Button 
-                                  size="sm" 
-                                  variant="outline" 
+                                <Button
+                                  size="sm"
+                                  variant="outline"
                                   onClick={() => handleCancelPayment(detail.payment_id, selectedApartment!.id, detail.amount_paid)}
                                   className="text-orange-600 hover:text-orange-700"
                                 >
@@ -1025,25 +933,25 @@ const Apartments = () => {
                     <TableBody>
                       {apartmentExpenses.map((expense) => (
                         <TableRow key={expense.id}>
-                          <TableCell className="text-right">{expense.expense?.description || '-'}</TableCell>
-                          <TableCell className="text-right">{expense.created_at ? new Date(expense.created_at).toLocaleDateString() : '-'}</TableCell>
-                          <TableCell className="text-right text-red-600 font-medium">₪{expense.amount.toFixed(2)}</TableCell>
+                          <TableCell className="text-right">{expense.description || expense.expenseId || '-'}</TableCell>
+                          <TableCell className="text-right">{expense.createdAt ? new Date(expense.createdAt).toLocaleDateString() : '-'}</TableCell>
+                          <TableCell className="text-right text-red-600 font-medium">₪{parseFloat(expense.amount).toFixed(2)}</TableCell>
                           <TableCell className="text-right">
                             <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                              expense.is_canceled 
-                                ? 'bg-gray-100 text-gray-800' 
+                              expense.isCanceled
+                                ? 'bg-gray-100 text-gray-800'
                                 : 'bg-red-100 text-red-800'
                             }`}>
-                              {expense.is_canceled ? t('canceled') : t('active')}
+                              {expense.isCanceled ? t('canceled') : t('active')}
                             </span>
                           </TableCell>
                           {(isAdmin || isModerator) && (
                             <TableCell className="text-right">
-                              {!expense.is_canceled && (
-                                <Button 
-                                  size="sm" 
-                                  variant="outline" 
-                                  onClick={() => handleCancelExpense(expense.id, expense.apartment_id, expense.amount)}
+                              {!expense.isCanceled && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleCancelExpense(expense.id, expense.apartmentId, parseFloat(expense.amount))}
                                   className="text-orange-600 hover:text-orange-700"
                                 >
                                   <XCircle className="w-4 h-4 mr-1" />
@@ -1071,7 +979,7 @@ const Apartments = () => {
               <AlertDialogTitle>{t('terminateOccupancy')}</AlertDialogTitle>
               <AlertDialogDescription>
                 {t('terminateOccupancyConfirm')
-                  .replace('{apartment}', apartmentToTerminate?.apartment_number || '')
+                  .replace('{apartment}', apartmentToTerminate?.apartmentNumber || '')
                   .replace('{credit}', `₪${calculatedTerminationCredit.toFixed(2)}`)}
               </AlertDialogDescription>
             </AlertDialogHeader>

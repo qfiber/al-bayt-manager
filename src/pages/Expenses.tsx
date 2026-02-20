@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -17,16 +17,21 @@ import { formatDate } from '@/lib/utils';
 
 interface Expense {
   id: string;
-  building_id: string;
+  buildingId: string;
   description: string;
   amount: number;
-  expense_date: string;
+  expenseDate: string;
   category: string | null;
-  is_recurring: boolean;
-  recurring_type: 'monthly' | 'yearly' | null;
-  recurring_start_date: string | null;
-  recurring_end_date: string | null;
-  parent_expense_id: string | null;
+  isRecurring: boolean;
+  recurringType: 'monthly' | 'yearly' | null;
+  recurringStartDate: string | null;
+  recurringEndDate: string | null;
+  parentExpenseId: string | null;
+}
+
+interface ExpenseRow {
+  expense: Expense;
+  buildingName: string;
 }
 
 interface Building {
@@ -36,8 +41,8 @@ interface Building {
 
 interface ApartmentOption {
   id: string;
-  apartment_number: string;
-  building_id: string;
+  apartmentNumber: string;
+  buildingId: string;
 }
 
 const Expenses = () => {
@@ -45,7 +50,7 @@ const Expenses = () => {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [expenseRows, setExpenseRows] = useState<ExpenseRow[]>([]);
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [apartments, setApartments] = useState<ApartmentOption[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -81,176 +86,94 @@ const Expenses = () => {
   }, [user, isAdmin, isModerator]);
 
   const fetchBuildings = async () => {
-    const { data, error } = await supabase
-      .from('buildings')
-      .select('id, name')
-      .order('name');
-
-    if (error) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    } else {
+    try {
+      const data = await api.get<Building[]>('/buildings');
       setBuildings(data || []);
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
     }
   };
 
   const fetchApartments = async () => {
-    const { data, error } = await supabase
-      .from('apartments')
-      .select('id, apartment_number, building_id')
-      .order('apartment_number');
-
-    if (error) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    } else {
-      setApartments((data as ApartmentOption[]) || []);
+    try {
+      const data = await api.get<{ apartment: ApartmentOption }[]>('/apartments');
+      setApartments((data || []).map(row => row.apartment));
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
     }
   };
 
   const fetchExpenses = async () => {
-    const { data, error } = await supabase
-      .from('expenses')
-      .select('*')
-      .order('expense_date', { ascending: false });
-
-    if (error) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    } else {
-      setExpenses((data as Expense[]) || []);
+    try {
+      const data = await api.get<ExpenseRow[]>('/expenses');
+      setExpenseRows(data || []);
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Convert dd/mm/yyyy to yyyy-mm-dd for database
+
+    // Convert dd/mm/yyyy to yyyy-mm-dd for the API
     let dbDate = formData.expense_date;
     const parts = formData.expense_date.split('/');
     if (parts.length === 3) {
       const [day, month, year] = parts;
       dbDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
     }
-    
-    const expenseData: any = {
-      building_id: formData.building_id,
-      description: formData.description,
-      amount: parseFloat(formData.amount),
-      expense_date: dbDate,
-      category: formData.category || null,
-      is_recurring: formData.is_recurring,
-      recurring_type: formData.is_recurring ? formData.recurring_type || null : null,
-      recurring_start_date: formData.is_recurring && formData.recurring_start_date ? formData.recurring_start_date : null,
-      recurring_end_date: formData.is_recurring && formData.recurring_end_date ? formData.recurring_end_date : null,
-    };
 
     if (editingExpense) {
-      const { error } = await supabase
-        .from('expenses')
-        .update(expenseData)
-        .eq('id', editingExpense.id);
-
-      if (error) {
-        toast({ title: 'Error', description: error.message, variant: 'destructive' });
-      } else {
+      try {
+        await api.put(`/expenses/${editingExpense.id}`, {
+          description: formData.description,
+          amount: parseFloat(formData.amount),
+          expenseDate: dbDate,
+          category: formData.category || null,
+        });
         toast({ title: 'Success', description: 'Expense updated successfully' });
         fetchExpenses();
         resetForm();
+      } catch (err: any) {
+        toast({ title: 'Error', description: err.message, variant: 'destructive' });
       }
     } else {
-      const { error } = await supabase
-        .from('expenses')
-        .insert([expenseData]);
+      try {
+        const payload: any = {
+          buildingId: formData.building_id,
+          description: formData.description,
+          amount: parseFloat(formData.amount),
+          expenseDate: dbDate,
+          category: formData.category || undefined,
+          isRecurring: formData.is_recurring,
+          recurringType: formData.is_recurring ? formData.recurring_type || undefined : undefined,
+          recurringStartDate: formData.is_recurring && formData.recurring_start_date ? formData.recurring_start_date : undefined,
+          recurringEndDate: formData.is_recurring && formData.recurring_end_date ? formData.recurring_end_date : undefined,
+        };
 
-      if (error) {
-        toast({ title: 'Error', description: error.message, variant: 'destructive' });
-      } else {
-        // Get the created expense ID
-        const { data: createdExpense, error: fetchError } = await supabase
-          .from('expenses')
-          .select('id')
-          .eq('building_id', formData.building_id)
-          .eq('description', formData.description)
-          .eq('amount', parseFloat(formData.amount))
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .single();
-
-        if (fetchError) {
-          toast({ title: 'Error', description: fetchError.message, variant: 'destructive' });
-          return;
+        // If single apartment mode, include apartmentId so the server assigns the expense to that apartment only
+        if (formData.is_single_apartment && formData.apartment_id) {
+          payload.apartmentId = formData.apartment_id;
         }
 
-        // Check if single apartment mode
+        await api.post('/expenses', payload);
+
         if (formData.is_single_apartment && formData.apartment_id) {
-          // Apply expense to single apartment
-          const expenseAmount = parseFloat(formData.amount);
-
-          // Create single apartment_expense record
-          const { error: insertError } = await supabase
-            .from('apartment_expenses')
-            .insert([{
-              apartment_id: formData.apartment_id,
-              expense_id: createdExpense.id,
-              amount: expenseAmount
-            }]);
-
-          if (insertError) {
-            toast({ title: 'Error', description: insertError.message, variant: 'destructive' });
-            return;
-          }
-
-          // Recalculate apartment balance (no direct credit manipulation)
-          const { recalculateApartmentBalance } = await import('@/hooks/useExpenseRecalculation');
-          await recalculateApartmentBalance(formData.apartment_id);
-
-          toast({ 
-            title: t('success'), 
+          toast({
+            title: t('success'),
             description: t('expenseAppliedToApartment')
           });
         } else {
-          // Fetch all apartments for this building to split the expense
-          const { data: buildingApartments, error: apartmentsError } = await supabase
-            .from('apartments')
-            .select('id')
-            .eq('building_id', formData.building_id);
-
-          if (!apartmentsError && buildingApartments && buildingApartments.length > 0) {
-            // Calculate per-apartment expense
-            const totalAmount = parseFloat(formData.amount);
-            const perApartmentAmount = totalAmount / buildingApartments.length;
-
-            // Create apartment_expenses records
-            const apartmentExpensesRecords = buildingApartments.map(apt => ({
-              apartment_id: apt.id,
-              expense_id: createdExpense.id,
-              amount: perApartmentAmount
-            }));
-
-            const { error: insertError } = await supabase
-              .from('apartment_expenses')
-              .insert(apartmentExpensesRecords);
-
-            if (insertError) {
-              toast({ title: 'Error', description: insertError.message, variant: 'destructive' });
-              return;
-            }
-
-            // Recalculate each apartment's balance (no direct credit manipulation)
-            const { recalculateApartmentBalance } = await import('@/hooks/useExpenseRecalculation');
-            for (const apt of buildingApartments) {
-              await recalculateApartmentBalance(apt.id);
-            }
-
-            toast({ 
-              title: t('success'), 
-              description: `${t('expenseCreatedAndSplit')} ${buildingApartments.length} ${t('apartments')} (₪${perApartmentAmount.toFixed(2)} ${t('perApartment')})` 
-            });
-          } else {
-            toast({ title: t('success'), description: t('expenseCreatedSuccessfully') });
-          }
+          toast({
+            title: t('success'),
+            description: t('expenseCreatedSuccessfully')
+          });
         }
-        
+
         fetchExpenses();
         resetForm();
+      } catch (err: any) {
+        toast({ title: 'Error', description: err.message, variant: 'destructive' });
       }
     }
   };
@@ -258,60 +181,35 @@ const Expenses = () => {
   const handleDelete = async (id: string) => {
     if (!confirm(t('deleteExpenseConfirm'))) return;
 
-    // First, fetch apartment_expenses to know which apartments to recalculate
-    const { data: apartmentExpenses, error: fetchError } = await supabase
-      .from('apartment_expenses')
-      .select('apartment_id')
-      .eq('expense_id', id);
-
-    if (fetchError) {
-      toast({ title: 'Error', description: fetchError.message, variant: 'destructive' });
-      return;
-    }
-
-    // Get unique apartment IDs
-    const apartmentIds = [...new Set(apartmentExpenses?.map(ae => ae.apartment_id) || [])];
-
-    // Delete the expense (apartment_expenses will cascade delete)
-    const { error } = await supabase
-      .from('expenses')
-      .delete()
-      .eq('id', id);
-
-    if (error) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    } else {
-      // Recalculate balances for affected apartments
-      const { recalculateApartmentBalance } = await import('@/hooks/useExpenseRecalculation');
-      for (const aptId of apartmentIds) {
-        await recalculateApartmentBalance(aptId);
-      }
-
+    try {
+      await api.delete(`/expenses/${id}`);
       toast({ title: 'Success', description: t('expenseDeletedAndRestored') });
       fetchExpenses();
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
     }
   };
 
   const handleEdit = (expense: Expense) => {
     setEditingExpense(expense);
-    // Convert yyyy-mm-dd from database to dd/mm/yyyy for display
-    let displayDate = expense.expense_date;
-    const parts = expense.expense_date.split('-');
+    // Convert yyyy-mm-dd from API to dd/mm/yyyy for display
+    let displayDate = expense.expenseDate;
+    const parts = expense.expenseDate.split('-');
     if (parts.length === 3) {
       const [year, month, day] = parts;
       displayDate = `${day}/${month}/${year}`;
     }
-    
+
     setFormData({
-      building_id: expense.building_id,
+      building_id: expense.buildingId,
       description: expense.description,
       amount: expense.amount.toString(),
       expense_date: displayDate,
       category: expense.category || '',
-      is_recurring: expense.is_recurring,
-      recurring_type: expense.recurring_type || '',
-      recurring_start_date: expense.recurring_start_date || '',
-      recurring_end_date: expense.recurring_end_date || '',
+      is_recurring: expense.isRecurring,
+      recurring_type: expense.recurringType || '',
+      recurring_start_date: expense.recurringStartDate || '',
+      recurring_end_date: expense.recurringEndDate || '',
       is_single_apartment: false,
       apartment_id: '',
     });
@@ -427,7 +325,7 @@ const Expenses = () => {
                       placeholder={t('categoryPlaceholder')}
                     />
                   </div>
-                  
+
                   {/* Recurring Expense Options */}
                   <div className="space-y-4 border-t pt-4">
                     <div className="flex items-center space-x-2">
@@ -442,7 +340,7 @@ const Expenses = () => {
                         {t('recurringExpense')}
                       </Label>
                     </div>
-                    
+
                     {formData.is_recurring && (
                       <>
                         <div>
@@ -457,7 +355,7 @@ const Expenses = () => {
                             </SelectContent>
                           </Select>
                         </div>
-                        
+
                         <div>
                           <Label htmlFor="recurring_start_date">{t('recurringStartDate')}</Label>
                           <Input
@@ -467,7 +365,7 @@ const Expenses = () => {
                             onChange={(e) => setFormData({ ...formData, recurring_start_date: e.target.value })}
                           />
                         </div>
-                        
+
                         <div>
                           <Label htmlFor="recurring_end_date">{t('recurringEndDateOptional')}</Label>
                           <Input
@@ -499,7 +397,7 @@ const Expenses = () => {
                           {t('applyToSingleApartment')}
                         </Label>
                       </div>
-                      
+
                       {formData.is_single_apartment && (
                         <div>
                           <Label htmlFor="apartment_id">{t('selectApartment')}</Label>
@@ -509,10 +407,10 @@ const Expenses = () => {
                             </SelectTrigger>
                             <SelectContent>
                               {apartments
-                                .filter(apt => apt.building_id === formData.building_id)
+                                .filter(apt => apt.buildingId === formData.building_id)
                                 .map((apt) => (
                                   <SelectItem key={apt.id} value={apt.id}>
-                                    {apt.apartment_number}
+                                    {apt.apartmentNumber}
                                   </SelectItem>
                                 ))}
                             </SelectContent>
@@ -521,7 +419,7 @@ const Expenses = () => {
                       )}
                     </div>
                   )}
-                  
+
                   <div className="flex gap-2">
                     <Button type="submit" className="flex-1">
                       {editingExpense ? t('update') : t('create')}
@@ -533,9 +431,6 @@ const Expenses = () => {
                 </form>
               </DialogContent>
             </Dialog>
-            <Button variant="outline" onClick={() => navigate('/dashboard')}>
-              {t('backToDashboard')}
-            </Button>
           </div>
         </div>
 
@@ -557,24 +452,24 @@ const Expenses = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {expenses.length === 0 ? (
+                {expenseRows.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center text-muted-foreground">
                       {t('noExpensesFound')}
                     </TableCell>
                   </TableRow>
                 ) : (
-                  expenses.map((expense) => (
-                    <TableRow key={expense.id}>
-                      <TableCell className="font-medium text-right">{getBuildingName(expense.building_id)}</TableCell>
-                      <TableCell className="text-right">{expense.description}</TableCell>
-                      <TableCell className="text-right">{expense.category || '-'}</TableCell>
-                      <TableCell className="text-right">₪{expense.amount.toFixed(2)}</TableCell>
-                      <TableCell className="text-right">{formatDate(expense.expense_date)}</TableCell>
+                  expenseRows.map((row) => (
+                    <TableRow key={row.expense.id}>
+                      <TableCell className="font-medium text-right">{row.buildingName || getBuildingName(row.expense.buildingId)}</TableCell>
+                      <TableCell className="text-right">{row.expense.description}</TableCell>
+                      <TableCell className="text-right">{row.expense.category || '-'}</TableCell>
+                      <TableCell className="text-right">₪{Number(row.expense.amount).toFixed(2)}</TableCell>
+                      <TableCell className="text-right">{formatDate(row.expense.expenseDate)}</TableCell>
                       <TableCell className="text-right">
-                        {expense.is_recurring ? (
+                        {row.expense.isRecurring ? (
                           <span className="text-xs px-2 py-1 bg-primary/10 text-primary rounded">
-                            {t(expense.recurring_type || 'recurring')}
+                            {t(row.expense.recurringType || 'recurring')}
                           </span>
                         ) : (
                           '-'
@@ -582,11 +477,11 @@ const Expenses = () => {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
-                          <Button size="sm" variant="outline" onClick={() => handleEdit(expense)}>
+                          <Button size="sm" variant="outline" onClick={() => handleEdit(row.expense)}>
                             <Pencil className="w-4 h-4" />
                           </Button>
                           {isAdmin && (
-                            <Button size="sm" variant="destructive" onClick={() => handleDelete(expense.id)}>
+                            <Button size="sm" variant="destructive" onClick={() => handleDelete(row.expense.id)}>
                               <Trash2 className="w-4 h-4" />
                             </Button>
                           )}

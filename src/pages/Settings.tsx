@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -14,15 +14,15 @@ import { Settings as SettingsIcon, Save, DollarSign, Globe, Upload, Shield, Mail
 
 interface SettingsData {
   id: string;
-  monthly_fee: number;
-  system_language: string;
-  logo_url: string | null;
-  turnstile_enabled: boolean;
-  turnstile_site_key: string | null;
-  smtp_enabled?: boolean;
-  smtp_from_email?: string | null;
-  smtp_from_name?: string | null;
-  resend_api_key?: string | null;
+  monthlyFee: number;
+  systemLanguage: string;
+  logoUrl: string | null;
+  turnstileEnabled: boolean;
+  turnstileSiteKey: string | null;
+  smtpEnabled: boolean;
+  smtpFromEmail: string | null;
+  smtpFromName: string | null;
+  resendApiKey: string | null;
 }
 
 interface LogoFile {
@@ -35,7 +35,7 @@ const Settings = () => {
   const { t, language, setLanguage } = useLanguage();
   const navigate = useNavigate();
   const { toast } = useToast();
-  
+
   const [settings, setSettings] = useState<SettingsData | null>(null);
   const [monthlyFee, setMonthlyFee] = useState('');
   const [systemLanguage, setSystemLanguage] = useState('ar');
@@ -73,8 +73,8 @@ const Settings = () => {
 
   const check2FAStatus = async () => {
     try {
-      const { data: factors } = await supabase.auth.mfa.listFactors();
-      if (factors && factors.totp && factors.totp.length > 0) {
+      const factors = await api.get<{ id: string; friendlyName: string; status: string }[]>('/auth/2fa/factors');
+      if (factors && factors.length > 0) {
         setHas2FA(true);
       } else {
         setHas2FA(false);
@@ -88,51 +88,33 @@ const Settings = () => {
   };
 
   const fetchSettings = async () => {
-    const { data, error } = await supabase
-      .from('settings')
-      .select('*')
-      .maybeSingle();
+    try {
+      const data = await api.get<SettingsData>('/settings');
 
-    if (error) {
+      if (data) {
+        setSettings(data);
+        setMonthlyFee(data.monthlyFee.toString());
+        setSystemLanguage(data.systemLanguage);
+        setTurnstileEnabled(data.turnstileEnabled || false);
+        setTurnstileSiteKey(data.turnstileSiteKey || '');
+        setSmtpEnabled(data.smtpEnabled || false);
+        setSmtpFromEmail(data.smtpFromEmail || '');
+        setSmtpFromName(data.smtpFromName || '');
+        setResendApiKey(data.resendApiKey || '');
+      }
+    } catch (error: any) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
       return;
     }
 
-    if (data) {
-      setSettings(data);
-      setMonthlyFee(data.monthly_fee.toString());
-      setSystemLanguage(data.system_language);
-      setTurnstileEnabled(data.turnstile_enabled || false);
-      setTurnstileSiteKey(data.turnstile_site_key || '');
-      setSmtpEnabled((data as any).smtp_enabled || false);
-      setSmtpFromEmail((data as any).smtp_from_email || '');
-      setSmtpFromName((data as any).smtp_from_name || '');
-      setResendApiKey((data as any).resend_api_key || '');
-    } else {
-      // Create initial settings if none exist
-      const { data: newSettings, error: createError } = await supabase
-        .from('settings')
-        .insert([{ monthly_fee: 0, system_language: 'ar' }])
-        .select()
-        .single();
-
-      if (createError) {
-        toast({ title: 'Error', description: createError.message, variant: 'destructive' });
-      } else {
-        setSettings(newSettings);
-        setMonthlyFee('0');
-        setSystemLanguage('ar');
-      }
-    }
-
     // Fetch branding logo
-    const { data: brandingData } = await supabase
-      .from('public_branding')
-      .select('logo_url')
-      .maybeSingle();
-    
-    if (brandingData?.logo_url) {
-      setBrandingLogoUrl(brandingData.logo_url);
+    try {
+      const brandingData = await api.get<{ logoUrl: string | null }>('/branding');
+      if (brandingData?.logoUrl) {
+        setBrandingLogoUrl(brandingData.logoUrl);
+      }
+    } catch (error) {
+      // Branding may not exist yet, ignore
     }
   };
 
@@ -149,23 +131,8 @@ const Settings = () => {
   const uploadLogo = async (): Promise<string | null> => {
     if (!logoFile.file || !user) return null;
 
-    const fileExt = logoFile.file.name.split('.').pop();
-    const fileName = `${user.id}-${Date.now()}.${fileExt}`;
-    const filePath = `${fileName}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from('logos')
-      .upload(filePath, logoFile.file);
-
-    if (uploadError) {
-      throw uploadError;
-    }
-
-    const { data } = supabase.storage
-      .from('logos')
-      .getPublicUrl(filePath);
-
-    return data.publicUrl;
+    const result = await api.upload<{ url: string }>('/upload/logo', logoFile.file);
+    return result.url;
   };
 
   const handleSave = async () => {
@@ -177,63 +144,35 @@ const Settings = () => {
     setIsSaving(true);
 
     try {
-      let logoUrl = null;
+      let logoUrl: string | null = null;
       if (logoFile.file) {
         logoUrl = await uploadLogo();
       }
 
       // Update settings (monthly fee, language, turnstile, and email)
-      const settingsUpdateData: any = {
-        monthly_fee: parseFloat(monthlyFee),
-        system_language: systemLanguage,
-        turnstile_enabled: turnstileEnabled,
-        turnstile_site_key: turnstileSiteKey || null,
-        smtp_enabled: smtpEnabled,
-        smtp_from_email: smtpFromEmail || null,
-        smtp_from_name: smtpFromName || null,
-        resend_api_key: resendApiKey || null,
-      };
+      await api.put('/settings', {
+        monthlyFee: parseFloat(monthlyFee),
+        systemLanguage,
+        turnstileEnabled,
+        turnstileSiteKey: turnstileSiteKey || null,
+        smtpEnabled,
+        smtpFromEmail: smtpFromEmail || null,
+        smtpFromName: smtpFromName || null,
+        resendApiKey: resendApiKey || null,
+      });
 
-      const { error: settingsError } = await supabase
-        .from('settings')
-        .update(settingsUpdateData)
-        .eq('id', settings.id);
-
-      if (settingsError) throw settingsError;
-
-      // Update public_branding if logo changed
+      // Update branding if logo changed
       if (logoUrl) {
-        // Check if branding record exists
-        const { data: existingBranding } = await supabase
-          .from('public_branding')
-          .select('id')
-          .maybeSingle();
-
-        if (existingBranding) {
-          // Update existing record
-          const { error: brandingError } = await supabase
-            .from('public_branding')
-            .update({ logo_url: logoUrl })
-            .eq('id', existingBranding.id);
-
-          if (brandingError) throw brandingError;
-        } else {
-          // Insert new record
-          const { error: brandingError } = await supabase
-            .from('public_branding')
-            .insert({ logo_url: logoUrl, company_name: 'qFiber LTD' });
-
-          if (brandingError) throw brandingError;
-        }
+        await api.put('/branding', { logoUrl });
       }
 
       toast({ title: 'Success', description: 'Settings updated successfully' });
-      
+
       // Update the app language if it changed
       if (systemLanguage !== language) {
         setLanguage(systemLanguage as 'ar' | 'en' | 'he');
       }
-      
+
       fetchSettings();
       setLogoFile({ file: null, preview: null });
     } catch (error: any) {
@@ -257,9 +196,6 @@ const Settings = () => {
             <SettingsIcon className="w-8 h-8 text-primary" />
             <h1 className="text-3xl font-bold">{t('settings')}</h1>
           </div>
-          <Button variant="outline" onClick={() => navigate('/dashboard')} className="w-full sm:w-auto">
-            {t('backToDashboard')}
-          </Button>
         </div>
 
         <div className="space-y-6">
@@ -394,8 +330,8 @@ const Settings = () => {
                     {t('addExtraSecurityWithAuthApp')}
                   </p>
                 </div>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   onClick={() => navigate('/setup-2fa')}
                   disabled={checking2FA}
                 >
@@ -412,7 +348,7 @@ const Settings = () => {
                       {t('captchaDescription')}
                     </p>
                   </div>
-                  
+
                   <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/20">
                     <div>
                       <Label htmlFor="turnstile-enabled">{t('enableCaptcha')}</Label>
@@ -548,8 +484,8 @@ const Settings = () => {
               variant="outline"
               onClick={() => {
                 if (settings) {
-                  setMonthlyFee(settings.monthly_fee.toString());
-                  setSystemLanguage(settings.system_language);
+                  setMonthlyFee(settings.monthlyFee.toString());
+                  setSystemLanguage(settings.systemLanguage);
                 }
               }}
               disabled={isSaving}

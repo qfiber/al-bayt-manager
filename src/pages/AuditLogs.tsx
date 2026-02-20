@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -16,16 +16,31 @@ import { format } from 'date-fns';
 
 interface AuditLog {
   id: string;
-  created_at: string;
-  user_id: string | null;
-  user_email: string | null;
-  action_type: string;
-  table_name: string | null;
-  record_id: string | null;
-  action_details: any;
-  ip_address: string | null;
-  user_agent: string | null;
+  createdAt: string;
+  userId: string | null;
+  userEmail: string | null;
+  actionType: string;
+  tableName: string | null;
+  recordId: string | null;
+  actionDetails: any;
+  ipAddress: string | null;
+  userAgent: string | null;
 }
+
+const ACTION_TYPES = [
+  'login',
+  'logout',
+  'signup',
+  'create',
+  'update',
+  'delete',
+  'role_change',
+  'password_change',
+  'api_key_created',
+  'api_key_deleted',
+] as const;
+
+const PAGE_SIZE = 50;
 
 const AuditLogs = () => {
   const { user, isAdmin, isModerator, loading } = useAuth();
@@ -36,9 +51,15 @@ const AuditLogs = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
-  
-  // Filters
+
+  // Server-side filters
   const [actionFilter, setActionFilter] = useState<string>('all');
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+
+  // Client-side filters
   const [tableFilter, setTableFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -48,53 +69,64 @@ const AuditLogs = () => {
     }
   }, [user, isAdmin, isModerator, loading, navigate]);
 
-  useEffect(() => {
-    if (user && (isAdmin || isModerator)) {
-      fetchAuditLogs();
-    }
-  }, [user, isAdmin, isModerator]);
-
-  useEffect(() => {
-    applyFilters();
-  }, [logs, actionFilter, tableFilter, searchTerm]);
-
-  const fetchAuditLogs = async () => {
+  const fetchAuditLogs = useCallback(async (currentPage: number) => {
     setIsLoading(true);
-    const { data, error } = await supabase
-      .from('audit_logs')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(500);
+    try {
+      const params = new URLSearchParams();
+      if (actionFilter !== 'all') params.set('actionType', actionFilter);
+      if (startDate) params.set('startDate', startDate);
+      if (endDate) params.set('endDate', endDate);
+      params.set('limit', String(PAGE_SIZE));
+      params.set('offset', String(currentPage * PAGE_SIZE));
 
-    if (!error && data) {
-      setLogs(data);
+      const queryString = params.toString();
+      const path = `/audit-logs${queryString ? `?${queryString}` : ''}`;
+      const data = await api.get<AuditLog[]>(path);
+      const results = data || [];
+      setLogs(results);
+      setHasMore(results.length === PAGE_SIZE);
+    } catch {
+      setLogs([]);
+      setHasMore(false);
     }
     setIsLoading(false);
-  };
+  }, [actionFilter, startDate, endDate]);
 
-  const applyFilters = () => {
+  // Fetch when server-side filters or page change
+  useEffect(() => {
+    if (user && (isAdmin || isModerator)) {
+      fetchAuditLogs(page);
+    }
+  }, [user, isAdmin, isModerator, page, fetchAuditLogs]);
+
+  // Reset to page 0 when server-side filters change
+  useEffect(() => {
+    setPage(0);
+  }, [actionFilter, startDate, endDate]);
+
+  // Apply client-side filters
+  useEffect(() => {
     let filtered = [...logs];
 
-    if (actionFilter !== 'all') {
-      filtered = filtered.filter(log => log.action_type === actionFilter);
-    }
-
     if (tableFilter !== 'all') {
-      filtered = filtered.filter(log => log.table_name === tableFilter);
+      filtered = filtered.filter(log => log.tableName === tableFilter);
     }
 
     if (searchTerm) {
       const search = searchTerm.toLowerCase();
-      filtered = filtered.filter(log => 
-        log.user_email?.toLowerCase().includes(search) ||
-        log.action_type?.toLowerCase().includes(search) ||
-        log.table_name?.toLowerCase().includes(search) ||
-        JSON.stringify(log.action_details).toLowerCase().includes(search)
+      filtered = filtered.filter(log =>
+        log.userEmail?.toLowerCase().includes(search) ||
+        log.actionType?.toLowerCase().includes(search) ||
+        log.tableName?.toLowerCase().includes(search) ||
+        JSON.stringify(log.actionDetails).toLowerCase().includes(search)
       );
     }
 
     setFilteredLogs(filtered);
-  };
+  }, [logs, tableFilter, searchTerm]);
+
+  // Derive unique tables from current page of results for client-side filter
+  const uniqueTables = Array.from(new Set(logs.map(log => log.tableName).filter(Boolean)));
 
   const getActionColor = (actionType: string) => {
     switch (actionType) {
@@ -124,8 +156,17 @@ const AuditLogs = () => {
     setDetailsOpen(true);
   };
 
-  const uniqueActions = Array.from(new Set(logs.map(log => log.action_type)));
-  const uniqueTables = Array.from(new Set(logs.map(log => log.table_name).filter(Boolean)));
+  const handleActionFilterChange = (value: string) => {
+    setActionFilter(value);
+  };
+
+  const handleResetFilters = () => {
+    setActionFilter('all');
+    setTableFilter('all');
+    setSearchTerm('');
+    setStartDate('');
+    setEndDate('');
+  };
 
   if (loading || isLoading) {
     return (
@@ -145,9 +186,6 @@ const AuditLogs = () => {
             <h1 className="text-3xl font-bold">{t('auditLogs')}</h1>
             <p className="text-muted-foreground mt-1">{t('auditLogsDescription')}</p>
           </div>
-          <Button onClick={() => navigate('/dashboard')} variant="outline" className="w-full sm:w-auto">
-            {t('backToDashboard')}
-          </Button>
         </div>
 
         <Card>
@@ -156,7 +194,7 @@ const AuditLogs = () => {
               <span>{t('activityLog')}</span>
               <Badge variant="secondary">{filteredLogs.length} {t('entries')}</Badge>
             </CardTitle>
-            
+
             {/* Filters */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
               <div className="relative">
@@ -168,14 +206,14 @@ const AuditLogs = () => {
                   className="pl-9"
                 />
               </div>
-              
-              <Select value={actionFilter} onValueChange={setActionFilter}>
+
+              <Select value={actionFilter} onValueChange={handleActionFilterChange}>
                 <SelectTrigger>
                   <SelectValue placeholder={t('filterByAction')} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">{t('allActions')}</SelectItem>
-                  {uniqueActions.map(action => (
+                  {ACTION_TYPES.map(action => (
                     <SelectItem key={action} value={action}>
                       {action}
                     </SelectItem>
@@ -199,15 +237,27 @@ const AuditLogs = () => {
 
               <Button
                 variant="outline"
-                onClick={() => {
-                  setActionFilter('all');
-                  setTableFilter('all');
-                  setSearchTerm('');
-                }}
+                onClick={handleResetFilters}
               >
                 <Filter className="mr-2 h-4 w-4" />
                 {t('resetFilters')}
               </Button>
+            </div>
+
+            {/* Date filters */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
+              <Input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                placeholder={t('startDate')}
+              />
+              <Input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                placeholder={t('endDate')}
+              />
             </div>
           </CardHeader>
 
@@ -234,23 +284,23 @@ const AuditLogs = () => {
                     filteredLogs.map((log) => (
                       <TableRow key={log.id}>
                         <TableCell className={`font-mono text-sm ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>
-                          {format(new Date(log.created_at), 'yyyy-MM-dd HH:mm:ss')}
+                          {format(new Date(log.createdAt), 'yyyy-MM-dd HH:mm:ss')}
                         </TableCell>
                         <TableCell className={language === 'ar' || language === 'he' ? 'text-right' : ''}>
                           <div className="flex flex-col">
-                            <span className="font-medium">{log.user_email || t('system')}</span>
-                            {log.ip_address && (
-                              <span className="text-xs text-muted-foreground">{log.ip_address}</span>
+                            <span className="font-medium">{log.userEmail || t('system')}</span>
+                            {log.ipAddress && (
+                              <span className="text-xs text-muted-foreground">{log.ipAddress}</span>
                             )}
                           </div>
                         </TableCell>
                         <TableCell className={language === 'ar' || language === 'he' ? 'text-right' : ''}>
-                          <Badge className={getActionColor(log.action_type)}>
-                            {log.action_type}
+                          <Badge className={getActionColor(log.actionType)}>
+                            {log.actionType}
                           </Badge>
                         </TableCell>
                         <TableCell className={language === 'ar' || language === 'he' ? 'text-right' : ''}>
-                          <code className="text-sm">{log.table_name || '-'}</code>
+                          <code className="text-sm">{log.tableName || '-'}</code>
                         </TableCell>
                         <TableCell className={language === 'ar' || language === 'he' ? 'text-right' : ''}>
                           <Button
@@ -266,6 +316,29 @@ const AuditLogs = () => {
                   )}
                 </TableBody>
               </Table>
+            </div>
+
+            {/* Pagination */}
+            <div className="flex items-center justify-between mt-4">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page === 0}
+                onClick={() => setPage(p => p - 1)}
+              >
+                {t('previous')}
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                {t('page')} {page + 1}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!hasMore}
+                onClick={() => setPage(p => p + 1)}
+              >
+                {t('next')}
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -284,16 +357,16 @@ const AuditLogs = () => {
                       {t('timestamp')}
                     </h4>
                     <p className={`text-sm font-mono ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>
-                      {format(new Date(selectedLog.created_at), 'PPpp')}
+                      {format(new Date(selectedLog.createdAt), 'PPpp')}
                     </p>
                   </div>
-                  
+
                   <div>
                     <h4 className={`font-semibold mb-2 ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>
                       {t('user')}
                     </h4>
                     <p className={`text-sm ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>
-                      {selectedLog.user_email || t('system')}
+                      {selectedLog.userEmail || t('system')}
                     </p>
                   </div>
 
@@ -301,62 +374,62 @@ const AuditLogs = () => {
                     <h4 className={`font-semibold mb-2 ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>
                       {t('actions')}
                     </h4>
-                    <Badge className={getActionColor(selectedLog.action_type)}>
-                      {selectedLog.action_type}
+                    <Badge className={getActionColor(selectedLog.actionType)}>
+                      {selectedLog.actionType}
                     </Badge>
                   </div>
 
-                  {selectedLog.table_name && (
+                  {selectedLog.tableName && (
                     <div>
                       <h4 className={`font-semibold mb-2 ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>
                         {t('table')}
                       </h4>
                       <code className={`text-sm ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>
-                        {selectedLog.table_name}
+                        {selectedLog.tableName}
                       </code>
                     </div>
                   )}
 
-                  {selectedLog.record_id && (
+                  {selectedLog.recordId && (
                     <div>
                       <h4 className={`font-semibold mb-2 ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>
                         {t('recordId')}
                       </h4>
                       <code className={`text-sm font-mono ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>
-                        {selectedLog.record_id}
+                        {selectedLog.recordId}
                       </code>
                     </div>
                   )}
 
-                  {selectedLog.ip_address && (
+                  {selectedLog.ipAddress && (
                     <div>
                       <h4 className={`font-semibold mb-2 ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>
                         {t('ipAddress')}
                       </h4>
                       <code className={`text-sm font-mono ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>
-                        {selectedLog.ip_address}
+                        {selectedLog.ipAddress}
                       </code>
                     </div>
                   )}
 
-                  {selectedLog.user_agent && (
+                  {selectedLog.userAgent && (
                     <div>
                       <h4 className={`font-semibold mb-2 ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>
                         {t('userAgent')}
                       </h4>
                       <p className={`text-sm text-muted-foreground break-all ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>
-                        {selectedLog.user_agent}
+                        {selectedLog.userAgent}
                       </p>
                     </div>
                   )}
 
-                  {selectedLog.action_details && (
+                  {selectedLog.actionDetails && (
                     <div>
                       <h4 className={`font-semibold mb-2 ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>
                         {t('actionDetails')}
                       </h4>
                       <pre className="text-xs bg-muted p-4 rounded-lg overflow-auto text-left" dir="ltr">
-                        {JSON.stringify(selectedLog.action_details, null, 2)}
+                        {JSON.stringify(selectedLog.actionDetails, null, 2)}
                       </pre>
                     </div>
                   )}

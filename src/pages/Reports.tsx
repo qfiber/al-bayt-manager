@@ -2,32 +2,21 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
 import { FileText, DollarSign, TrendingUp } from 'lucide-react';
 
-interface PaymentStats {
-  total: number;
-  paid: number;
-}
-
-interface ExpenseByCategory {
-  category: string;
-  amount: number;
-}
-
 interface BuildingStats {
   buildingId: string;
   buildingName: string;
   totalApartments: number;
-  occupied: number;
-  vacant: number;
-  income: number;
-  expenses: number;
-  netIncome: number;
+  occupiedApartments: number;
+  totalDebt: string;
+  totalCredit: string;
 }
 
 interface MonthlyData {
@@ -42,14 +31,11 @@ const Reports = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const [paymentStats, setPaymentStats] = useState<PaymentStats>({ total: 0, paid: 0 });
-  const [expensesByCategory, setExpensesByCategory] = useState<ExpenseByCategory[]>([]);
-  const [buildingStats, setBuildingStats] = useState<BuildingStats[]>([]);
-  const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([]);
   const [totalRevenue, setTotalRevenue] = useState(0);
   const [totalExpenses, setTotalExpenses] = useState(0);
-
-  const COLORS = ['hsl(var(--primary))', 'hsl(var(--destructive))', 'hsl(var(--muted))', 'hsl(var(--accent))'];
+  const [expensesByCategory, setExpensesByCategory] = useState<{ category: string; amount: number }[]>([]);
+  const [buildingStats, setBuildingStats] = useState<BuildingStats[]>([]);
+  const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([]);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -65,154 +51,39 @@ const Reports = () => {
 
   const fetchReportsData = async () => {
     try {
-      await Promise.all([
-        fetchPaymentStats(),
-        fetchExpensesByCategory(),
-        fetchBuildingStats(),
-        fetchMonthlyTrends(),
+      const [summary, buildings, trends, categories] = await Promise.all([
+        api.get('/reports/summary'),
+        api.get('/reports/buildings'),
+        api.get('/reports/monthly-trends'),
+        api.get('/reports/expenses-by-category'),
       ]);
+
+      setTotalRevenue(parseFloat(summary.payments.totalPayments));
+      setTotalExpenses(parseFloat(summary.expenses.totalExpenses));
+      setBuildingStats(buildings);
+      setExpensesByCategory(categories.map((c: any) => ({
+        category: c.category || 'Uncategorized',
+        amount: parseFloat(c.total),
+      })));
+
+      // Merge payment and expense trends by month
+      const monthMap = new Map<string, { payments: number; expenses: number }>();
+      trends.payments?.forEach((p: any) => {
+        const existing = monthMap.get(p.month) || { payments: 0, expenses: 0 };
+        monthMap.set(p.month, { ...existing, payments: parseFloat(p.total) });
+      });
+      trends.expenses?.forEach((e: any) => {
+        const existing = monthMap.get(e.month) || { payments: 0, expenses: 0 };
+        monthMap.set(e.month, { ...existing, expenses: parseFloat(e.total) });
+      });
+      setMonthlyData(
+        Array.from(monthMap.entries())
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([month, data]) => ({ month, payments: data.payments, expenses: data.expenses })),
+      );
     } catch (error: any) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
     }
-  };
-
-  const fetchPaymentStats = async () => {
-    const { data: payments, error } = await supabase
-      .from('payments')
-      .select('amount');
-
-    if (error) throw error;
-
-    const stats = payments?.reduce(
-      (acc, payment) => {
-        acc.total += payment.amount;
-        acc.paid += payment.amount;
-        return acc;
-      },
-      { total: 0, paid: 0 }
-    ) || { total: 0, paid: 0 };
-
-    setPaymentStats(stats);
-    setTotalRevenue(stats.paid);
-  };
-
-
-  const fetchExpensesByCategory = async () => {
-    const { data: expenses, error } = await supabase
-      .from('expenses')
-      .select('category, amount');
-
-    if (error) throw error;
-
-    const categoryMap = new Map<string, number>();
-    let total = 0;
-
-    expenses?.forEach(expense => {
-      const category = expense.category || 'Uncategorized';
-      categoryMap.set(category, (categoryMap.get(category) || 0) + expense.amount);
-      total += expense.amount;
-    });
-
-    const categoryData = Array.from(categoryMap.entries()).map(([category, amount]) => ({
-      category,
-      amount: Number(amount.toFixed(2)),
-    }));
-
-    setExpensesByCategory(categoryData);
-    setTotalExpenses(total);
-  };
-
-  const fetchBuildingStats = async () => {
-    const { data: buildings, error: buildingError } = await supabase
-      .from('buildings')
-      .select('id, name');
-
-    if (buildingError) throw buildingError;
-
-    const stats = await Promise.all(
-      (buildings || []).map(async (building) => {
-        // Get apartments for this building
-        const { data: apartments } = await supabase
-          .from('apartments')
-          .select('id, status')
-          .eq('building_id', building.id);
-
-        const total = apartments?.length || 0;
-        const occupied = apartments?.filter(a => a.status === 'occupied').length || 0;
-        const vacant = total - occupied;
-
-        // Get income from payments for this building's apartments
-        const apartmentIds = apartments?.map(a => a.id) || [];
-        let income = 0;
-        if (apartmentIds.length > 0) {
-          const { data: payments } = await supabase
-            .from('payments')
-            .select('amount')
-            .in('apartment_id', apartmentIds);
-          
-          income = payments?.reduce((sum, p) => sum + p.amount, 0) || 0;
-        }
-
-        // Get expenses for this building
-        const { data: expenses } = await supabase
-          .from('expenses')
-          .select('amount')
-          .eq('building_id', building.id);
-
-        const buildingExpenses = expenses?.reduce((sum, e) => sum + e.amount, 0) || 0;
-
-        return {
-          buildingId: building.id,
-          buildingName: building.name,
-          totalApartments: total,
-          occupied,
-          vacant,
-          income,
-          expenses: buildingExpenses,
-          netIncome: income - buildingExpenses,
-        };
-      })
-    );
-
-    setBuildingStats(stats);
-  };
-
-  const fetchMonthlyTrends = async () => {
-    const { data: payments, error: paymentError } = await supabase
-      .from('payments')
-      .select('month, amount')
-      .order('month', { ascending: true })
-      .limit(6);
-
-    const { data: expenses, error: expenseError } = await supabase
-      .from('expenses')
-      .select('expense_date, amount')
-      .order('expense_date', { ascending: true })
-      .limit(6);
-
-    if (paymentError || expenseError) throw paymentError || expenseError;
-
-    const monthMap = new Map<string, { payments: number; expenses: number }>();
-
-    payments?.forEach(payment => {
-      const month = payment.month;
-      const existing = monthMap.get(month) || { payments: 0, expenses: 0 };
-      monthMap.set(month, { ...existing, payments: existing.payments + payment.amount });
-    });
-
-    expenses?.forEach(expense => {
-      const month = new Date(expense.expense_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-      const existing = monthMap.get(month) || { payments: 0, expenses: 0 };
-      monthMap.set(month, { ...existing, expenses: existing.expenses + expense.amount });
-    });
-
-    const trends = Array.from(monthMap.entries()).map(([month, data]) => ({
-      month,
-      payments: Number(data.payments.toFixed(2)),
-      expenses: Number(data.expenses.toFixed(2)),
-    }));
-
-    setMonthlyData(trends);
   };
 
   if (loading) {
@@ -231,9 +102,6 @@ const Reports = () => {
             <FileText className="w-8 h-8 text-primary" />
             <h1 className="text-3xl font-bold">{t('reports')}</h1>
           </div>
-          <Button variant="outline" onClick={() => navigate('/dashboard')} className="w-full sm:w-auto">
-            {t('backToDashboard')}
-          </Button>
         </div>
 
         {/* Summary Cards */}
@@ -278,39 +146,42 @@ const Reports = () => {
         <div className="mb-8">
           <h2 className="text-2xl font-bold mb-4">{t('buildingFinancialReports')}</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {buildingStats.map((building) => (
-              <Card key={building.buildingId}>
-                <CardHeader>
-                  <CardTitle className="text-lg">{building.buildingName}</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">{t('occupancy')}</span>
-                    <span className="font-medium">{building.occupied}/{building.totalApartments}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">{t('buildingIncome')}</span>
-                    <span className="font-medium text-green-600">₪{building.income.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">{t('buildingExpenses')}</span>
-                    <span className="font-medium text-red-600">₪{building.expenses.toFixed(2)}</span>
-                  </div>
-                  <div className="pt-2 border-t flex justify-between items-center">
-                    <span className="text-sm font-semibold">{t('buildingNetIncome')}</span>
-                    <span className={`font-bold ${building.netIncome >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      ₪{building.netIncome.toFixed(2)}
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+            {buildingStats.map((building) => {
+              const debt = parseFloat(building.totalDebt);
+              const credit = parseFloat(building.totalCredit);
+              return (
+                <Card key={building.buildingId}>
+                  <CardHeader>
+                    <CardTitle className="text-lg">{building.buildingName}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">{t('occupancy')}</span>
+                      <span className="font-medium">{building.occupiedApartments}/{building.totalApartments}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">{t('buildingIncome')}</span>
+                      <span className="font-medium text-green-600">₪{credit.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">{t('buildingExpenses')}</span>
+                      <span className="font-medium text-red-600">₪{debt.toFixed(2)}</span>
+                    </div>
+                    <div className="pt-2 border-t flex justify-between items-center">
+                      <span className="text-sm font-semibold">{t('buildingNetIncome')}</span>
+                      <span className={`font-bold ${credit - debt >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        ₪{(credit - debt).toFixed(2)}
+                      </span>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         </div>
 
         {/* Charts Section */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          {/* Combined Expenses by Category */}
           <Card>
             <CardHeader>
               <CardTitle>{t('combinedExpensesByCategory')}</CardTitle>
@@ -334,7 +205,6 @@ const Reports = () => {
             </CardContent>
           </Card>
 
-          {/* Building Occupancy Stats */}
           <Card>
             <CardHeader>
               <CardTitle>{t('buildingOccupancy')}</CardTitle>
@@ -342,7 +212,11 @@ const Reports = () => {
             <CardContent>
               {buildingStats.length > 0 ? (
                 <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={buildingStats}>
+                  <BarChart data={buildingStats.map(b => ({
+                    buildingName: b.buildingName,
+                    occupied: b.occupiedApartments,
+                    vacant: b.totalApartments - b.occupiedApartments,
+                  }))}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="buildingName" />
                     <YAxis />

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -14,24 +14,37 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { CreditCard, Plus, Pencil, Trash2 } from 'lucide-react';
-import { getUnpaidExpensesForApartment, applyPaymentToExpenses, cancelPaymentAndRecalculate, recalculateApartmentBalance, recalculateBuildingExpenses } from '@/hooks/useExpenseRecalculation';
 import { formatDate } from '@/lib/utils';
 
 interface Payment {
   id: string;
-  apartment_id: string;
+  apartmentId: string;
   amount: number;
   month: string;
-  is_canceled: boolean;
+  isCanceled: boolean;
+}
+
+interface PaymentRow {
+  payment: Payment;
+  apartmentNumber: string;
+  buildingName: string;
+  buildingId: string;
 }
 
 interface Apartment {
   id: string;
-  apartment_number: string;
-  building_id: string;
-  subscription_amount: number;
+  apartmentNumber: string;
+  buildingId: string;
+  subscriptionAmount: number;
   credit: number;
-  occupancy_start: string | null;
+  occupancyStart: string | null;
+}
+
+interface ApartmentRow {
+  apartment: Apartment;
+  buildingName: string;
+  ownerName: string;
+  beneficiaryName: string;
 }
 
 interface Building {
@@ -41,19 +54,20 @@ interface Building {
 
 interface UnpaidExpense {
   id: string;
-  expense_id: string;
+  expenseId: string;
   description: string;
   category: string | null;
-  expense_date: string;
+  expenseDate: string;
   amount: number;
-  amount_paid: number;
+  amountPaid: number;
   remaining: number;
   isSubscription?: boolean;
+  isCanceled: boolean;
 }
 
 interface ExpenseAllocation {
   apartmentExpenseId: string;
-  amount: number;
+  amountAllocated: number;
 }
 
 const Payments = () => {
@@ -61,8 +75,8 @@ const Payments = () => {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [payments, setPayments] = useState<Payment[]>([]);
-  const [apartments, setApartments] = useState<Apartment[]>([]);
+  const [paymentRows, setPaymentRows] = useState<PaymentRow[]>([]);
+  const [apartmentRows, setApartmentRows] = useState<ApartmentRow[]>([]);
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
@@ -70,7 +84,7 @@ const Payments = () => {
     apartment_id: '',
     amount: '',
   });
-  
+
   // Expense allocation state
   const [unpaidExpenses, setUnpaidExpenses] = useState<UnpaidExpense[]>([]);
   const [allocations, setAllocations] = useState<Record<string, number>>({});
@@ -104,48 +118,41 @@ const Payments = () => {
 
   const loadUnpaidExpenses = async (apartmentId: string) => {
     setLoadingExpenses(true);
-    const expenses = await getUnpaidExpensesForApartment(apartmentId);
-    setUnpaidExpenses(expenses);
+    try {
+      const expenses = await api.get<UnpaidExpense[]>(`/apartment-expenses/${apartmentId}`);
+      setUnpaidExpenses(expenses);
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      setUnpaidExpenses([]);
+    }
     setAllocations({});
     setLoadingExpenses(false);
   };
 
   const fetchBuildings = async () => {
-    const { data, error } = await supabase
-      .from('buildings')
-      .select('id, name')
-      .order('name');
-
-    if (error) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    } else {
+    try {
+      const data = await api.get<Building[]>('/buildings');
       setBuildings(data || []);
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
     }
   };
 
   const fetchApartments = async () => {
-    const { data, error } = await supabase
-      .from('apartments')
-      .select('*')
-      .order('apartment_number');
-
-    if (error) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    } else {
-      setApartments(data || []);
+    try {
+      const data = await api.get<ApartmentRow[]>('/apartments');
+      setApartmentRows(data || []);
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
     }
   };
 
   const fetchPayments = async () => {
-    const { data, error } = await supabase
-      .from('payments')
-      .select('*')
-      .order('month', { ascending: false });
-
-    if (error) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    } else {
-      setPayments((data as Payment[]) || []);
+    try {
+      const data = await api.get<PaymentRow[]>('/payments');
+      setPaymentRows(data || []);
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
     }
   };
 
@@ -188,9 +195,9 @@ const Payments = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    const apartment = apartments.find(a => a.id === formData.apartment_id);
-    if (!apartment) {
+
+    const apartmentRow = apartmentRows.find(a => a.apartment.id === formData.apartment_id);
+    if (!apartmentRow) {
       toast({ title: 'Error', description: 'Apartment not found', variant: 'destructive' });
       return;
     }
@@ -198,77 +205,59 @@ const Payments = () => {
     const paymentAmount = parseFloat(formData.amount);
     const totalAllocated = getTotalAllocated();
 
-    // Always create a new payment - never overwrite existing ones
+    // Build allocations list if any
+    const allocationsList: ExpenseAllocation[] | undefined = totalAllocated > 0
+      ? Object.entries(allocations)
+          .filter(([_, amount]) => amount > 0)
+          .map(([apartmentExpenseId, amount]) => ({ apartmentExpenseId, amountAllocated: amount }))
+      : undefined;
+
     const now = new Date();
-    const monthStr = `${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
+    const monthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
-    const { data: createdPayment, error } = await supabase
-      .from('payments')
-      .insert([{
-        apartment_id: formData.apartment_id,
-        amount: paymentAmount,
+    try {
+      await api.post('/payments', {
+        apartmentId: formData.apartment_id,
         month: monthStr,
-      }])
-      .select()
-      .single();
+        amount: paymentAmount,
+        allocations: allocationsList,
+      });
 
-    if (error || !createdPayment) {
-      toast({ title: 'Error', description: error?.message || 'Failed to create payment', variant: 'destructive' });
-      return;
-    }
-
-    // Apply allocations to expenses (or just recalculate if no allocations)
-    if (totalAllocated > 0) {
-      const allocationsList: ExpenseAllocation[] = Object.entries(allocations)
-        .filter(([_, amount]) => amount > 0)
-        .map(([apartmentExpenseId, amount]) => ({ apartmentExpenseId, amount }));
-
-      const result = await applyPaymentToExpenses(createdPayment.id, formData.apartment_id, allocationsList);
-      
-      if (!result.success) {
-        toast({ title: 'Error', description: result.message, variant: 'destructive' });
-      } else {
+      if (totalAllocated > 0) {
         toast({ title: t('success'), description: t('paymentAllocated') });
+      } else {
+        toast({ title: t('success'), description: `Payment of ₪${paymentAmount.toFixed(2)} recorded` });
       }
-    } else {
-      // No allocations - just recalculate the apartment balance
-      await recalculateApartmentBalance(formData.apartment_id);
-      toast({ title: t('success'), description: `Payment of ₪${paymentAmount.toFixed(2)} recorded` });
-    }
 
-    // Also trigger building recalculation (apartment already defined above)
-    if (apartment.building_id) {
-      await recalculateBuildingExpenses(apartment.building_id);
+      fetchPayments();
+      fetchApartments();
+      resetForm();
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
     }
-
-    fetchPayments();
-    fetchApartments();
-    resetForm();
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm(t('deletePaymentConfirm'))) return;
 
     // Get payment details before cancellation
-    const payment = payments.find(p => p.id === id);
-    if (!payment || payment.is_canceled) return;
+    const row = paymentRows.find(r => r.payment.id === id);
+    if (!row || row.payment.isCanceled) return;
 
-    // Use centralized cancel function
-    const result = await cancelPaymentAndRecalculate(id, payment.apartment_id);
-
-    if (!result.success) {
-      toast({ title: 'Error', description: result.message, variant: 'destructive' });
-    } else {
+    try {
+      await api.post(`/payments/${id}/cancel`);
       toast({ title: t('success'), description: t('paymentCanceled') });
       fetchPayments();
       fetchApartments();
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
     }
   };
 
   const handleEdit = (payment: Payment) => {
     setEditingPayment(payment);
     setFormData({
-      apartment_id: payment.apartment_id,
+      apartment_id: payment.apartmentId,
       amount: payment.amount.toString(),
     });
     setIsDialogOpen(true);
@@ -286,15 +275,15 @@ const Payments = () => {
   };
 
   const getApartmentInfo = (apartmentId: string) => {
-    const apartment = apartments.find(a => a.id === apartmentId);
-    if (!apartment) return t('unknown');
-    const building = buildings.find(b => b.id === apartment.building_id);
-    return `${building?.name || t('unknown')} - ${t('apt')} ${apartment.apartment_number}`;
+    const row = apartmentRows.find(a => a.apartment.id === apartmentId);
+    if (!row) return t('unknown');
+    const building = buildings.find(b => b.id === row.apartment.buildingId);
+    return `${building?.name || row.buildingName || t('unknown')} - ${t('apt')} ${row.apartment.apartmentNumber}`;
   };
 
   const getExpensePaymentStatus = (expense: UnpaidExpense) => {
-    if (expense.amount_paid === 0) return null;
-    if (expense.amount_paid >= expense.amount) return 'paid';
+    if (expense.amountPaid === 0) return null;
+    if (expense.amountPaid >= expense.amount) return 'paid';
     return 'partial';
   };
 
@@ -332,9 +321,9 @@ const Payments = () => {
                         <SelectValue placeholder={t('selectApartmentPlaceholder')} />
                       </SelectTrigger>
                       <SelectContent>
-                        {apartments.map((apartment) => (
-                          <SelectItem key={apartment.id} value={apartment.id}>
-                            {getApartmentInfo(apartment.id)}
+                        {apartmentRows.map((row) => (
+                          <SelectItem key={row.apartment.id} value={row.apartment.id}>
+                            {getApartmentInfo(row.apartment.id)}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -351,7 +340,7 @@ const Payments = () => {
                       required
                     />
                   </div>
-                  
+
                   {/* Expense Allocation Section */}
                   {formData.apartment_id && !editingPayment && (
                     <div className="border-t pt-4">
@@ -359,7 +348,7 @@ const Payments = () => {
                       <p className="text-sm text-muted-foreground mb-3">
                         {t('remainingAmount')}: ₪{getRemainingToAllocate().toFixed(2)}
                       </p>
-                      
+
                       {loadingExpenses ? (
                         <p className="text-muted-foreground">{t('loading')}</p>
                       ) : unpaidExpenses.length === 0 ? (
@@ -385,7 +374,7 @@ const Payments = () => {
                                     )}
                                   </div>
                                   <p className="text-sm text-muted-foreground">
-                                    {expense.isSubscription ? t('due') : formatDate(expense.expense_date)} • {t('remainingAmount')}: ₪{expense.remaining.toFixed(2)}
+                                    {expense.isSubscription ? t('due') : formatDate(expense.expenseDate)} • {t('remainingAmount')}: ₪{expense.remaining.toFixed(2)}
                                   </p>
                                 </div>
                                 <div className="flex items-center gap-2">
@@ -413,7 +402,7 @@ const Payments = () => {
                           })}
                         </div>
                       )}
-                      
+
                       {getRemainingToAllocate() > 0 && unpaidExpenses.length > 0 && (
                         <p className="text-sm text-muted-foreground mt-3">
                           {t('creditFromPayment')}: ₪{getRemainingToAllocate().toFixed(2)}
@@ -433,9 +422,6 @@ const Payments = () => {
                 </form>
               </DialogContent>
             </Dialog>
-            <Button variant="outline" onClick={() => navigate('/dashboard')}>
-              {t('backToDashboard')}
-            </Button>
           </div>
         </div>
 
@@ -454,28 +440,30 @@ const Payments = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {payments.length === 0 ? (
+                {paymentRows.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={4} className="text-center text-muted-foreground">
                       {t('noPaymentsFound')}
                     </TableCell>
                   </TableRow>
                 ) : (
-                  payments.map((payment) => (
-                    <TableRow key={payment.id} className={payment.is_canceled ? 'opacity-50' : ''}>
-                      <TableCell className="font-medium text-right">{getApartmentInfo(payment.apartment_id)}</TableCell>
-                      <TableCell className="text-right">₪{payment.amount.toFixed(2)}</TableCell>
+                  paymentRows.map((row) => (
+                    <TableRow key={row.payment.id} className={row.payment.isCanceled ? 'opacity-50' : ''}>
+                      <TableCell className="font-medium text-right">
+                        {row.buildingName} - {t('apt')} {row.apartmentNumber}
+                      </TableCell>
+                      <TableCell className="text-right">₪{row.payment.amount.toFixed(2)}</TableCell>
                       <TableCell className="text-right">
-                        {payment.month}
-                        {payment.is_canceled && <Badge variant="destructive" className="mr-2">{t('canceled')}</Badge>}
+                        {row.payment.month}
+                        {row.payment.isCanceled && <Badge variant="destructive" className="mr-2">{t('canceled')}</Badge>}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
-                          <Button size="sm" variant="outline" onClick={() => handleEdit(payment)} disabled={payment.is_canceled}>
+                          <Button size="sm" variant="outline" onClick={() => handleEdit(row.payment)} disabled={row.payment.isCanceled}>
                             <Pencil className="w-4 h-4" />
                           </Button>
                           {isAdmin && (
-                            <Button size="sm" variant="destructive" onClick={() => handleDelete(payment.id)} disabled={payment.is_canceled}>
+                            <Button size="sm" variant="destructive" onClick={() => handleDelete(row.payment.id)} disabled={row.payment.isCanceled}>
                               <Trash2 className="w-4 h-4" />
                             </Button>
                           )}

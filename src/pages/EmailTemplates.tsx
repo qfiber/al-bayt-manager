@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -16,25 +16,36 @@ import { useToast } from '@/hooks/use-toast';
 import { Mail, Pencil, Trash2, Plus, Eye } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
+interface EmailTemplateTranslation {
+  language: 'ar' | 'en' | 'he';
+  subject: string;
+  htmlBody: string;
+}
+
 interface EmailTemplate {
   id: string;
   identifier: string;
   name: string;
   description: string | null;
-  created_at: string;
+  createdAt: string;
+  translations: EmailTemplateTranslation[];
+}
+
+// Internal UI shape for convenient access by language
+interface TemplateWithTranslationMap extends Omit<EmailTemplate, 'translations'> {
   translations: {
-    ar?: { subject: string; html_body: string };
-    en?: { subject: string; html_body: string };
-    he?: { subject: string; html_body: string };
+    ar?: { subject: string; htmlBody: string };
+    en?: { subject: string; htmlBody: string };
+    he?: { subject: string; htmlBody: string };
   };
 }
 
-interface TemplateTranslation {
-  id?: string;
-  template_id: string;
-  language: 'ar' | 'en' | 'he';
-  subject: string;
-  html_body: string;
+function toTranslationMap(template: EmailTemplate): TemplateWithTranslationMap {
+  const map: TemplateWithTranslationMap['translations'] = {};
+  template.translations?.forEach(t => {
+    map[t.language] = { subject: t.subject, htmlBody: t.htmlBody };
+  });
+  return { ...template, translations: map };
 }
 
 const EmailTemplates = () => {
@@ -43,12 +54,12 @@ const EmailTemplates = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const [templates, setTemplates] = useState<EmailTemplate[]>([]);
+  const [templates, setTemplates] = useState<TemplateWithTranslationMap[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [editingTemplate, setEditingTemplate] = useState<EmailTemplate | null>(null);
-  const [deletingTemplate, setDeletingTemplate] = useState<EmailTemplate | null>(null);
+  const [editingTemplate, setEditingTemplate] = useState<TemplateWithTranslationMap | null>(null);
+  const [deletingTemplate, setDeletingTemplate] = useState<TemplateWithTranslationMap | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [previewContent, setPreviewContent] = useState({ subject: '', body: '' });
 
@@ -83,31 +94,9 @@ const EmailTemplates = () => {
   const fetchTemplates = async () => {
     setIsLoading(true);
     try {
-      const { data: templatesData, error: templatesError } = await supabase
-        .from('email_templates')
-        .select('*')
-        .order('identifier');
-
-      if (templatesError) throw templatesError;
-
-      const { data: translationsData, error: translationsError } = await supabase
-        .from('email_template_translations')
-        .select('*');
-
-      if (translationsError) throw translationsError;
-
-      const templatesWithTranslations = templatesData?.map(template => {
-        const translations: EmailTemplate['translations'] = {};
-        translationsData?.filter(t => t.template_id === template.id).forEach(t => {
-          translations[t.language as 'ar' | 'en' | 'he'] = {
-            subject: t.subject,
-            html_body: t.html_body,
-          };
-        });
-        return { ...template, translations };
-      }) || [];
-
-      setTemplates(templatesWithTranslations);
+      const data = await api.get<EmailTemplate[]>('/email/templates');
+      const mapped = (data || []).map(toTranslationMap);
+      setTemplates(mapped);
     } catch (error: any) {
       toast({ title: t('error'), description: error.message, variant: 'destructive' });
     } finally {
@@ -131,18 +120,18 @@ const EmailTemplates = () => {
     setIsDialogOpen(true);
   };
 
-  const handleEdit = (template: EmailTemplate) => {
+  const handleEdit = (template: TemplateWithTranslationMap) => {
     setEditingTemplate(template);
     setFormData({
       identifier: template.identifier,
       name: template.name,
       description: template.description || '',
       ar_subject: template.translations.ar?.subject || '',
-      ar_body: template.translations.ar?.html_body || '',
+      ar_body: template.translations.ar?.htmlBody || '',
       en_subject: template.translations.en?.subject || '',
-      en_body: template.translations.en?.html_body || '',
+      en_body: template.translations.en?.htmlBody || '',
       he_subject: template.translations.he?.subject || '',
-      he_body: template.translations.he?.html_body || '',
+      he_body: template.translations.he?.htmlBody || '',
     });
     setIsDialogOpen(true);
   };
@@ -153,76 +142,49 @@ const EmailTemplates = () => {
 
       if (editingTemplate) {
         // Update template
-        const { error } = await supabase
-          .from('email_templates')
-          .update({
-            identifier: formData.identifier,
-            name: formData.name,
-            description: formData.description || null,
-          })
-          .eq('id', editingTemplate.id);
-
-        if (error) throw error;
+        await api.put(`/email/templates/${editingTemplate.id}`, {
+          name: formData.name,
+          description: formData.description || null,
+        });
       } else {
         // Create template
-        const { data, error } = await supabase
-          .from('email_templates')
-          .insert({
-            identifier: formData.identifier,
-            name: formData.name,
-            description: formData.description || null,
-          })
-          .select()
-          .single();
-
-        if (error) throw error;
+        const data = await api.post<{ id: string }>('/email/templates', {
+          identifier: formData.identifier,
+          name: formData.name,
+          description: formData.description || null,
+        });
         templateId = data.id;
       }
 
-      // Delete existing translations if editing
-      if (editingTemplate) {
-        await supabase
-          .from('email_template_translations')
-          .delete()
-          .eq('template_id', editingTemplate.id);
-      }
-
-      // Insert translations for languages that have content
-      const translationsToInsert: Omit<TemplateTranslation, 'id'>[] = [];
+      // Build translations array for languages that have content
+      const translations: { language: string; subject: string; htmlBody: string }[] = [];
 
       if (formData.ar_subject.trim() && formData.ar_body.trim()) {
-        translationsToInsert.push({
-          template_id: templateId!,
+        translations.push({
           language: 'ar',
           subject: formData.ar_subject,
-          html_body: formData.ar_body,
+          htmlBody: formData.ar_body,
         });
       }
 
       if (formData.en_subject.trim() && formData.en_body.trim()) {
-        translationsToInsert.push({
-          template_id: templateId!,
+        translations.push({
           language: 'en',
           subject: formData.en_subject,
-          html_body: formData.en_body,
+          htmlBody: formData.en_body,
         });
       }
 
       if (formData.he_subject.trim() && formData.he_body.trim()) {
-        translationsToInsert.push({
-          template_id: templateId!,
+        translations.push({
           language: 'he',
           subject: formData.he_subject,
-          html_body: formData.he_body,
+          htmlBody: formData.he_body,
         });
       }
 
-      if (translationsToInsert.length > 0) {
-        const { error: transError } = await supabase
-          .from('email_template_translations')
-          .insert(translationsToInsert);
-
-        if (transError) throw transError;
+      if (translations.length > 0) {
+        await api.put(`/email/templates/${templateId}/translations`, { translations });
       }
 
       toast({ title: t('success'), description: editingTemplate ? t('updateSuccess') : t('addSuccess') });
@@ -237,12 +199,7 @@ const EmailTemplates = () => {
     if (!deletingTemplate) return;
 
     try {
-      const { error } = await supabase
-        .from('email_templates')
-        .delete()
-        .eq('id', deletingTemplate.id);
-
-      if (error) throw error;
+      await api.delete(`/email/templates/${deletingTemplate.id}`);
 
       toast({ title: t('success'), description: t('deleteSuccess') });
       fetchTemplates();
@@ -256,7 +213,7 @@ const EmailTemplates = () => {
   const handlePreview = (langKey: 'ar' | 'en' | 'he') => {
     const subjectKey = `${langKey}_subject` as keyof typeof formData;
     const bodyKey = `${langKey}_body` as keyof typeof formData;
-    
+
     const samplePlaceholders = {
       username: 'محمد أحمد',
       apartment_number: '101',
@@ -275,7 +232,7 @@ const EmailTemplates = () => {
     setIsPreviewOpen(true);
   };
 
-  const getTranslationBadges = (template: EmailTemplate) => {
+  const getTranslationBadges = (template: TemplateWithTranslationMap) => {
     const badges = [];
     if (template.translations.ar) badges.push(<Badge key="ar" variant="default" className="bg-green-500">AR</Badge>);
     if (template.translations.en) badges.push(<Badge key="en" variant="default" className="bg-blue-500">EN</Badge>);
@@ -300,9 +257,6 @@ const EmailTemplates = () => {
             <Mail className="h-8 w-8" />
             {t('emailTemplates')}
           </h1>
-          <Button variant="outline" onClick={() => navigate('/dashboard')}>
-            {t('backToDashboard')}
-          </Button>
         </div>
         <div className="flex items-center justify-between">
           <p className="text-muted-foreground">{t('emailTemplatesDescription')}</p>

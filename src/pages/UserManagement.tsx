@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -26,13 +26,30 @@ interface UserProfile {
 
 interface Apartment {
   id: string;
-  apartment_number: string;
-  building_id: string;
+  apartmentNumber: string;
+  buildingId: string;
 }
 
 interface Building {
   id: string;
   name: string;
+}
+
+interface ApiUser {
+  id: string;
+  email: string;
+  name: string;
+  phone: string | null;
+  preferredLanguage: string | null;
+  role: string;
+  createdAt: string;
+}
+
+interface TwoFAStatusEntry {
+  id: string;
+  email: string;
+  name: string;
+  totpStatus: 'none' | 'unverified' | 'verified';
 }
 
 const UserManagement = () => {
@@ -57,14 +74,14 @@ const UserManagement = () => {
   const [changingPasswordUser, setChangingPasswordUser] = useState<UserProfile | null>(null);
   const [passwordFormData, setPasswordFormData] = useState({ adminPassword: '', newPassword: '', confirmPassword: '' });
   const [isChangingPassword, setIsChangingPassword] = useState(false);
-  
+
   const [isOwnerDialogOpen, setIsOwnerDialogOpen] = useState(false);
   const [isBeneficiaryDialogOpen, setIsBeneficiaryDialogOpen] = useState(false);
   const [assigningOwnerUser, setAssigningOwnerUser] = useState<UserProfile | null>(null);
   const [assigningBeneficiaryUser, setAssigningBeneficiaryUser] = useState<UserProfile | null>(null);
   const [selectedOwnerApartments, setSelectedOwnerApartments] = useState<string[]>([]);
   const [selectedBeneficiaryApartments, setSelectedBeneficiaryApartments] = useState<string[]>([]);
-  
+
   const [isBuildingsDialogOpen, setIsBuildingsDialogOpen] = useState(false);
   const [assigningBuildingsUser, setAssigningBuildingsUser] = useState<UserProfile | null>(null);
   const [selectedBuildings, setSelectedBuildings] = useState<string[]>([]);
@@ -94,117 +111,78 @@ const UserManagement = () => {
 
   const fetchUsers2FAStatus = async () => {
     try {
-      const { data, error } = await supabase.functions.invoke('disable-user-2fa', {
-        body: { action: 'list-status' },
+      const data = await api.get<TwoFAStatusEntry[]>('/users/2fa-status');
+
+      const statusMap = new Map<string, boolean>();
+      data.forEach((entry) => {
+        statusMap.set(entry.id, entry.totpStatus === 'verified');
       });
-
-      if (error) {
-        console.error('Error fetching 2FA status:', error);
-        return;
-      }
-
-      if (data.users2FAStatus) {
-        const statusMap = new Map<string, boolean>();
-        Object.entries(data.users2FAStatus).forEach(([userId, has2FA]) => {
-          statusMap.set(userId, has2FA as boolean);
-        });
-        setUsers2FAStatus(statusMap);
-      }
+      setUsers2FAStatus(statusMap);
     } catch (error) {
       console.error('Error fetching 2FA status:', error);
     }
   };
 
   const fetchBuildings = async () => {
-    const { data, error } = await supabase
-      .from('buildings')
-      .select('id, name')
-      .order('name');
-
-    if (error) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    } else {
+    try {
+      const data = await api.get<Building[]>('/buildings');
       setBuildings(data || []);
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
     }
   };
 
   const fetchApartments = async () => {
-    const { data, error } = await supabase
-      .from('apartments')
-      .select('id, apartment_number, building_id')
-      .order('apartment_number');
-
-    if (error) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    } else {
+    try {
+      const data = await api.get<Apartment[]>('/apartments');
       setApartments(data || []);
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
     }
   };
 
   const fetchUsers = async () => {
-    // Fetch all profiles
-    const { data: profiles, error: profilesError } = await supabase
-      .from('profiles')
-      .select('id, name, phone')
-      .order('name');
+    try {
+      const data = await api.get<ApiUser[]>('/users');
 
-    if (profilesError) {
-      toast({ title: 'Error', description: profilesError.message, variant: 'destructive' });
-      return;
+      const usersWithDetails: UserProfile[] = (data || []).map((u) => ({
+        id: u.id,
+        name: u.name,
+        phone: u.phone,
+        email: u.email,
+        role: u.role || 'user',
+      }));
+
+      setUsers(usersWithDetails);
+
+      // Fetch moderator building assignments
+      fetchModeratorBuildings(usersWithDetails);
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
     }
-
-    // Fetch user roles
-    const { data: roles, error: rolesError } = await supabase
-      .from('user_roles')
-      .select('user_id, role');
-
-    if (rolesError) {
-      toast({ title: 'Error', description: rolesError.message, variant: 'destructive' });
-      return;
-    }
-
-    // Fetch user apartment assignments
-    const { data: userApartments, error: apartmentsError } = await supabase
-      .from('user_apartments')
-      .select('user_id, apartment_id');
-
-    if (apartmentsError) {
-      toast({ title: 'Error', description: apartmentsError.message, variant: 'destructive' });
-      return;
-    }
-
-    // Combine all data
-    const usersWithDetails = profiles?.map(profile => {
-      const userRole = roles?.find(r => r.user_id === profile.id);
-      
-      return {
-        ...profile,
-        role: userRole?.role || 'user',
-      };
-    }) || [];
-
-    setUsers(usersWithDetails);
-    
-    // Fetch moderator building assignments
-    fetchModeratorBuildings();
   };
 
-  const fetchModeratorBuildings = async () => {
-    const { data, error } = await supabase
-      .from('moderator_buildings')
-      .select('user_id, building_id');
+  const fetchModeratorBuildings = async (usersList?: UserProfile[]) => {
+    const moderators = (usersList || users).filter((u) => u.role === 'moderator');
+    const buildingsMap = new Map<string, string[]>();
 
-    if (error) {
-      console.error('Error fetching moderator buildings:', error);
-      return;
+    try {
+      await Promise.all(
+        moderators.map(async (mod) => {
+          try {
+            const userData = await api.get<{ buildingAssignments?: string[] }>(`/users/${mod.id}`);
+            if (userData.buildingAssignments && userData.buildingAssignments.length > 0) {
+              buildingsMap.set(mod.id, userData.buildingAssignments);
+            }
+          } catch {
+            // Ignore errors for individual moderators
+          }
+        })
+      );
+    } catch {
+      // Ignore errors
     }
 
-    const buildingsMap = new Map<string, string[]>();
-    data?.forEach(mb => {
-      const existing = buildingsMap.get(mb.user_id) || [];
-      buildingsMap.set(mb.user_id, [...existing, mb.building_id]);
-    });
-    
     setModeratorBuildings(buildingsMap);
   };
 
@@ -221,38 +199,20 @@ const UserManagement = () => {
   const handleSaveUser = async () => {
     if (!editingUser) return;
 
-    // Update profile
-    const { error: profileError } = await supabase
-      .from('profiles')
-      .update({ name: formData.name, phone: formData.phone || null })
-      .eq('id', editingUser.id);
-
-    if (profileError) {
-      toast({ title: 'Error', description: profileError.message, variant: 'destructive' });
-      return;
-    }
-
-    // Update role using delete + insert pattern to ensure it works even if no record exists
-    await supabase
-      .from('user_roles')
-      .delete()
-      .eq('user_id', editingUser.id);
-
-    const { error: roleError } = await supabase
-      .from('user_roles')
-      .insert({ 
-        user_id: editingUser.id, 
-        role: formData.role as 'admin' | 'moderator' | 'user' 
+    try {
+      // Update profile and role in a single API call
+      await api.put(`/users/${editingUser.id}`, {
+        name: formData.name,
+        phone: formData.phone || null,
+        role: formData.role,
       });
 
-    if (roleError) {
-      toast({ title: 'Error', description: roleError.message, variant: 'destructive' });
-      return;
+      toast({ title: 'Success', description: 'User updated successfully' });
+      fetchUsers();
+      resetForm();
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
     }
-
-    toast({ title: 'Success', description: 'User updated successfully' });
-    fetchUsers();
-    resetForm();
   };
 
   const handleCreateUser = async () => {
@@ -264,46 +224,26 @@ const UserManagement = () => {
     setIsCreating(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke('create-user', {
-        body: {
-          email: createFormData.email,
-          password: createFormData.password,
-          name: createFormData.name,
-          phone: createFormData.phone || null,
-          role: createFormData.role,
-        },
+      await api.post('/users', {
+        email: createFormData.email,
+        password: createFormData.password,
+        name: createFormData.name,
+        phone: createFormData.phone || null,
+        role: createFormData.role,
       });
 
-      if (error) throw error;
-
-      if (data.success) {
-        toast({ title: 'Success', description: 'User created successfully' });
-        fetchUsers();
-        resetCreateForm();
-      } else {
-        throw new Error(data.error || 'Failed to create user');
-      }
+      toast({ title: 'Success', description: 'User created successfully' });
+      fetchUsers();
+      resetCreateForm();
     } catch (error: any) {
       console.error('Create user error:', error);
-      
-      // Extract the most relevant error message
-      let errorMessage = 'Failed to create user';
-      
-      if (error.message) {
-        errorMessage = error.message;
-      } else if (error.context?.body) {
-        try {
-          const bodyError = JSON.parse(error.context.body);
-          errorMessage = bodyError.error || errorMessage;
-        } catch (e) {
-          // Ignore JSON parse errors
-        }
-      }
-      
-      toast({ 
-        title: 'Error', 
-        description: errorMessage, 
-        variant: 'destructive' 
+
+      const errorMessage = error.message || 'Failed to create user';
+
+      toast({
+        title: 'Error',
+        description: errorMessage,
+        variant: 'destructive'
       });
     } finally {
       setIsCreating(false);
@@ -357,23 +297,18 @@ const UserManagement = () => {
     setIsChangingPassword(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke('change-user-password', {
-        body: {
-          targetUserId: changingPasswordUser.id,
-          newPassword: passwordFormData.newPassword,
-          adminPassword: passwordFormData.adminPassword,
-        },
+      await api.post(`/users/${changingPasswordUser.id}/change-password`, {
+        newPassword: passwordFormData.newPassword,
+        adminPassword: passwordFormData.adminPassword,
       });
-
-      if (error) throw error;
 
       toast({ title: t('success'), description: t('passwordChanged') });
       resetPasswordForm();
     } catch (error: any) {
-      toast({ 
-        title: t('error'), 
-        description: error.message || t('failedToChangePassword'), 
-        variant: 'destructive' 
+      toast({
+        title: t('error'),
+        description: error.message || t('failedToChangePassword'),
+        variant: 'destructive'
       });
     } finally {
       setIsChangingPassword(false);
@@ -392,22 +327,12 @@ const UserManagement = () => {
     setIsDeleting(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke('delete-user', {
-        body: {
-          userId: deletingUser.id,
-        },
-      });
+      await api.delete(`/users/${deletingUser.id}`);
 
-      if (error) throw error;
-
-      if (data.success) {
-        toast({ title: 'Success', description: 'User deleted successfully' });
-        fetchUsers();
-        setIsDeleteDialogOpen(false);
-        setDeletingUser(null);
-      } else {
-        throw new Error(data.error || 'Failed to delete user');
-      }
+      toast({ title: 'Success', description: 'User deleted successfully' });
+      fetchUsers();
+      setIsDeleteDialogOpen(false);
+      setDeletingUser(null);
     } catch (error: any) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
     } finally {
@@ -423,100 +348,68 @@ const UserManagement = () => {
   const getApartmentLabel = (apartmentId: string) => {
     const apartment = apartments.find(a => a.id === apartmentId);
     if (!apartment) return 'Unknown';
-    const building = buildings.find(b => b.id === apartment.building_id);
-    return `${apartment.apartment_number} - ${building?.name || 'Unknown'}`;
+    const building = buildings.find(b => b.id === apartment.buildingId);
+    return `${apartment.apartmentNumber} - ${building?.name || 'Unknown'}`;
   };
 
   const handleAssignOwner = async (userProfile: UserProfile) => {
     setAssigningOwnerUser(userProfile);
-    
-    // Fetch apartments where this user is owner
-    const { data: ownedApartments, error } = await supabase
-      .from('apartments')
-      .select('id')
-      .eq('owner_id', userProfile.id);
 
-    if (error) {
+    try {
+      // Fetch user details to get current owner assignments
+      const userData = await api.get<{ ownerAssignments?: string[] }>(`/users/${userProfile.id}`);
+      setSelectedOwnerApartments(userData.ownerAssignments || []);
+      setIsOwnerDialogOpen(true);
+    } catch (error: any) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
-      return;
     }
-
-    setSelectedOwnerApartments(ownedApartments?.map(a => a.id) || []);
-    setIsOwnerDialogOpen(true);
   };
 
   const handleAssignBeneficiary = async (userProfile: UserProfile) => {
     setAssigningBeneficiaryUser(userProfile);
-    
-    // Fetch apartments where this user is beneficiary
-    const { data: beneficiaryApartments, error } = await supabase
-      .from('apartments')
-      .select('id')
-      .eq('beneficiary_id', userProfile.id);
 
-    if (error) {
+    try {
+      // Fetch user details to get current beneficiary assignments
+      const userData = await api.get<{ beneficiaryAssignments?: string[] }>(`/users/${userProfile.id}`);
+      setSelectedBeneficiaryApartments(userData.beneficiaryAssignments || []);
+      setIsBeneficiaryDialogOpen(true);
+    } catch (error: any) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
-      return;
     }
-
-    setSelectedBeneficiaryApartments(beneficiaryApartments?.map(a => a.id) || []);
-    setIsBeneficiaryDialogOpen(true);
   };
 
   const handleSaveOwnerAssignments = async () => {
     if (!assigningOwnerUser) return;
 
-    // First, remove this user as owner from all apartments
-    await supabase
-      .from('apartments')
-      .update({ owner_id: null })
-      .eq('owner_id', assigningOwnerUser.id);
+    try {
+      await api.put(`/users/${assigningOwnerUser.id}/owner-assignments`, {
+        ids: selectedOwnerApartments,
+      });
 
-    // Then, set this user as owner for selected apartments
-    if (selectedOwnerApartments.length > 0) {
-      const { error } = await supabase
-        .from('apartments')
-        .update({ owner_id: assigningOwnerUser.id })
-        .in('id', selectedOwnerApartments);
-
-      if (error) {
-        toast({ title: 'Error', description: error.message, variant: 'destructive' });
-        return;
-      }
+      toast({ title: 'Success', description: 'Owner assignments updated successfully' });
+      setIsOwnerDialogOpen(false);
+      setAssigningOwnerUser(null);
+      setSelectedOwnerApartments([]);
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
     }
-
-    toast({ title: 'Success', description: 'Owner assignments updated successfully' });
-    setIsOwnerDialogOpen(false);
-    setAssigningOwnerUser(null);
-    setSelectedOwnerApartments([]);
   };
 
   const handleSaveBeneficiaryAssignments = async () => {
     if (!assigningBeneficiaryUser) return;
 
-    // First, remove this user as beneficiary from all apartments
-    await supabase
-      .from('apartments')
-      .update({ beneficiary_id: null })
-      .eq('beneficiary_id', assigningBeneficiaryUser.id);
+    try {
+      await api.put(`/users/${assigningBeneficiaryUser.id}/beneficiary-assignments`, {
+        ids: selectedBeneficiaryApartments,
+      });
 
-    // Then, set this user as beneficiary for selected apartments
-    if (selectedBeneficiaryApartments.length > 0) {
-      const { error } = await supabase
-        .from('apartments')
-        .update({ beneficiary_id: assigningBeneficiaryUser.id })
-        .in('id', selectedBeneficiaryApartments);
-
-      if (error) {
-        toast({ title: 'Error', description: error.message, variant: 'destructive' });
-        return;
-      }
+      toast({ title: 'Success', description: 'Beneficiary assignments updated successfully' });
+      setIsBeneficiaryDialogOpen(false);
+      setAssigningBeneficiaryUser(null);
+      setSelectedBeneficiaryApartments([]);
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
     }
-
-    toast({ title: 'Success', description: 'Beneficiary assignments updated successfully' });
-    setIsBeneficiaryDialogOpen(false);
-    setAssigningBeneficiaryUser(null);
-    setSelectedBeneficiaryApartments([]);
   };
 
   const toggleOwnerApartmentSelection = (apartmentId: string) => {
@@ -538,62 +431,42 @@ const UserManagement = () => {
   const handleAssignBuildings = async (userProfile: UserProfile) => {
     // Only allow assigning buildings to moderators
     if (userProfile.role !== 'moderator') {
-      toast({ 
-        title: 'Error', 
-        description: 'Buildings can only be assigned to moderators', 
-        variant: 'destructive' 
+      toast({
+        title: 'Error',
+        description: 'Buildings can only be assigned to moderators',
+        variant: 'destructive'
       });
       return;
     }
 
     setAssigningBuildingsUser(userProfile);
-    
-    // Fetch buildings assigned to this moderator
-    const { data: assignedBuildings, error } = await supabase
-      .from('moderator_buildings')
-      .select('building_id')
-      .eq('user_id', userProfile.id);
 
-    if (error) {
+    try {
+      // Fetch user details to get current building assignments
+      const userData = await api.get<{ buildingAssignments?: string[] }>(`/users/${userProfile.id}`);
+      setSelectedBuildings(userData.buildingAssignments || []);
+      setIsBuildingsDialogOpen(true);
+    } catch (error: any) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
-      return;
     }
-
-    setSelectedBuildings(assignedBuildings?.map(b => b.building_id) || []);
-    setIsBuildingsDialogOpen(true);
   };
 
   const handleSaveBuildingAssignments = async () => {
     if (!assigningBuildingsUser) return;
 
-    // First, remove all existing building assignments for this moderator
-    await supabase
-      .from('moderator_buildings')
-      .delete()
-      .eq('user_id', assigningBuildingsUser.id);
+    try {
+      await api.put(`/users/${assigningBuildingsUser.id}/building-assignments`, {
+        ids: selectedBuildings,
+      });
 
-    // Then, add new building assignments
-    if (selectedBuildings.length > 0) {
-      const assignments = selectedBuildings.map(buildingId => ({
-        user_id: assigningBuildingsUser.id,
-        building_id: buildingId,
-      }));
-
-      const { error } = await supabase
-        .from('moderator_buildings')
-        .insert(assignments);
-
-      if (error) {
-        toast({ title: 'Error', description: error.message, variant: 'destructive' });
-        return;
-      }
+      toast({ title: 'Success', description: 'Building assignments updated successfully' });
+      fetchModeratorBuildings();
+      setIsBuildingsDialogOpen(false);
+      setAssigningBuildingsUser(null);
+      setSelectedBuildings([]);
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
     }
-
-    toast({ title: 'Success', description: 'Building assignments updated successfully' });
-    fetchModeratorBuildings();
-    setIsBuildingsDialogOpen(false);
-    setAssigningBuildingsUser(null);
-    setSelectedBuildings([]);
   };
 
   const toggleBuildingSelection = (buildingId: string) => {
@@ -607,10 +480,10 @@ const UserManagement = () => {
   const handleDisable2FA = (userProfile: UserProfile) => {
     // Only allow for users and moderators, not admins
     if (userProfile.role === 'admin') {
-      toast({ 
-        title: t('error'), 
-        description: 'Cannot disable 2FA for admin users', 
-        variant: 'destructive' 
+      toast({
+        title: t('error'),
+        description: 'Cannot disable 2FA for admin users',
+        variant: 'destructive'
       });
       return;
     }
@@ -620,23 +493,15 @@ const UserManagement = () => {
 
   const confirmDisable2FA = async () => {
     if (!disable2FAUser) return;
-    
+
     setIsDisabling2FA(true);
-    
+
     try {
-      const { data, error } = await supabase.functions.invoke('disable-user-2fa', {
-        body: { targetUserId: disable2FAUser.id },
-      });
+      await api.post(`/users/${disable2FAUser.id}/disable-2fa`);
 
-      if (error) throw error;
-
-      if (data.success) {
-        toast({ title: t('success'), description: t('twoFactorDisabledForUser') });
-        // Refresh 2FA status after disabling
-        fetchUsers2FAStatus();
-      } else {
-        throw new Error(data.error || t('failedToDisable2FAForUser'));
-      }
+      toast({ title: t('success'), description: t('twoFactorDisabledForUser') });
+      // Refresh 2FA status after disabling
+      fetchUsers2FAStatus();
     } catch (error: any) {
       const errorMessage = error.message || t('failedToDisable2FAForUser');
       // Check if user doesn't have 2FA
@@ -670,9 +535,6 @@ const UserManagement = () => {
             <Button onClick={() => setIsCreateDialogOpen(true)} className="w-full sm:w-auto">
               <UserPlus className="w-4 h-4 mr-2" />
               {t('createUser')}
-            </Button>
-            <Button variant="outline" onClick={() => navigate('/dashboard')} className="w-full sm:w-auto">
-              {t('backToDashboard')}
             </Button>
           </div>
         </div>
@@ -1015,7 +877,7 @@ const UserManagement = () => {
               <p className="text-sm text-muted-foreground">{t('selectApartmentsAsOwner')}</p>
               <div className="space-y-2">
                 {buildings.map(building => {
-                  const buildingApartments = apartments.filter(a => a.building_id === building.id);
+                  const buildingApartments = apartments.filter(a => a.buildingId === building.id);
                   if (buildingApartments.length === 0) return null;
 
                   return (
@@ -1024,7 +886,7 @@ const UserManagement = () => {
                       <div className="grid grid-cols-3 gap-2 pl-4">
                         {buildingApartments.map(apartment => {
                           const isSelected = selectedOwnerApartments.includes(apartment.id);
-                          
+
                           return (
                             <div
                               key={apartment.id}
@@ -1037,7 +899,7 @@ const UserManagement = () => {
                                 }
                               `}
                             >
-                              <div>{apartment.apartment_number}</div>
+                              <div>{apartment.apartmentNumber}</div>
                             </div>
                           );
                         })}
@@ -1082,7 +944,7 @@ const UserManagement = () => {
                   <div className="grid grid-cols-2 gap-2">
                     {buildings.map(building => {
                       const isSelected = selectedBuildings.includes(building.id);
-                      
+
                       return (
                         <div
                           key={building.id}
@@ -1133,7 +995,7 @@ const UserManagement = () => {
               <p className="text-sm text-muted-foreground">{t('selectApartmentsAsBeneficiary')}</p>
               <div className="space-y-2">
                 {buildings.map(building => {
-                  const buildingApartments = apartments.filter(a => a.building_id === building.id);
+                  const buildingApartments = apartments.filter(a => a.buildingId === building.id);
                   if (buildingApartments.length === 0) return null;
 
                   return (
@@ -1142,7 +1004,7 @@ const UserManagement = () => {
                       <div className="grid grid-cols-3 gap-2 pl-4">
                         {buildingApartments.map(apartment => {
                           const isSelected = selectedBeneficiaryApartments.includes(apartment.id);
-                          
+
                           return (
                             <div
                               key={apartment.id}
@@ -1155,7 +1017,7 @@ const UserManagement = () => {
                                 }
                               `}
                             >
-                              <div>{apartment.apartment_number}</div>
+                              <div>{apartment.apartmentNumber}</div>
                             </div>
                           );
                         })}
@@ -1196,7 +1058,7 @@ const UserManagement = () => {
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel disabled={isDisabling2FA}>{t('cancel')}</AlertDialogCancel>
-              <AlertDialogAction 
+              <AlertDialogAction
                 onClick={confirmDisable2FA}
                 disabled={isDisabling2FA}
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"

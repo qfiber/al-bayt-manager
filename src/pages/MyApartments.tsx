@@ -2,55 +2,26 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import { Home } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
 
-interface Apartment {
-  id: string;
-  apartment_number: string;
-  building_id: string;
-  status: string;
-  occupancy_start: string | null;
-  subscription_amount: number;
-  subscription_status: string;
-  credit: number;
-}
-
-interface Building {
-  id: string;
-  name: string;
-  address: string;
-}
-
-interface Payment {
-  id: string;
-  apartment_id: string;
-  amount: number;
-  month: string;
-  created_at: string;
-}
-
-interface ApartmentExpense {
-  id: string;
-  apartment_id: string;
-  expense_id: string;
-  amount: number;
-  created_at: string;
-  is_canceled: boolean;
-  expense?: {
-    description: string;
-    expense_date: string;
+interface ApartmentData {
+  apartment: {
+    id: string;
+    apartmentNumber: string;
+    status: string;
+    occupancyStart: string | null;
+    subscriptionAmount: string;
+    subscriptionStatus: string;
+    cachedBalance: string;
+    buildingId: string;
   };
-}
-
-interface ApartmentWithDetails extends Apartment {
-  building: Building | null;
-  payments: Payment[];
-  apartmentExpenses: ApartmentExpense[];
+  buildingName: string;
+  buildingAddress: string;
 }
 
 const MyApartments = () => {
@@ -58,7 +29,7 @@ const MyApartments = () => {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [apartments, setApartments] = useState<ApartmentWithDetails[]>([]);
+  const [apartments, setApartments] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -76,61 +47,43 @@ const MyApartments = () => {
   const fetchMyApartments = async () => {
     try {
       setIsLoading(true);
-      
-      const { data: userApartments, error: assignError } = await supabase
-        .from('user_apartments')
-        .select('apartment_id')
-        .eq('user_id', user?.id);
+      const data: ApartmentData[] = await api.get('/my-apartments');
 
-      if (assignError) throw assignError;
-
-      if (!userApartments || userApartments.length === 0) {
+      if (!data || data.length === 0) {
         setApartments([]);
         setIsLoading(false);
         return;
       }
 
-      const apartmentIds = userApartments.map(ua => ua.apartment_id);
+      // For each apartment, fetch debt details (includes payments, expenses, ledger)
+      const withDetails = await Promise.all(
+        data.map(async (item) => {
+          try {
+            const details = await api.get(`/apartments/${item.apartment.id}/debt-details`);
+            return {
+              ...item.apartment,
+              buildingName: item.buildingName,
+              buildingAddress: item.buildingAddress,
+              payments: details.payments || [],
+              expenses: details.expenses || [],
+              ledger: details.ledger || [],
+              balance: details.balance,
+            };
+          } catch {
+            return {
+              ...item.apartment,
+              buildingName: item.buildingName,
+              buildingAddress: item.buildingAddress,
+              payments: [],
+              expenses: [],
+              ledger: [],
+              balance: parseFloat(item.apartment.cachedBalance),
+            };
+          }
+        }),
+      );
 
-      const { data: apartmentsData, error: aptError } = await supabase
-        .from('apartments')
-        .select('*')
-        .in('id', apartmentIds);
-
-      if (aptError) throw aptError;
-
-      const buildingIds = apartmentsData?.map(a => a.building_id) || [];
-      const { data: buildingsData, error: buildError } = await supabase
-        .from('buildings')
-        .select('*')
-        .in('id', buildingIds);
-
-      if (buildError) throw buildError;
-
-      const { data: paymentsData, error: payError } = await supabase
-        .from('payments')
-        .select('*')
-        .in('apartment_id', apartmentIds)
-        .order('created_at', { ascending: false });
-
-      if (payError) throw payError;
-
-      const { data: apartmentExpensesData, error: expensesError } = await supabase
-        .from('apartment_expenses')
-        .select('*, expense:expenses(description, expense_date)')
-        .in('apartment_id', apartmentIds)
-        .order('created_at', { ascending: false });
-
-      if (expensesError) throw expensesError;
-
-      const apartmentsWithDetails: ApartmentWithDetails[] = (apartmentsData || []).map(apt => ({
-        ...apt,
-        building: buildingsData?.find(b => b.id === apt.building_id) || null,
-        payments: paymentsData?.filter(p => p.apartment_id === apt.id) || [],
-        apartmentExpenses: apartmentExpensesData?.filter(ae => ae.apartment_id === apt.id) || [],
-      }));
-
-      setApartments(apartmentsWithDetails);
+      setApartments(withDetails);
     } catch (error: any) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
     } finally {
@@ -138,8 +91,8 @@ const MyApartments = () => {
     }
   };
 
-  const getTotalPaid = (payments: Payment[]) => {
-    return payments.reduce((sum, p) => sum + p.amount, 0);
+  const getTotalPaid = (payments: any[]) => {
+    return payments.filter((p: any) => !p.isCanceled).reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
   };
 
   if (loading || isLoading) {
@@ -166,152 +119,157 @@ const MyApartments = () => {
           </Card>
         ) : (
           <div className="grid gap-6">
-            {apartments.map((apartment) => (
-              <Card key={apartment.id}>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Home className="w-5 h-5" />
-                    Apartment {apartment.apartment_number}
-                  </CardTitle>
-                  <CardDescription>
-                    {apartment.building?.name} - {apartment.building?.address}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div className="space-y-1">
-                      <p className="text-sm text-muted-foreground">Status</p>
-                      <p className="font-medium capitalize">{apartment.status}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-sm text-muted-foreground">Occupancy Start</p>
-                      <p className="font-medium">{apartment.occupancy_start ? formatDate(apartment.occupancy_start) : 'Not set'}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-sm text-muted-foreground">Monthly Subscription</p>
-                      <p className="font-medium">₪{apartment.subscription_amount.toFixed(2)}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-sm text-muted-foreground">Subscription Status</p>
-                      <p className={`font-medium capitalize ${
-                        apartment.subscription_status === 'paid' ? 'text-green-600' : 
-                        apartment.subscription_status === 'partial' ? 'text-yellow-600' : 
-                        'text-red-600'
-                      }`}>
-                        {apartment.subscription_status}
-                      </p>
-                    </div>
-                  </div>
+            {apartments.map((apartment) => {
+              const balance = typeof apartment.balance === 'number' ? apartment.balance : parseFloat(apartment.cachedBalance);
+              const subscriptionAmount = parseFloat(apartment.subscriptionAmount || '0');
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t">
-                    <Card>
-                      <CardHeader className="pb-3">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">
-                          Total Paid
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="text-2xl font-bold text-green-600">
-                          ₪{getTotalPaid(apartment.payments).toFixed(2)}
-                        </p>
-                      </CardContent>
-                    </Card>
-
-                    <Card>
-                      <CardHeader className="pb-3">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">
-                          Credit Balance
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <p className={`text-2xl font-bold ${
-                          apartment.credit > 0 ? 'text-green-600' : 
-                          apartment.credit < 0 ? 'text-red-600' : 
-                          'text-gray-600'
+              return (
+                <Card key={apartment.id}>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Home className="w-5 h-5" />
+                      Apartment {apartment.apartmentNumber}
+                    </CardTitle>
+                    <CardDescription>
+                      {apartment.buildingName} - {apartment.buildingAddress}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                      <div className="space-y-1">
+                        <p className="text-sm text-muted-foreground">Status</p>
+                        <p className="font-medium capitalize">{apartment.status}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-sm text-muted-foreground">Occupancy Start</p>
+                        <p className="font-medium">{apartment.occupancyStart ? formatDate(apartment.occupancyStart) : 'Not set'}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-sm text-muted-foreground">Monthly Subscription</p>
+                        <p className="font-medium">₪{subscriptionAmount.toFixed(2)}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-sm text-muted-foreground">Subscription Status</p>
+                        <p className={`font-medium capitalize ${
+                          apartment.subscriptionStatus === 'paid' ? 'text-green-600' :
+                          apartment.subscriptionStatus === 'partial' ? 'text-yellow-600' :
+                          'text-red-600'
                         }`}>
-                          ₪{apartment.credit.toFixed(2)}
+                          {apartment.subscriptionStatus}
                         </p>
-                      </CardContent>
-                    </Card>
-
-                    <Card>
-                      <CardHeader className="pb-3">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">
-                          Total Payments
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="text-2xl font-bold">{apartment.payments.length}</p>
-                      </CardContent>
-                    </Card>
-                  </div>
-
-                  {(apartment.payments.length > 0 || apartment.apartmentExpenses.length > 0) && (
-                    <div className="pt-4 border-t">
-                      <h3 className="text-lg font-semibold mb-3">Transaction History</h3>
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Date</TableHead>
-                            <TableHead>Description</TableHead>
-                            <TableHead>Type</TableHead>
-                            <TableHead className="text-right">Amount (₪)</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {[
-                            ...apartment.payments.map(p => ({
-                              id: p.id,
-                              date: p.created_at,
-                              description: `Payment for ${p.month}`,
-                              type: 'payment',
-                              amount: p.amount,
-                              is_canceled: false
-                            })),
-                            ...apartment.apartmentExpenses.map(ae => ({
-                              id: ae.id,
-                              date: ae.created_at,
-                              description: ae.expense?.description || 'Building expense',
-                              type: 'expense',
-                              amount: ae.amount,
-                              is_canceled: ae.is_canceled
-                            }))
-                          ]
-                          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-                          .map((transaction) => (
-                            <TableRow key={transaction.id}>
-                              <TableCell>{formatDate(transaction.date)}</TableCell>
-                              <TableCell>
-                                {transaction.description}
-                                {transaction.type === 'expense' && transaction.is_canceled && (
-                                  <span className="ml-2 text-xs text-muted-foreground">(Canceled)</span>
-                                )}
-                              </TableCell>
-                              <TableCell>
-                                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                                  transaction.type === 'payment' 
-                                    ? 'bg-green-100 text-green-800' 
-                                    : transaction.is_canceled
-                                    ? 'bg-gray-100 text-gray-800'
-                                    : 'bg-red-100 text-red-800'
-                                }`}>
-                                  {transaction.type === 'payment' ? 'Payment' : transaction.is_canceled ? 'Canceled Expense' : 'Expense'}
-                                </span>
-                              </TableCell>
-                              <TableCell className={`text-right font-medium ${
-                                transaction.type === 'payment' ? 'text-green-600' : transaction.is_canceled ? 'text-gray-600' : 'text-red-600'
-                              }`}>
-                                {transaction.type === 'payment' ? '+' : '-'}₪{transaction.amount.toFixed(2)}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
+                      </div>
                     </div>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t">
+                      <Card>
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-sm font-medium text-muted-foreground">
+                            Total Paid
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <p className="text-2xl font-bold text-green-600">
+                            ₪{getTotalPaid(apartment.payments).toFixed(2)}
+                          </p>
+                        </CardContent>
+                      </Card>
+
+                      <Card>
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-sm font-medium text-muted-foreground">
+                            Credit Balance
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <p className={`text-2xl font-bold ${
+                            balance > 0 ? 'text-green-600' :
+                            balance < 0 ? 'text-red-600' :
+                            'text-gray-600'
+                          }`}>
+                            ₪{balance.toFixed(2)}
+                          </p>
+                        </CardContent>
+                      </Card>
+
+                      <Card>
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-sm font-medium text-muted-foreground">
+                            Total Payments
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <p className="text-2xl font-bold">{apartment.payments.length}</p>
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    {(apartment.payments.length > 0 || apartment.expenses.length > 0) && (
+                      <div className="pt-4 border-t">
+                        <h3 className="text-lg font-semibold mb-3">Transaction History</h3>
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Date</TableHead>
+                              <TableHead>Description</TableHead>
+                              <TableHead>Type</TableHead>
+                              <TableHead className="text-right">Amount (₪)</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {[
+                              ...apartment.payments.map((p: any) => ({
+                                id: p.id,
+                                date: p.createdAt,
+                                description: `Payment for ${p.month}`,
+                                type: 'payment',
+                                amount: parseFloat(p.amount),
+                                isCanceled: p.isCanceled,
+                              })),
+                              ...apartment.expenses.map((ae: any) => ({
+                                id: ae.id,
+                                date: ae.createdAt,
+                                description: ae.expenseDescription || 'Building expense',
+                                type: 'expense',
+                                amount: parseFloat(ae.amount),
+                                isCanceled: ae.isCanceled,
+                              })),
+                            ]
+                            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                            .map((transaction) => (
+                              <TableRow key={transaction.id}>
+                                <TableCell>{formatDate(transaction.date)}</TableCell>
+                                <TableCell>
+                                  {transaction.description}
+                                  {transaction.isCanceled && (
+                                    <span className="ml-2 text-xs text-muted-foreground">(Canceled)</span>
+                                  )}
+                                </TableCell>
+                                <TableCell>
+                                  <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                                    transaction.type === 'payment'
+                                      ? 'bg-green-100 text-green-800'
+                                      : transaction.isCanceled
+                                      ? 'bg-gray-100 text-gray-800'
+                                      : 'bg-red-100 text-red-800'
+                                  }`}>
+                                    {transaction.type === 'payment' ? 'Payment' : transaction.isCanceled ? 'Canceled Expense' : 'Expense'}
+                                  </span>
+                                </TableCell>
+                                <TableCell className={`text-right font-medium ${
+                                  transaction.type === 'payment' ? 'text-green-600' : transaction.isCanceled ? 'text-gray-600' : 'text-red-600'
+                                }`}>
+                                  {transaction.type === 'payment' ? '+' : '-'}₪{transaction.amount.toFixed(2)}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         )}
       </div>

@@ -1,153 +1,111 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User, Session } from '@supabase/supabase-js';
-import { supabase } from '@/integrations/supabase/client';
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { logAuditEvent } from '@/lib/auditLogger';
+import { api, auth } from '@/lib/api';
+
+interface UserData {
+  id: string;
+  email: string;
+  name?: string;
+  phone?: string;
+  preferredLanguage?: string;
+  role: string;
+  totpFactors?: { id: string; status: string; friendlyName?: string }[];
+}
 
 interface AuthContextType {
-  user: User | null;
-  session: Session | null;
+  user: UserData | null;
   isAdmin: boolean;
   isModerator: boolean;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: any }>;
-  signUp: (email: string, password: string, name: string, phone?: string) => Promise<{ error: any }>;
+  signIn: (email: string, password: string) => Promise<{
+    error?: any;
+    requires2FA?: boolean;
+    sessionToken?: string;
+  }>;
+  signUp: (email: string, password: string, name: string, phone?: string) => Promise<{ error?: any }>;
   signOut: () => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [isModerator, setIsModerator] = useState(false);
+  const [user, setUser] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        if (session?.user) {
-          setTimeout(() => {
-            checkAdminStatus(session.user.id);
-            checkModeratorStatus(session.user.id);
-          }, 0);
-        } else {
-          setIsAdmin(false);
-          setIsModerator(false);
-        }
-      }
-    );
+  const isAdmin = user?.role === 'admin';
+  const isModerator = user?.role === 'moderator';
 
-    // Check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      if (session?.user) {
-        checkAdminStatus(session.user.id);
-        checkModeratorStatus(session.user.id);
-      }
+  const fetchUser = useCallback(async () => {
+    if (!auth.isAuthenticated()) {
+      setUser(null);
       setLoading(false);
-    });
+      return;
+    }
 
-    return () => subscription.unsubscribe();
+    try {
+      const me = await auth.getMe();
+      setUser(me);
+    } catch {
+      setUser(null);
+      auth.clearTokens();
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const checkAdminStatus = async (userId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', userId)
-        .eq('role', 'admin')
-        .maybeSingle();
+  useEffect(() => {
+    fetchUser();
+  }, [fetchUser]);
 
-      if (!error && data) {
-        setIsAdmin(true);
-      } else {
-        setIsAdmin(false);
-      }
-    } catch (error) {
-      console.error('Error checking admin status:', error);
-      setIsAdmin(false);
-    }
-  };
-
-  const checkModeratorStatus = async (userId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', userId)
-        .eq('role', 'moderator')
-        .maybeSingle();
-
-      if (!error && data) {
-        setIsModerator(true);
-      } else {
-        setIsModerator(false);
-      }
-    } catch (error) {
-      console.error('Error checking moderator status:', error);
-      setIsModerator(false);
-    }
+  const refreshUser = async () => {
+    await fetchUser();
   };
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    
-    if (!error) {
-      await logAuditEvent({
-        action_type: 'login',
-        action_details: { email }
-      });
+    try {
+      const result = await auth.login(email, password);
+
+      if (result.requires2FA) {
+        return {
+          requires2FA: true,
+          sessionToken: result.sessionToken,
+        };
+      }
+
+      // Tokens already stored by auth.login
+      await fetchUser();
       navigate('/dashboard');
+      return {};
+    } catch (err: any) {
+      return { error: err.message || 'Login failed' };
     }
-    
-    return { error };
   };
 
   const signUp = async (email: string, password: string, name: string, phone?: string) => {
-    const redirectUrl = `${window.location.origin}/dashboard`;
-    
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: redirectUrl,
-        data: {
-          name,
-          phone,
-        },
-      },
-    });
-    
-    if (!error) {
-      navigate('/dashboard');
+    try {
+      await auth.register(email, password, name, phone);
+      // Auto-login after registration
+      const loginResult = await auth.login(email, password);
+      if (!loginResult.requires2FA) {
+        await fetchUser();
+        navigate('/dashboard');
+      }
+      return {};
+    } catch (err: any) {
+      return { error: err.message || 'Registration failed' };
     }
-    
-    return { error };
   };
 
   const signOut = async () => {
-    await logAuditEvent({
-      action_type: 'logout'
-    });
-    await supabase.auth.signOut();
+    await auth.logout();
+    setUser(null);
     navigate('/auth');
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, isAdmin, isModerator, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ user, isAdmin, isModerator, loading, signIn, signUp, signOut, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

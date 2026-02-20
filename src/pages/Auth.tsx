@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { supabase } from '@/integrations/supabase/client';
+import { api, auth } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,62 +18,39 @@ const Auth = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [require2FA, setRequire2FA] = useState(false);
+  const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [verificationCode, setVerificationCode] = useState('');
   const [turnstileEnabled, setTurnstileEnabled] = useState(false);
   const [turnstileSiteKey, setTurnstileSiteKey] = useState<string | null>(null);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
-  const { signIn, user, loading } = useAuth();
+  const { user, loading } = useAuth();
   const { t, language } = useLanguage();
   const navigate = useNavigate();
   const { toast } = useToast();
 
   useEffect(() => {
     const fetchBranding = async () => {
-      const { data, error } = await supabase
-        .from('public_branding')
-        .select('logo_url, turnstile_enabled, turnstile_site_key')
-        .maybeSingle();
-      
-      if (error) {
-        console.log('Branding fetch error:', error);
-        return;
-      }
-      
-      if (data?.logo_url) {
-        setLogoUrl(data.logo_url);
-      }
-      
-      if (data?.turnstile_enabled && data?.turnstile_site_key) {
-        setTurnstileEnabled(true);
-        setTurnstileSiteKey(data.turnstile_site_key);
-      }
-    };
-    
-    fetchBranding();
-    
-    // Subscribe to branding changes for real-time updates
-    const channel = supabase
-      .channel('branding-changes')
-      .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'public_branding' },
-        (payload) => {
-          if (payload.new && typeof payload.new === 'object') {
-            const newData = payload.new as any;
-            if ('logo_url' in newData) {
-              setLogoUrl(newData.logo_url as string);
-            }
-            if ('turnstile_enabled' in newData && 'turnstile_site_key' in newData) {
-              setTurnstileEnabled(newData.turnstile_enabled || false);
-              setTurnstileSiteKey(newData.turnstile_site_key || null);
-            }
-          }
+      try {
+        const data = await api.get<{
+          logo_url?: string;
+          turnstile_enabled?: boolean;
+          turnstile_site_key?: string;
+        }>('/branding');
+
+        if (data?.logo_url) {
+          setLogoUrl(data.logo_url);
         }
-      )
-      .subscribe();
-    
-    return () => {
-      supabase.removeChannel(channel);
+
+        if (data?.turnstile_enabled && data?.turnstile_site_key) {
+          setTurnstileEnabled(true);
+          setTurnstileSiteKey(data.turnstile_site_key);
+        }
+      } catch (error) {
+        console.log('Branding fetch error:', error);
+      }
     };
+
+    fetchBranding();
   }, []);
 
   useEffect(() => {
@@ -100,11 +77,20 @@ const Auth = () => {
       }
 
       if (turnstileEnabled && turnstileToken) {
-        const { data: verifyData, error: verifyError } = await supabase.functions.invoke('verify-turnstile', {
-          body: { token: turnstileToken },
-        });
+        try {
+          const verifyData = await api.post<{ success: boolean }>('/captcha/verify', { token: turnstileToken });
 
-        if (verifyError || !verifyData?.success) {
+          if (!verifyData?.success) {
+            toast({
+              title: t('error'),
+              description: t('captchaVerificationFailed'),
+              variant: 'destructive',
+            });
+            setIsLoading(false);
+            setTurnstileToken(null);
+            return;
+          }
+        } catch {
           toast({
             title: t('error'),
             description: t('captchaVerificationFailed'),
@@ -115,79 +101,28 @@ const Auth = () => {
           return;
         }
       }
-      // First, attempt to sign in with email and password
-      const { data: { session }, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
 
-      if (error) {
-        toast({
-          title: t('error'),
-          description: error.message,
-          variant: 'destructive',
-        });
-        setIsLoading(false);
-        return;
-      }
+      // Sign in with email and password
+      const result = await auth.login(email, password);
 
-      if (!session) {
-        toast({
-          title: t('error'),
-          description: t('sessionNotFound'),
-          variant: 'destructive',
-        });
-        setIsLoading(false);
-        return;
-      }
-
-      // Check if user has 2FA factors
-      const { data: factorsData, error: factorsError } = await supabase.auth.mfa.listFactors();
-      
-      console.log('MFA Factors:', factorsData);
-      
-      if (factorsError) {
-        console.error('Error fetching factors:', factorsError);
-      }
-      
-      const totpFactors = factorsData?.totp || [];
-      
-      // Check if user has any verified TOTP factors
-      const hasVerifiedTotp = totpFactors.some(factor => factor.status === 'verified');
-      
-      console.log('Has verified TOTP:', hasVerifiedTotp);
-      console.log('TOTP Factors:', totpFactors);
-      
-      // Use the official method to get the authentication assurance level
-      const { data: aalData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-      const currentLevel = aalData?.currentLevel;
-      const nextLevel = aalData?.nextLevel;
-      
-      console.log('Current AAL:', currentLevel);
-      console.log('Next AAL:', nextLevel);
-      
-      // If user has verified 2FA factors and nextLevel suggests 2FA is needed
-      // currentLevel: aal1 = password only, aal2 = password + 2FA
-      // nextLevel: indicates what level can be achieved
-      if (hasVerifiedTotp && currentLevel === 'aal1' && nextLevel === 'aal2') {
-        // User has 2FA enabled but hasn't verified it yet in this session
-        console.log('Requiring 2FA verification');
+      if (result.requires2FA && result.sessionToken) {
+        // User has 2FA enabled — store session token and show 2FA form
+        setSessionToken(result.sessionToken);
         setRequire2FA(true);
         setIsLoading(false);
       } else {
-        // Either no 2FA or already verified
-        console.log('Proceeding to dashboard');
+        // No 2FA — tokens are already stored by auth.login
         toast({
           title: t('success'),
           description: t('signedInSuccessfully'),
         });
         navigate('/dashboard');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Sign in error:', error);
       toast({
         title: t('error'),
-        description: t('errorDuringSignIn'),
+        description: error?.message || t('errorDuringSignIn'),
         variant: 'destructive',
       });
       setIsLoading(false);
@@ -199,43 +134,22 @@ const Auth = () => {
     setIsLoading(true);
 
     try {
-      const { data: factors } = await supabase.auth.mfa.listFactors();
-      const totpFactor = factors?.totp?.[0];
-
-      if (!totpFactor) {
-        throw new Error('No 2FA factor found');
+      if (!sessionToken) {
+        throw new Error('No 2FA session found');
       }
 
-      const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({
-        factorId: totpFactor.id,
+      await auth.login2FA(sessionToken, verificationCode);
+
+      toast({
+        title: t('success'),
+        description: t('signedInSuccessfully'),
       });
-
-      if (challengeError) throw challengeError;
-
-      const { error: verifyError } = await supabase.auth.mfa.verify({
-        factorId: totpFactor.id,
-        challengeId: challengeData.id,
-        code: verificationCode,
-      });
-
-      if (verifyError) {
-        toast({
-          title: t('error'),
-          description: t('invalidVerificationCode'),
-          variant: 'destructive',
-        });
-      } else {
-        toast({
-          title: t('success'),
-          description: t('signedInSuccessfully'),
-        });
-        navigate('/dashboard');
-      }
-    } catch (error) {
+      navigate('/dashboard');
+    } catch (error: any) {
       console.error('2FA verification error:', error);
       toast({
         title: t('error'),
-        description: t('errorDuringVerification'),
+        description: error?.message || t('errorDuringVerification'),
         variant: 'destructive',
       });
     }
@@ -303,7 +217,7 @@ const Auth = () => {
               {turnstileEnabled && turnstileSiteKey && (
                 <div className="space-y-2">
                   <Label>{t('captchaVerification')}</Label>
-                  <div 
+                  <div
                     className="flex justify-center items-center p-4 border rounded-lg bg-muted/20"
                     dir="ltr"
                   >
@@ -321,9 +235,9 @@ const Auth = () => {
                 </div>
               )}
 
-              <Button 
-                type="submit" 
-                className="w-full" 
+              <Button
+                type="submit"
+                className="w-full"
                 disabled={isLoading}
               >
                 {isLoading ? t('signingIn') : t('signInButton')}
@@ -349,28 +263,29 @@ const Auth = () => {
                 </p>
               </div>
 
-              <Button 
-                type="submit" 
-                className="w-full" 
+              <Button
+                type="submit"
+                className="w-full"
                 disabled={isLoading}
               >
                 {isLoading ? t('verifying') : t('verify')}
               </Button>
 
-              <Button 
-                type="button" 
+              <Button
+                type="button"
                 variant="outline"
-                className="w-full" 
+                className="w-full"
                 onClick={() => {
                   setRequire2FA(false);
                   setVerificationCode('');
+                  setSessionToken(null);
                 }}
               >
                 {t('back')}
               </Button>
             </form>
           )}
-          
+
           <div className="mt-6 text-center text-sm">
             <p className="text-muted-foreground">
               {t('dontHaveAccount')}{' '}
@@ -379,13 +294,13 @@ const Auth = () => {
               </a>
             </p>
           </div>
-          
+
           <div className="mt-4 pt-4 border-t text-center text-xs text-muted-foreground">
             <p>
               {language === 'ar' ? 'تصميم شركة ' : language === 'he' ? 'מופעל על ידי ' : 'Powered by '}
-              <a 
-                href="https://qfiber.co.il" 
-                target="_blank" 
+              <a
+                href="https://qfiber.co.il"
+                target="_blank"
                 rel="noopener noreferrer"
                 className="text-primary hover:underline"
               >

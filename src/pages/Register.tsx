@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -29,50 +29,23 @@ const Register = () => {
 
   useEffect(() => {
     const fetchBranding = async () => {
-      const { data, error } = await supabase
-        .from('public_branding')
-        .select('logo_url, turnstile_enabled, turnstile_site_key')
-        .maybeSingle();
-      
-      if (error) {
-        console.log('Branding fetch error:', error);
-        return;
-      }
-      
-      if (data?.logo_url) {
-        setLogoUrl(data.logo_url);
-      }
-      
-      if (data?.turnstile_enabled && data?.turnstile_site_key) {
-        setTurnstileEnabled(true);
-        setTurnstileSiteKey(data.turnstile_site_key);
-      }
-    };
-    
-    fetchBranding();
-    
-    const channel = supabase
-      .channel('branding-changes')
-      .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'public_branding' },
-        (payload) => {
-          if (payload.new && typeof payload.new === 'object') {
-            const newData = payload.new as any;
-            if ('logo_url' in newData) {
-              setLogoUrl(newData.logo_url as string);
-            }
-            if ('turnstile_enabled' in newData && 'turnstile_site_key' in newData) {
-              setTurnstileEnabled(newData.turnstile_enabled || false);
-              setTurnstileSiteKey(newData.turnstile_site_key || null);
-            }
-          }
+      try {
+        const data = await api.get('/branding');
+
+        if (data?.logoUrl) {
+          setLogoUrl(data.logoUrl);
         }
-      )
-      .subscribe();
-    
-    return () => {
-      supabase.removeChannel(channel);
+
+        if (data?.turnstileEnabled && data?.turnstileSiteKey) {
+          setTurnstileEnabled(true);
+          setTurnstileSiteKey(data.turnstileSiteKey);
+        }
+      } catch (error) {
+        console.log('Branding fetch error:', error);
+      }
     };
+
+    fetchBranding();
   }, []);
 
   useEffect(() => {
@@ -116,11 +89,9 @@ const Register = () => {
 
     try {
       if (turnstileEnabled && turnstileToken) {
-        const { data: verifyData, error: verifyError } = await supabase.functions.invoke('verify-turnstile', {
-          body: { token: turnstileToken },
-        });
+        const verifyData = await api.post('/captcha/verify', { token: turnstileToken });
 
-        if (verifyError || !verifyData?.success) {
+        if (!verifyData?.success) {
           toast({
             title: t('error'),
             description: t('captchaVerificationFailed'),
@@ -200,7 +171,7 @@ const Register = () => {
                 disabled={isLoading}
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="email">{t('email')}</Label>
               <Input
@@ -247,7 +218,7 @@ const Register = () => {
             {turnstileEnabled && turnstileSiteKey && (
               <div className="space-y-2">
                 <Label>{t('captchaVerification')}</Label>
-                <div 
+                <div
                   className="flex justify-center items-center p-4 border rounded-lg bg-muted/20"
                   dir="ltr"
                 >
@@ -265,15 +236,15 @@ const Register = () => {
               </div>
             )}
 
-            <Button 
-              type="submit" 
-              className="w-full" 
+            <Button
+              type="submit"
+              className="w-full"
               disabled={isLoading}
             >
               {isLoading ? t('creatingAccount') : t('createAccount')}
             </Button>
           </form>
-          
+
           <div className="mt-6 text-center text-sm">
             <p className="text-muted-foreground">
               {t('alreadyHaveAccount')}{' '}
@@ -282,13 +253,13 @@ const Register = () => {
               </a>
             </p>
           </div>
-          
+
           <div className="mt-4 pt-4 border-t text-center text-xs text-muted-foreground">
             <p>
               {language === 'ar' ? 'تصميم شركة ' : language === 'he' ? 'מופעל על ידי ' : 'Powered by '}
-              <a 
-                href="https://qfiber.co.il" 
-                target="_blank" 
+              <a
+                href="https://qfiber.co.il"
+                target="_blank"
                 rel="noopener noreferrer"
                 className="text-primary hover:underline"
               >

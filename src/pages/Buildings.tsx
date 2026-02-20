@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -12,14 +12,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { useToast } from '@/hooks/use-toast';
 import { Building, Plus, Pencil, Trash2, Upload } from 'lucide-react';
 
-interface Building {
+interface BuildingData {
   id: string;
   name: string;
   address: string;
-  number_of_floors: number | null;
-  underground_floors: number | null;
-  logo_url: string | null;
-  created_at: string | null;
+  numberOfFloors: number | null;
+  undergroundFloors: number | null;
+  logoUrl: string | null;
+  createdAt: string | null;
 }
 
 const Buildings = () => {
@@ -27,10 +27,10 @@ const Buildings = () => {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [buildings, setBuildings] = useState<Building[]>([]);
+  const [buildings, setBuildings] = useState<BuildingData[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingBuilding, setEditingBuilding] = useState<Building | null>(null);
-  const [formData, setFormData] = useState({ name: '', address: '', number_of_floors: '', underground_floors: '' });
+  const [editingBuilding, setEditingBuilding] = useState<BuildingData | null>(null);
+  const [formData, setFormData] = useState({ name: '', address: '', numberOfFloors: '', undergroundFloors: '' });
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
 
@@ -49,15 +49,11 @@ const Buildings = () => {
   }, [user, isAdmin]);
 
   const fetchBuildings = async () => {
-    const { data, error } = await supabase
-      .from('buildings')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    } else {
+    try {
+      const data = await api.get('/buildings');
       setBuildings(data || []);
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
     }
   };
 
@@ -70,68 +66,33 @@ const Buildings = () => {
   };
 
   const uploadLogo = async (): Promise<string | null> => {
-    if (!logoFile || !user) return null;
-
-    const fileExt = logoFile.name.split('.').pop();
-    const fileName = `${Date.now()}.${fileExt}`;
-    const filePath = `${fileName}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from('logos')
-      .upload(filePath, logoFile);
-
-    if (uploadError) {
-      throw uploadError;
-    }
-
-    const { data } = supabase.storage
-      .from('logos')
-      .getPublicUrl(filePath);
-
-    return data.publicUrl;
+    if (!logoFile) return null;
+    const result = await api.upload('/upload/logo', logoFile);
+    return result.url;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     try {
       let logoUrl = null;
       if (logoFile) {
         logoUrl = await uploadLogo();
       }
 
+      const payload: any = {
+        name: formData.name,
+        address: formData.address,
+        numberOfFloors: formData.numberOfFloors ? parseInt(formData.numberOfFloors) : undefined,
+        undergroundFloors: formData.undergroundFloors ? parseInt(formData.undergroundFloors) : 0,
+      };
+      if (logoUrl) payload.logoUrl = logoUrl;
+
       if (editingBuilding) {
-        const updateData: any = { 
-          name: formData.name, 
-          address: formData.address,
-          number_of_floors: formData.number_of_floors ? parseInt(formData.number_of_floors) : null,
-          underground_floors: formData.underground_floors ? parseInt(formData.underground_floors) : 0
-        };
-        if (logoUrl) {
-          updateData.logo_url = logoUrl;
-        }
-
-        const { error } = await supabase
-          .from('buildings')
-          .update(updateData)
-          .eq('id', editingBuilding.id);
-
-        if (error) throw error;
+        await api.put(`/buildings/${editingBuilding.id}`, payload);
         toast({ title: 'Success', description: 'Building updated successfully' });
       } else {
-        const insertData: any = { 
-          name: formData.name, 
-          address: formData.address,
-          number_of_floors: formData.number_of_floors ? parseInt(formData.number_of_floors) : null,
-          underground_floors: formData.underground_floors ? parseInt(formData.underground_floors) : 0,
-          logo_url: logoUrl
-        };
-
-        const { error } = await supabase
-          .from('buildings')
-          .insert([insertData]);
-
-        if (error) throw error;
+        await api.post('/buildings', payload);
         toast({ title: 'Success', description: 'Building created successfully' });
       }
 
@@ -145,35 +106,31 @@ const Buildings = () => {
   const handleDelete = async (id: string) => {
     if (!confirm(t('deleteBuildingConfirm'))) return;
 
-    const { error } = await supabase
-      .from('buildings')
-      .delete()
-      .eq('id', id);
-
-    if (error) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    } else {
+    try {
+      await api.delete(`/buildings/${id}`);
       toast({ title: 'Success', description: 'Building deleted successfully' });
       fetchBuildings();
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
     }
   };
 
-  const handleEdit = (building: Building) => {
+  const handleEdit = (building: BuildingData) => {
     setEditingBuilding(building);
-    setFormData({ 
-      name: building.name, 
+    setFormData({
+      name: building.name,
       address: building.address,
-      number_of_floors: building.number_of_floors?.toString() || '',
-      underground_floors: building.underground_floors?.toString() || ''
+      numberOfFloors: building.numberOfFloors?.toString() || '',
+      undergroundFloors: building.undergroundFloors?.toString() || '',
     });
-    if (building.logo_url) {
-      setLogoPreview(building.logo_url);
+    if (building.logoUrl) {
+      setLogoPreview(building.logoUrl);
     }
     setIsDialogOpen(true);
   };
 
   const resetForm = () => {
-    setFormData({ name: '', address: '', number_of_floors: '', underground_floors: '' });
+    setFormData({ name: '', address: '', numberOfFloors: '', undergroundFloors: '' });
     setLogoFile(null);
     setLogoPreview(null);
     setEditingBuilding(null);
@@ -226,24 +183,24 @@ const Buildings = () => {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="number_of_floors">{t('numberOfFloors')}</Label>
+                    <Label htmlFor="numberOfFloors">{t('numberOfFloors')}</Label>
                     <Input
-                      id="number_of_floors"
+                      id="numberOfFloors"
                       type="number"
                       min="1"
-                      value={formData.number_of_floors}
-                      onChange={(e) => setFormData({ ...formData, number_of_floors: e.target.value })}
+                      value={formData.numberOfFloors}
+                      onChange={(e) => setFormData({ ...formData, numberOfFloors: e.target.value })}
                       placeholder={t('optional')}
                     />
                   </div>
                   <div>
-                    <Label htmlFor="underground_floors">{t('undergroundFloors')}</Label>
+                    <Label htmlFor="undergroundFloors">{t('undergroundFloors')}</Label>
                     <Input
-                      id="underground_floors"
+                      id="undergroundFloors"
                       type="number"
                       min="0"
-                      value={formData.underground_floors}
-                      onChange={(e) => setFormData({ ...formData, underground_floors: e.target.value })}
+                      value={formData.undergroundFloors}
+                      onChange={(e) => setFormData({ ...formData, undergroundFloors: e.target.value })}
                       placeholder="0"
                     />
                     <p className="text-xs text-muted-foreground mt-1">{t('undergroundFloorsHelp')}</p>
@@ -273,9 +230,6 @@ const Buildings = () => {
                 </form>
               </DialogContent>
             </Dialog>
-            <Button variant="outline" onClick={() => navigate('/dashboard')}>
-              {t('backToDashboard')}
-            </Button>
           </div>
         </div>
 
@@ -307,11 +261,11 @@ const Buildings = () => {
                       <TableCell className="font-medium text-right">{building.name}</TableCell>
                       <TableCell className="text-right">{building.address}</TableCell>
                       <TableCell className="text-right">
-                        {building.number_of_floors || '-'}
+                        {building.numberOfFloors || '-'}
                       </TableCell>
                       <TableCell className="text-right">
-                        {building.logo_url ? (
-                          <img src={building.logo_url} alt={building.name} className="w-10 h-10 object-cover rounded" />
+                        {building.logoUrl ? (
+                          <img src={building.logoUrl} alt={building.name} className="w-10 h-10 object-cover rounded" />
                         ) : (
                           <span className="text-muted-foreground">{t('noLogo')}</span>
                         )}
