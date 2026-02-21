@@ -88,6 +88,7 @@ export async function recordSubscriptionCharge(
   month: string,
   userId: string | null,
   txOrDb: TxOrDb = db,
+  description?: string,
 ) {
   await txOrDb.insert(apartmentLedger).values({
     apartmentId,
@@ -95,7 +96,7 @@ export async function recordSubscriptionCharge(
     amount: amount.toFixed(2),
     referenceType: 'subscription',
     referenceId: null,
-    description: `Monthly subscription ${month}`,
+    description: description || `Monthly subscription ${month}`,
     createdBy: userId,
   });
 }
@@ -220,6 +221,29 @@ export async function hasSubscriptionForMonth(
         eq(apartmentLedger.apartmentId, apartmentId),
         eq(apartmentLedger.referenceType, 'subscription'),
         eq(apartmentLedger.description, `Monthly subscription ${month}`),
+      ),
+    )
+    .limit(1);
+  return !!existing;
+}
+
+/**
+ * Check if a subscription ledger entry already exists with a specific description.
+ * Used for idempotency when posting child apartment charges to parent's ledger.
+ */
+export async function hasSubscriptionByDescription(
+  apartmentId: string,
+  description: string,
+  txOrDb: TxOrDb = db,
+): Promise<boolean> {
+  const [existing] = await txOrDb
+    .select({ id: apartmentLedger.id })
+    .from(apartmentLedger)
+    .where(
+      and(
+        eq(apartmentLedger.apartmentId, apartmentId),
+        eq(apartmentLedger.referenceType, 'subscription'),
+        eq(apartmentLedger.description, description),
       ),
     )
     .limit(1);

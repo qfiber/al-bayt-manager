@@ -57,21 +57,43 @@ export async function createApartment(data: {
   ownerId?: string;
   beneficiaryId?: string;
   occupancyStart?: Date;
+  apartmentType?: string;
+  parentApartmentId?: string | null;
 }, userId: string) {
   return await db.transaction(async (tx) => {
     // Verify building exists
     const [building] = await tx.select({ id: buildings.id }).from(buildings).where(eq(buildings.id, data.buildingId)).limit(1);
     if (!building) throw new AppError(404, 'Building not found');
 
+    // Validate apartment type and parent relationship
+    const aptType = data.apartmentType || 'regular';
+    if (aptType === 'storage' || aptType === 'parking') {
+      if (!data.parentApartmentId) {
+        throw new AppError(400, 'Parent apartment is required for storage/parking units');
+      }
+      const [parent] = await tx.select().from(apartments).where(eq(apartments.id, data.parentApartmentId)).limit(1);
+      if (!parent) throw new AppError(404, 'Parent apartment not found');
+      if (parent.apartmentType !== 'regular') throw new AppError(400, 'Parent apartment must be a regular apartment');
+      if (parent.buildingId !== data.buildingId) throw new AppError(400, 'Parent apartment must be in the same building');
+    } else {
+      // Regular apartments cannot have a parent
+      data.parentApartmentId = undefined;
+    }
+
     const [apt] = await tx.insert(apartments).values({
       ...data,
+      apartmentType: aptType,
+      parentApartmentId: data.parentApartmentId || null,
       cachedBalance: '0',
     }).returning();
 
     // Backfill subscriptions and expenses if apartment is occupied with a past date
     if (apt.status === 'occupied' && apt.occupancyStart) {
       await backfillSubscriptions(apt.id, tx);
-      await backfillExpensesForApartment(apt.id, apt.buildingId, new Date(apt.occupancyStart), userId, tx);
+      // Only backfill expenses for regular apartments
+      if (apt.apartmentType === 'regular') {
+        await backfillExpensesForApartment(apt.id, apt.buildingId, new Date(apt.occupancyStart), userId, tx);
+      }
     }
 
     return apt;
@@ -87,11 +109,29 @@ export async function updateApartment(id: string, data: Partial<{
   ownerId: string | null;
   beneficiaryId: string | null;
   occupancyStart: Date | null;
+  apartmentType: string;
+  parentApartmentId: string | null;
 }>, userId: string) {
   return await db.transaction(async (tx) => {
     // Fetch old state before update
     const [oldApt] = await tx.select().from(apartments).where(eq(apartments.id, id)).limit(1);
     if (!oldApt) throw new AppError(404, 'Apartment not found');
+
+    // Validate apartment type and parent relationship if changing
+    const aptType = data.apartmentType ?? oldApt.apartmentType;
+    if (aptType === 'storage' || aptType === 'parking') {
+      const parentId = data.parentApartmentId !== undefined ? data.parentApartmentId : oldApt.parentApartmentId;
+      if (!parentId) {
+        throw new AppError(400, 'Parent apartment is required for storage/parking units');
+      }
+      const [parent] = await tx.select().from(apartments).where(eq(apartments.id, parentId)).limit(1);
+      if (!parent) throw new AppError(404, 'Parent apartment not found');
+      if (parent.apartmentType !== 'regular') throw new AppError(400, 'Parent apartment must be a regular apartment');
+      if (parent.buildingId !== oldApt.buildingId) throw new AppError(400, 'Parent apartment must be in the same building');
+    } else if (data.apartmentType === 'regular') {
+      // If changing to regular, clear parent
+      data.parentApartmentId = null;
+    }
 
     const [apt] = await tx
       .update(apartments)
@@ -105,7 +145,10 @@ export async function updateApartment(id: string, data: Partial<{
 
     if (!wasOccupied && isNowOccupied && apt.occupancyStart) {
       await backfillSubscriptions(apt.id, tx);
-      await backfillExpensesForApartment(apt.id, apt.buildingId, new Date(apt.occupancyStart), userId, tx);
+      // Only backfill expenses for regular apartments
+      if (apt.apartmentType === 'regular') {
+        await backfillExpensesForApartment(apt.id, apt.buildingId, new Date(apt.occupancyStart), userId, tx);
+      }
     }
 
     return apt;
@@ -126,6 +169,13 @@ export async function deleteApartment(id: string) {
     throw new AppError(400, `Cannot delete apartment with non-zero balance (₪${balance.toFixed(2)}). Settle outstanding balance first.`);
   }
 
+  // Check for linked child apartments (storage/parking)
+  const children = await db.select({ id: apartments.id }).from(apartments)
+    .where(eq(apartments.parentApartmentId, id)).limit(1);
+  if (children.length > 0) {
+    throw new AppError(400, 'Cannot delete apartment with linked storage/parking units. Delete child units first.');
+  }
+
   const [deleted] = await db.delete(apartments).where(eq(apartments.id, id)).returning();
   return deleted;
 }
@@ -135,6 +185,10 @@ export async function terminateOccupancy(id: string, userId: string) {
     const [apt] = await tx.select().from(apartments).where(eq(apartments.id, id)).limit(1);
     if (!apt) throw new AppError(404, 'Apartment not found');
     if (apt.status !== 'occupied') throw new AppError(400, 'Apartment is not occupied');
+
+    // Determine where prorated credit goes (parent's ledger for child units)
+    const isChild = apt.apartmentType !== 'regular' && !!apt.parentApartmentId;
+    const creditTargetId = isChild ? apt.parentApartmentId! : id;
 
     // Calculate prorated credit for remaining days of the month
     const now = new Date();
@@ -147,7 +201,7 @@ export async function terminateOccupancy(id: string, userId: string) {
       const proratedCredit = Math.round(dailyRate * remainingDays * 100) / 100;
 
       if (proratedCredit > 0) {
-        await ledgerService.recordOccupancyCredit(id, proratedCredit, userId, tx);
+        await ledgerService.recordOccupancyCredit(creditTargetId, proratedCredit, userId, tx);
       }
     }
 
@@ -167,7 +221,39 @@ export async function terminateOccupancy(id: string, userId: string) {
     // Remove user-apartment assignments
     await tx.delete(userApartments).where(eq(userApartments.apartmentId, id));
 
-    await ledgerService.refreshCachedBalance(id, tx);
+    // Cascade: terminate occupied child apartments (storage/parking)
+    if (apt.apartmentType === 'regular') {
+      const children = await tx.select().from(apartments)
+        .where(and(eq(apartments.parentApartmentId, id), eq(apartments.status, 'occupied')));
+
+      for (const child of children) {
+        const childSubAmount = parseFloat(child.subscriptionAmount || '0');
+        if (childSubAmount > 0 && remainingDays > 0) {
+          const childDailyRate = childSubAmount / daysInMonth;
+          const childCredit = Math.round(childDailyRate * remainingDays * 100) / 100;
+          if (childCredit > 0) {
+            // Child's prorated credit goes to parent's ledger
+            await ledgerService.recordOccupancyCredit(id, childCredit, userId, tx);
+          }
+        }
+
+        await tx.update(apartments).set({
+          status: 'vacant',
+          ownerId: null,
+          beneficiaryId: null,
+          occupancyStart: null,
+          updatedAt: new Date(),
+        }).where(eq(apartments.id, child.id));
+
+        await tx.delete(userApartments).where(eq(userApartments.apartmentId, child.id));
+      }
+    }
+
+    await ledgerService.refreshCachedBalance(creditTargetId, tx);
+    // Also refresh the child's own balance if it's a child
+    if (isChild) {
+      await ledgerService.refreshCachedBalance(id, tx);
+    }
 
     return updated;
   });

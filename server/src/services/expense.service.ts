@@ -107,11 +107,15 @@ export async function createExpense(data: {
 
       await ledgerService.refreshCachedBalance(data.apartmentId, tx);
     } else {
-      // Building-wide expense: split among occupied apartments
+      // Building-wide expense: split among occupied regular apartments only
       const occupiedApartments = await tx
         .select()
         .from(apartments)
-        .where(and(eq(apartments.buildingId, data.buildingId), eq(apartments.status, 'occupied')));
+        .where(and(
+          eq(apartments.buildingId, data.buildingId),
+          eq(apartments.status, 'occupied'),
+          eq(apartments.apartmentType, 'regular'),
+        ));
 
       if (occupiedApartments.length === 0) {
         throw new AppError(400, 'No occupied apartments to split expense among');
@@ -402,6 +406,10 @@ export async function backfillExpensesForApartment(
   userId: string,
   tx: TxOrDb,
 ) {
+  // Only regular apartments participate in expense splitting
+  const [apt] = await tx.select().from(apartments).where(eq(apartments.id, apartmentId)).limit(1);
+  if (apt && apt.apartmentType !== 'regular') return;
+
   const occupancyDateStr = occupancyStart.toISOString().split('T')[0]; // YYYY-MM-DD
   // Also include expenses in the same month as occupancy start (even if expense date is before occupancy day)
   const occupancyMonthStr = occupancyDateStr.slice(0, 7) + '-01'; // First day of occupancy month

@@ -19,6 +19,8 @@ const createApartmentSchema = z.object({
   ownerId: z.string().uuid().nullable().optional(),
   beneficiaryId: z.string().uuid().nullable().optional(),
   occupancyStart: z.string().regex(/^\d{4}-\d{2}-\d{2}/).nullable().optional(),
+  apartmentType: z.enum(['regular', 'storage', 'parking']).optional().default('regular'),
+  parentApartmentId: z.string().uuid().nullable().optional(),
 });
 
 const updateApartmentSchema = z.object({
@@ -30,6 +32,8 @@ const updateApartmentSchema = z.object({
   ownerId: z.string().uuid().nullable().optional(),
   beneficiaryId: z.string().uuid().nullable().optional(),
   occupancyStart: z.string().regex(/^\d{4}-\d{2}-\d{2}/).nullable().optional(),
+  apartmentType: z.enum(['regular', 'storage', 'parking']).optional(),
+  parentApartmentId: z.string().uuid().nullable().optional(),
 });
 
 const idParams = z.object({ id: z.string().uuid() });
@@ -58,6 +62,7 @@ apartmentRoutes.post('/', requireAuth, requireRole('admin'), validate(createApar
     const data = {
       ...req.body,
       occupancyStart: req.body.occupancyStart ? new Date(req.body.occupancyStart) : undefined,
+      parentApartmentId: req.body.parentApartmentId || undefined,
     };
     const result = await apartmentService.createApartment(data, req.user!.userId);
     res.status(201).json(result);
@@ -71,6 +76,9 @@ apartmentRoutes.put('/:id', requireAuth, requireRole('admin'), validate({ params
     delete data.buildingId;
     if (data.occupancyStart !== undefined) {
       data.occupancyStart = data.occupancyStart ? new Date(data.occupancyStart) : null;
+    }
+    if (data.parentApartmentId !== undefined) {
+      data.parentApartmentId = data.parentApartmentId || null;
     }
     const result = await apartmentService.updateApartment(req.params.id as string, data, req.user!.userId);
     res.json(result);

@@ -43,6 +43,13 @@ export async function backfillSubscriptions(apartmentId: string, tx: TxOrDb) {
   if (amount <= 0) return;
   if (!apt.occupancyStart) return;
 
+  // Determine if this is a child apartment (storage/parking) that routes charges to parent
+  const isChild = apt.apartmentType !== 'regular' && !!apt.parentApartmentId;
+  const targetApartmentId = isChild ? apt.parentApartmentId! : apartmentId;
+
+  // Build description prefix for child apartments (e.g. "Storage S-1 subscription 2026-02")
+  const typeLabel = apt.apartmentType === 'storage' ? 'Storage' : apt.apartmentType === 'parking' ? 'Parking' : '';
+
   const occupancyStart = new Date(apt.occupancyStart);
   const now = new Date();
   const months = generateMonthRange(occupancyStart, now);
@@ -50,9 +57,15 @@ export async function backfillSubscriptions(apartmentId: string, tx: TxOrDb) {
   for (let i = 0; i < months.length; i++) {
     const month = months[i];
 
-    // Idempotency: skip if already charged
-    const exists = await ledgerService.hasSubscriptionForMonth(apartmentId, month, tx);
-    if (exists) continue;
+    // Idempotency check
+    if (isChild) {
+      const desc = `${typeLabel} ${apt.apartmentNumber} subscription ${month}`;
+      const exists = await ledgerService.hasSubscriptionByDescription(targetApartmentId, desc, tx);
+      if (exists) continue;
+    } else {
+      const exists = await ledgerService.hasSubscriptionForMonth(targetApartmentId, month, tx);
+      if (exists) continue;
+    }
 
     let chargeAmount: number;
 
@@ -76,11 +89,14 @@ export async function backfillSubscriptions(apartmentId: string, tx: TxOrDb) {
     }
 
     if (chargeAmount > 0) {
-      await ledgerService.recordSubscriptionCharge(apartmentId, chargeAmount, month, null, tx);
+      const description = isChild
+        ? `${typeLabel} ${apt.apartmentNumber} subscription ${month}`
+        : undefined;
+      await ledgerService.recordSubscriptionCharge(targetApartmentId, chargeAmount, month, null, tx, description);
     }
   }
 
-  await ledgerService.refreshCachedBalance(apartmentId, tx);
+  await ledgerService.refreshCachedBalance(targetApartmentId, tx);
 }
 
 /**
@@ -181,11 +197,15 @@ export async function generateChildExpenses(
         })
         .returning();
 
-      // Split among currently occupied apartments
+      // Split among currently occupied regular apartments only
       const occupiedApartments = await tx
         .select()
         .from(apartments)
-        .where(and(eq(apartments.buildingId, expense.buildingId), eq(apartments.status, 'occupied')));
+        .where(and(
+          eq(apartments.buildingId, expense.buildingId),
+          eq(apartments.status, 'occupied'),
+          eq(apartments.apartmentType, 'regular'),
+        ));
 
       if (occupiedApartments.length === 0) return;
 

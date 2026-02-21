@@ -11,10 +11,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { useToast } from '@/hooks/use-toast';
-import { Home, Plus, Pencil, Trash2, Eye, XCircle, Calendar as CalendarIcon, Eraser } from 'lucide-react';
+import { Home, Plus, Pencil, Trash2, Eye, XCircle, Calendar as CalendarIcon, Eraser, Package, Car } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 
@@ -30,6 +31,8 @@ interface Apartment {
   cachedBalance: string;
   ownerId: string | null;
   beneficiaryId: string | null;
+  apartmentType: string;
+  parentApartmentId: string | null;
 }
 
 interface ApartmentListItem {
@@ -75,6 +78,8 @@ const Apartments = () => {
     status: 'vacant',
     subscription_amount: '',
     subscription_status: 'inactive',
+    apartment_type: 'regular' as 'regular' | 'storage' | 'parking',
+    parent_apartment_id: '',
   });
 
   useEffect(() => {
@@ -164,6 +169,8 @@ const Apartments = () => {
       occupancyStart: dbDate,
       subscriptionAmount: subscriptionAmount.toString(),
       subscriptionStatus: formData.subscription_status,
+      apartmentType: formData.apartment_type,
+      parentApartmentId: formData.apartment_type !== 'regular' ? formData.parent_apartment_id || null : null,
     };
 
     if (editingApartment) {
@@ -209,6 +216,8 @@ const Apartments = () => {
       status: apartment.status,
       subscription_amount: apartment.subscriptionAmount,
       subscription_status: apartment.subscriptionStatus,
+      apartment_type: (apartment.apartmentType || 'regular') as 'regular' | 'storage' | 'parking',
+      parent_apartment_id: apartment.parentApartmentId || '',
     });
     setIsDialogOpen(true);
   };
@@ -221,6 +230,8 @@ const Apartments = () => {
       status: 'vacant',
       subscription_amount: '',
       subscription_status: 'inactive',
+      apartment_type: 'regular',
+      parent_apartment_id: '',
     });
     setOccupancyDate(undefined);
     setOpenPopover(null);
@@ -242,6 +253,19 @@ const Apartments = () => {
   const getBeneficiaryName = (apartmentId: string) => {
     const item = apartmentItems.find(a => a.apartment.id === apartmentId);
     return item?.beneficiaryName || '-';
+  };
+
+  const getParentApartmentNumber = (parentId: string | null) => {
+    if (!parentId) return null;
+    const item = apartmentItems.find(a => a.apartment.id === parentId);
+    return item?.apartment.apartmentNumber || null;
+  };
+
+  // Get regular occupied apartments in the same building (for parent dropdown)
+  const getRegularApartmentsForBuilding = (buildingId: string) => {
+    return apartmentItems
+      .filter(a => a.apartment.buildingId === buildingId && a.apartment.apartmentType === 'regular')
+      .map(a => a.apartment);
   };
 
   // Helper function to get ordinal suffix for a number
@@ -274,15 +298,24 @@ const Apartments = () => {
     return t('floorNumber').replace('{num}', floorValue);
   };
 
-  // Get floor options for a building (excludes parking floors for apartment assignment)
+  // Get floor options for a building
   // numberOfFloors includes ground floor, so if 4 floors: Ground, 1st, 2nd, 3rd
-  const getFloorOptions = (buildingId: string) => {
+  // includeUnderground: adds underground floors (-1, -2, etc.) for storage/parking
+  const getFloorOptions = (buildingId: string, includeUnderground: boolean = false) => {
     const building = buildings.find(b => b.id === buildingId);
     if (!building) return [];
 
     const floors: { value: string; label: string }[] = [];
 
-    // Add ground floor first
+    // Add underground floors if requested (for storage/parking)
+    if (includeUnderground) {
+      const undergroundCount = building.undergroundFloors || 0;
+      for (let i = -undergroundCount; i <= -1; i++) {
+        floors.push({ value: i.toString(), label: getFloorDisplayName(i.toString()) });
+      }
+    }
+
+    // Add ground floor
     floors.push({ value: 'Ground', label: t('groundFloor') });
 
     // Add above-ground floors (numFloors - 1 because ground floor is included in the count)
@@ -571,6 +604,43 @@ const Apartments = () => {
                     </Select>
                   </div>
                   <div>
+                    <Label>{t('apartmentType')}</Label>
+                    <Select
+                      value={formData.apartment_type}
+                      onValueChange={(value: 'regular' | 'storage' | 'parking') => setFormData({ ...formData, apartment_type: value, parent_apartment_id: value === 'regular' ? '' : formData.parent_apartment_id })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="regular">{t('regular')}</SelectItem>
+                        <SelectItem value="storage">{t('storageRoom')}</SelectItem>
+                        <SelectItem value="parking">{t('parkingSpot')}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {formData.apartment_type !== 'regular' && (
+                    <div>
+                      <Label>{t('parentApartment')}</Label>
+                      <Select
+                        value={formData.parent_apartment_id}
+                        onValueChange={(value) => setFormData({ ...formData, parent_apartment_id: value })}
+                        disabled={!formData.building_id}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder={t('selectParentApartment')} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {formData.building_id && getRegularApartmentsForBuilding(formData.building_id).map((apt) => (
+                            <SelectItem key={apt.id} value={apt.id}>
+                              {t('apt')} {apt.apartmentNumber}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  <div>
                     <Label htmlFor="floor">{t('floor')}</Label>
                     <Select
                       value={formData.floor}
@@ -580,7 +650,7 @@ const Apartments = () => {
                         <SelectValue placeholder={t('selectFloor')} />
                       </SelectTrigger>
                       <SelectContent>
-                        {formData.building_id && getFloorOptions(formData.building_id).map((floor) => (
+                        {formData.building_id && getFloorOptions(formData.building_id, formData.apartment_type !== 'regular').map((floor) => (
                           <SelectItem key={floor.value} value={floor.value}>
                             {floor.label}
                           </SelectItem>
@@ -711,7 +781,28 @@ const Apartments = () => {
                             const subscriptionAmount = parseFloat(apartment.subscriptionAmount);
                             return (
                               <TableRow key={apartment.id}>
-                                <TableCell className="font-medium text-start">{apartment.apartmentNumber}</TableCell>
+                                <TableCell className="font-medium text-start">
+                                  <div className="flex items-center gap-2">
+                                    {apartment.apartmentNumber}
+                                    {apartment.apartmentType === 'storage' && (
+                                      <Badge variant="secondary" className="text-xs gap-1">
+                                        <Package className="w-3 h-3" />
+                                        {t('storageRoom')}
+                                      </Badge>
+                                    )}
+                                    {apartment.apartmentType === 'parking' && (
+                                      <Badge variant="secondary" className="text-xs gap-1">
+                                        <Car className="w-3 h-3" />
+                                        {t('parkingSpot')}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  {apartment.parentApartmentId && (
+                                    <div className="text-xs text-muted-foreground mt-0.5">
+                                      {t('linkedTo')}: {t('apt')} {getParentApartmentNumber(apartment.parentApartmentId)}
+                                    </div>
+                                  )}
+                                </TableCell>
                                 <TableCell className="text-start">
                                   {apartment.floor != null ? getFloorDisplayName(apartment.floor === 0 ? 'Ground' : apartment.floor.toString()) : '-'}
                                 </TableCell>

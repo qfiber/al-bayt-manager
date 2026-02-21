@@ -38,6 +38,7 @@ interface Apartment {
   subscriptionAmount: number;
   credit: number;
   occupancyStart: string | null;
+  apartmentType?: string;
 }
 
 interface ApartmentRow {
@@ -359,7 +360,7 @@ const Payments = () => {
                       </SelectTrigger>
                       <SelectContent>
                         {apartmentRows
-                          .filter((row) => row.apartment.buildingId === formBuildingId)
+                          .filter((row) => row.apartment.buildingId === formBuildingId && (!row.apartment.apartmentType || row.apartment.apartmentType === 'regular'))
                           .map((row) => (
                             <SelectItem key={row.apartment.id} value={row.apartment.id}>
                               {t('apt')} {row.apartment.apartmentNumber}

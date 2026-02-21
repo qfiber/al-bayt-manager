@@ -13,6 +13,8 @@ export const apartments = pgTable('apartments', {
   subscriptionStatus: varchar('subscription_status', { length: 50 }).default('inactive'),
   ownerId: uuid('owner_id').references(() => profiles.id, { onDelete: 'set null' }),
   beneficiaryId: uuid('beneficiary_id').references(() => profiles.id, { onDelete: 'set null' }),
+  apartmentType: varchar('apartment_type', { length: 20 }).notNull().default('regular'),
+  parentApartmentId: uuid('parent_apartment_id'),
   occupancyStart: timestamp('occupancy_start', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),

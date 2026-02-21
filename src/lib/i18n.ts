@@ -497,6 +497,17 @@ export const translations = {
     timeAgo: "לפני {time}",
     administration: "ניהול",
     myApartments: "הדירות שלי",
+
+    // Apartment Types
+    apartmentType: "סוג יחידה",
+    regular: "רגילה",
+    storageRoom: "מחסן",
+    parkingSpot: "חנייה",
+    parentApartment: "דירת אם",
+    selectParentApartment: "בחר דירת אם",
+    parentRequired: "דירת אם נדרשת עבור מחסנים/חניות",
+    cannotDeleteParent: "לא ניתן למחוק דירה עם מחסנים/חניות מקושרים",
+    linkedTo: "משויך ל",
   },
   ar: {
     // Site
@@ -996,6 +1007,17 @@ export const translations = {
     timeAgo: "منذ {time}",
     administration: "الإدارة",
     myApartments: "شققي",
+
+    // Apartment Types
+    apartmentType: "نوع الوحدة",
+    regular: "عادية",
+    storageRoom: "مخزن",
+    parkingSpot: "موقف سيارات",
+    parentApartment: "الشقة الأم",
+    selectParentApartment: "اختر الشقة الأم",
+    parentRequired: "الشقة الأم مطلوبة للمخازن/المواقف",
+    cannotDeleteParent: "لا يمكن حذف شقة مرتبطة بمخازن/مواقف",
+    linkedTo: "مرتبط بـ",
   },
   en: {
     // Site
@@ -1500,6 +1522,17 @@ export const translations = {
     timeAgo: "{time} ago",
     administration: "Administration",
     myApartments: "My Apartments",
+
+    // Apartment Types
+    apartmentType: "Unit Type",
+    regular: "Regular",
+    storageRoom: "Storage Room",
+    parkingSpot: "Parking Spot",
+    parentApartment: "Parent Apartment",
+    selectParentApartment: "Select parent apartment",
+    parentRequired: "Parent apartment is required for storage/parking units",
+    cannotDeleteParent: "Cannot delete apartment with linked storage/parking units",
+    linkedTo: "Linked to",
   },
 };
 
