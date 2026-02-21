@@ -15,6 +15,13 @@
       "when": 1771671000000,
       "tag": "0001_add_monthly_fee_to_buildings",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1771718400000,
+      "tag": "0002_add_turnstile_secret_key",
+      "breakpoints": true
     }
   ]
 }

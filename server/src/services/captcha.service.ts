@@ -1,7 +1,11 @@
-import { env } from '../config/env.js';
+import { db } from '../config/database.js';
+import { settings } from '../db/schema/index.js';
 
 export async function verifyTurnstile(token: string): Promise<boolean> {
-  if (!env.TURNSTILE_SECRET_KEY) {
+  const [row] = await db.select({ turnstileSecretKey: settings.turnstileSecretKey }).from(settings).limit(1);
+  const secretKey = row?.turnstileSecretKey;
+
+  if (!secretKey) {
     return true; // Skip verification if no secret key configured
   }
 
@@ -9,7 +13,7 @@ export async function verifyTurnstile(token: string): Promise<boolean> {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
-      secret: env.TURNSTILE_SECRET_KEY,
+      secret: secretKey,
       response: token,
     }),
   });

@@ -201,7 +201,7 @@ const Apartments = () => {
 
   const handleEdit = (apartment: Apartment) => {
     setEditingApartment(apartment);
-    setOccupancyDate(apartment.occupancyStart ? new Date(apartment.occupancyStart + 'T00:00:00') : undefined);
+    setOccupancyDate(apartment.occupancyStart ? new Date(apartment.occupancyStart) : undefined);
     setFormData({
       apartment_number: apartment.apartmentNumber,
       building_id: apartment.buildingId,
@@ -926,8 +926,8 @@ const Apartments = () => {
                     <TableBody>
                       {apartmentExpenses.map((expense) => (
                         <TableRow key={expense.id}>
-                          <TableCell className="text-right">{expense.description || expense.expenseId || '-'}</TableCell>
-                          <TableCell className="text-right">{expense.createdAt ? new Date(expense.createdAt).toLocaleDateString() : '-'}</TableCell>
+                          <TableCell className="text-right">{expense.description || '-'}</TableCell>
+                          <TableCell className="text-right">{expense.expenseDate || (expense.createdAt ? new Date(expense.createdAt).toLocaleDateString() : '-')}</TableCell>
                           <TableCell className="text-right text-red-600 font-medium">₪{parseFloat(expense.amount).toFixed(2)}</TableCell>
                           <TableCell className="text-right">
                             <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${

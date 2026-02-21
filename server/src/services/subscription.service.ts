@@ -125,6 +125,118 @@ async function generateMonthlySubscriptions() {
 }
 
 /**
+ * Generate child expenses for a single recurring parent expense.
+ * Creates one child per month from recurringStartDate to now (or recurringEndDate),
+ * splits each among occupied apartments. Idempotent — skips months that already
+ * have a child expense.
+ *
+ * Can be called inside an existing transaction (from createExpense) or with
+ * its own transactions (from the cron job).
+ */
+export async function generateChildExpenses(
+  expense: typeof expenses.$inferSelect,
+  userId: string | null,
+  txOrDb?: TxOrDb,
+): Promise<number> {
+  if (!expense.recurringStartDate) return 0;
+
+  const startDate = new Date(expense.recurringStartDate);
+  const now = new Date();
+  const endDate = expense.recurringEndDate
+    ? new Date(Math.min(new Date(expense.recurringEndDate).getTime(), now.getTime()))
+    : now;
+
+  const months = generateMonthRange(startDate, endDate);
+  let created = 0;
+
+  for (const month of months) {
+    const childDate = `${month}-01`;
+
+    const runInTx = async (tx: TxOrDb) => {
+      // Check if child expense already exists for this month
+      const [existing] = await tx
+        .select({ id: expenses.id })
+        .from(expenses)
+        .where(
+          and(
+            eq(expenses.parentExpenseId, expense.id),
+            eq(expenses.expenseDate, childDate),
+          ),
+        )
+        .limit(1);
+
+      if (existing) return;
+
+      // Create child expense
+      const amount = parseFloat(expense.amount);
+      const [child] = await tx
+        .insert(expenses)
+        .values({
+          buildingId: expense.buildingId,
+          description: expense.description,
+          amount: expense.amount,
+          expenseDate: childDate,
+          category: expense.category,
+          parentExpenseId: expense.id,
+        })
+        .returning();
+
+      // Split among currently occupied apartments
+      const occupiedApartments = await tx
+        .select()
+        .from(apartments)
+        .where(and(eq(apartments.buildingId, expense.buildingId), eq(apartments.status, 'occupied')));
+
+      if (occupiedApartments.length === 0) return;
+
+      const count = occupiedApartments.length;
+      const totalCents = Math.round(amount * 100);
+      const baseCents = Math.floor(totalCents / count);
+      const extraPennies = totalCents - baseCents * count;
+
+      for (let i = 0; i < occupiedApartments.length; i++) {
+        const apt = occupiedApartments[i];
+        const aptShare = (baseCents + (i < extraPennies ? 1 : 0)) / 100;
+
+        const [ae] = await tx
+          .insert(apartmentExpenses)
+          .values({
+            apartmentId: apt.id,
+            expenseId: child.id,
+            amount: aptShare.toFixed(2),
+          })
+          .returning();
+
+        await ledgerService.recordExpenseCharge(
+          apt.id,
+          ae.id,
+          aptShare,
+          expense.description || 'Recurring expense charge',
+          userId as any,
+          tx,
+        );
+
+        await ledgerService.refreshCachedBalance(apt.id, tx);
+      }
+
+      created++;
+    };
+
+    if (txOrDb) {
+      // Run within the provided transaction
+      await runInTx(txOrDb);
+    } else {
+      // Create own transaction per month (cron job mode)
+      await db.transaction(async (tx) => {
+        await runInTx(tx);
+      });
+    }
+  }
+
+  return created;
+}
+
+/**
  * Process recurring expenses: generate child expenses for each month
  * in the recurring range that doesn't already have one.
  * Runs alongside the subscription cron.
@@ -143,98 +255,17 @@ async function processRecurringExpenses() {
         ),
       );
 
-    let created = 0;
+    let totalCreated = 0;
     for (const expense of recurringExpenses) {
       try {
-        if (!expense.recurringStartDate) continue;
-
-        const startDate = new Date(expense.recurringStartDate);
-        const now = new Date();
-        const endDate = expense.recurringEndDate
-          ? new Date(Math.min(new Date(expense.recurringEndDate).getTime(), now.getTime()))
-          : now;
-
-        const months = generateMonthRange(startDate, endDate);
-
-        for (const month of months) {
-          const childDate = `${month}-01`;
-
-          await db.transaction(async (tx) => {
-            // Check if child expense already exists for this month
-            const [existing] = await tx
-              .select({ id: expenses.id })
-              .from(expenses)
-              .where(
-                and(
-                  eq(expenses.parentExpenseId, expense.id),
-                  eq(expenses.expenseDate, childDate),
-                ),
-              )
-              .limit(1);
-
-            if (existing) return;
-
-            // Create child expense
-            const amount = parseFloat(expense.amount);
-            const [child] = await tx
-              .insert(expenses)
-              .values({
-                buildingId: expense.buildingId,
-                description: expense.description,
-                amount: expense.amount,
-                expenseDate: childDate,
-                category: expense.category,
-                parentExpenseId: expense.id,
-              })
-              .returning();
-
-            // Split among currently occupied apartments
-            const occupiedApartments = await tx
-              .select()
-              .from(apartments)
-              .where(and(eq(apartments.buildingId, expense.buildingId), eq(apartments.status, 'occupied')));
-
-            if (occupiedApartments.length === 0) return;
-
-            const count = occupiedApartments.length;
-            const totalCents = Math.round(amount * 100);
-            const baseCents = Math.floor(totalCents / count);
-            const extraPennies = totalCents - baseCents * count;
-
-            for (let i = 0; i < occupiedApartments.length; i++) {
-              const apt = occupiedApartments[i];
-              const aptShare = (baseCents + (i < extraPennies ? 1 : 0)) / 100;
-
-              const [ae] = await tx
-                .insert(apartmentExpenses)
-                .values({
-                  apartmentId: apt.id,
-                  expenseId: child.id,
-                  amount: aptShare.toFixed(2),
-                })
-                .returning();
-
-              await ledgerService.recordExpenseCharge(
-                apt.id,
-                ae.id,
-                aptShare,
-                expense.description || 'Recurring expense charge',
-                null as any, // System-generated, no user
-                tx,
-              );
-
-              await ledgerService.refreshCachedBalance(apt.id, tx);
-            }
-
-            created++;
-          });
-        }
+        const created = await generateChildExpenses(expense, null);
+        totalCreated += created;
       } catch (err) {
         logger.error({ err, expenseId: expense.id }, 'Failed to process recurring expense');
       }
     }
 
-    logger.info({ created }, 'Processed recurring expenses');
+    logger.info({ created: totalCreated }, 'Processed recurring expenses');
   } catch (err) {
     logger.error(err, 'Error processing recurring expenses');
   }

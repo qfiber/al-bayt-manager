@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Building, Plus, Pencil, Trash2, Upload } from 'lucide-react';
+import { Building, Plus, Pencil, Trash2 } from 'lucide-react';
 
 interface BuildingData {
   id: string;
@@ -19,7 +19,6 @@ interface BuildingData {
   numberOfFloors: number | null;
   undergroundFloors: number | null;
   monthlyFee: string | null;
-  logoUrl: string | null;
   createdAt: string | null;
 }
 
@@ -32,8 +31,6 @@ const Buildings = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingBuilding, setEditingBuilding] = useState<BuildingData | null>(null);
   const [formData, setFormData] = useState({ name: '', address: '', numberOfFloors: '', undergroundFloors: '', monthlyFee: '' });
-  const [logoFile, setLogoFile] = useState<File | null>(null);
-  const [logoPreview, setLogoPreview] = useState<string | null>(null);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -58,29 +55,10 @@ const Buildings = () => {
     }
   };
 
-  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setLogoFile(file);
-      setLogoPreview(URL.createObjectURL(file));
-    }
-  };
-
-  const uploadLogo = async (): Promise<string | null> => {
-    if (!logoFile) return null;
-    const result = await api.upload('/upload/logo', logoFile);
-    return result.url;
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     try {
-      let logoUrl = null;
-      if (logoFile) {
-        logoUrl = await uploadLogo();
-      }
-
       const payload: any = {
         name: formData.name,
         address: formData.address,
@@ -88,7 +66,6 @@ const Buildings = () => {
         undergroundFloors: formData.undergroundFloors ? parseInt(formData.undergroundFloors) : 0,
         monthlyFee: formData.monthlyFee || '0',
       };
-      if (logoUrl) payload.logoUrl = logoUrl;
 
       if (editingBuilding) {
         await api.put(`/buildings/${editingBuilding.id}`, payload);
@@ -126,16 +103,11 @@ const Buildings = () => {
       undergroundFloors: building.undergroundFloors?.toString() || '',
       monthlyFee: building.monthlyFee || '',
     });
-    if (building.logoUrl) {
-      setLogoPreview(building.logoUrl);
-    }
     setIsDialogOpen(true);
   };
 
   const resetForm = () => {
     setFormData({ name: '', address: '', numberOfFloors: '', undergroundFloors: '', monthlyFee: '' });
-    setLogoFile(null);
-    setLogoPreview(null);
     setEditingBuilding(null);
     setIsDialogOpen(false);
   };
@@ -224,20 +196,6 @@ const Buildings = () => {
                       />
                     </div>
                   </div>
-                  <div>
-                    <Label htmlFor="logo">{t('logoOptional')}</Label>
-                    <Input
-                      id="logo"
-                      type="file"
-                      accept="image/*"
-                      onChange={handleLogoChange}
-                    />
-                    {logoPreview && (
-                      <div className="mt-2">
-                        <img src={logoPreview} alt={t('logoPreview')} className="w-20 h-20 object-cover rounded" />
-                      </div>
-                    )}
-                  </div>
                   <div className="flex gap-2">
                     <Button type="submit" className="flex-1">
                       {editingBuilding ? t('update') : t('create')}
@@ -264,14 +222,13 @@ const Buildings = () => {
                   <TableHead className="text-right">{t('address')}</TableHead>
                   <TableHead className="text-right">{t('numberOfFloors')}</TableHead>
                   <TableHead className="text-right">{t('buildingMonthlyFee')}</TableHead>
-                  <TableHead className="text-right">{t('logo')}</TableHead>
                   <TableHead className="text-right">{t('actions')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {buildings.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground">
+                    <TableCell colSpan={5} className="text-center text-muted-foreground">
                       {t('noBuildingsFound')}
                     </TableCell>
                   </TableRow>
@@ -285,13 +242,6 @@ const Buildings = () => {
                       </TableCell>
                       <TableCell className="text-right">
                         ₪{parseFloat(building.monthlyFee || '0').toFixed(2)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {building.logoUrl ? (
-                          <img src={building.logoUrl} alt={building.name} className="w-10 h-10 object-cover rounded" />
-                        ) : (
-                          <span className="text-muted-foreground">{t('noLogo')}</span>
-                        )}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">

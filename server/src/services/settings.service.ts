@@ -18,6 +18,10 @@ function maskSensitiveFields(settings: any) {
     const key = masked.resendApiKey;
     masked.resendApiKey = key.length > 8 ? `${'*'.repeat(key.length - 4)}${key.slice(-4)}` : '********';
   }
+  if (masked.turnstileSecretKey) {
+    const key = masked.turnstileSecretKey;
+    masked.turnstileSecretKey = key.length > 8 ? `${'*'.repeat(key.length - 4)}${key.slice(-4)}` : '********';
+  }
   return masked;
 }
 
@@ -30,12 +34,16 @@ export async function updateSettings(data: Partial<{
   resendApiKey: string | null;
   turnstileEnabled: boolean;
   turnstileSiteKey: string | null;
+  turnstileSecretKey: string | null;
 }>) {
   const existing = await getRawSettings();
-  // Skip updating resendApiKey if it looks like a masked value
+  // Skip updating masked values
   const updateData = { ...data };
   if (updateData.resendApiKey && /^\*+/.test(updateData.resendApiKey)) {
     delete updateData.resendApiKey;
+  }
+  if (updateData.turnstileSecretKey && /^\*+/.test(updateData.turnstileSecretKey)) {
+    delete updateData.turnstileSecretKey;
   }
   const [result] = await db
     .update(settings)

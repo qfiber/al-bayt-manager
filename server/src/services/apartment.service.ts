@@ -1,7 +1,7 @@
 import { db } from '../config/database.js';
 import {
   apartments, buildings, profiles, apartmentExpenses, payments,
-  apartmentLedger, userApartments,
+  apartmentLedger, userApartments, expenses,
 } from '../db/schema/index.js';
 import { eq, and, inArray, sql, desc } from 'drizzle-orm';
 import { AppError } from '../middleware/error-handler.js';
@@ -177,9 +177,21 @@ export async function getDebtDetails(apartmentId: string) {
   const [apt] = await db.select().from(apartments).where(eq(apartments.id, apartmentId)).limit(1);
   if (!apt) throw new AppError(404, 'Apartment not found');
 
-  const expenses = await db
-    .select()
+  const expenseRows = await db
+    .select({
+      id: apartmentExpenses.id,
+      apartmentId: apartmentExpenses.apartmentId,
+      expenseId: apartmentExpenses.expenseId,
+      amount: apartmentExpenses.amount,
+      amountPaid: apartmentExpenses.amountPaid,
+      isCanceled: apartmentExpenses.isCanceled,
+      createdAt: apartmentExpenses.createdAt,
+      description: expenses.description,
+      category: expenses.category,
+      expenseDate: expenses.expenseDate,
+    })
     .from(apartmentExpenses)
+    .innerJoin(expenses, eq(apartmentExpenses.expenseId, expenses.id))
     .where(and(eq(apartmentExpenses.apartmentId, apartmentId), eq(apartmentExpenses.isCanceled, false)));
 
   const aptPayments = await db
@@ -198,7 +210,7 @@ export async function getDebtDetails(apartmentId: string) {
   return {
     apartment: apt,
     balance,
-    expenses,
+    expenses: expenseRows,
     payments: aptPayments,
     ledger,
   };

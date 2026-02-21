@@ -57,6 +57,7 @@ const Expenses = () => {
   const [expenseRows, setExpenseRows] = useState<ExpenseRow[]>([]);
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [apartments, setApartments] = useState<ApartmentOption[]>([]);
+  const [selectedBuildingFilter, setSelectedBuildingFilter] = useState<string>('all');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [expenseMode, setExpenseMode] = useState<'one-time' | 'recurring' | null>(null);
@@ -245,7 +246,20 @@ const Expenses = () => {
             <FileText className="w-8 h-8 text-primary" />
             <h1 className="text-3xl font-bold">{t('expenses')}</h1>
           </div>
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-2 flex-wrap items-center">
+            <Select value={selectedBuildingFilter} onValueChange={setSelectedBuildingFilter}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder={t('filterByBuilding')} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t('allBuildings')}</SelectItem>
+                {buildings.map((building) => (
+                  <SelectItem key={building.id} value={building.id}>
+                    {building.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Button
               onClick={() => {
                 setEditingExpense(null);
@@ -259,7 +273,7 @@ const Expenses = () => {
                   description: '',
                   amount: '',
                   category: '',
-              
+
                   apply_to: 'building',
                   apartment_id: '',
                 });
@@ -538,14 +552,18 @@ const Expenses = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {expenseRows.length === 0 ? (
+                {(() => {
+                  const filtered = selectedBuildingFilter === 'all'
+                    ? expenseRows
+                    : expenseRows.filter(r => r.expense.buildingId === selectedBuildingFilter);
+                  return filtered.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center text-muted-foreground">
                       {t('noExpensesFound')}
                     </TableCell>
                   </TableRow>
                 ) : (
-                  expenseRows.map((row) => (
+                  filtered.map((row) => (
                     <TableRow key={row.expense.id}>
                       <TableCell className="font-medium text-right">{row.buildingName || getBuildingName(row.expense.buildingId)}</TableCell>
                       <TableCell className="text-right">{row.expense.description}</TableCell>
@@ -575,7 +593,8 @@ const Expenses = () => {
                       </TableCell>
                     </TableRow>
                   ))
-                )}
+                );
+                })()}
               </TableBody>
             </Table>
           </CardContent>

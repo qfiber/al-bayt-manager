@@ -10,6 +10,7 @@ export const settings = pgTable('settings', {
   resendApiKey: varchar('resend_api_key', { length: 500 }),
   turnstileEnabled: boolean('turnstile_enabled').default(false),
   turnstileSiteKey: varchar('turnstile_site_key', { length: 255 }),
+  turnstileSecretKey: varchar('turnstile_secret_key', { length: 255 }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });

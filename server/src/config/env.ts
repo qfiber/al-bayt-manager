@@ -13,7 +13,6 @@ const envSchema = z.object({
   JWT_REFRESH_SECRET: z.string().min(32).default(generateSecret()),
   JWT_ACCESS_EXPIRY: z.string().default('15m'),
   JWT_REFRESH_EXPIRY: z.string().default('7d'),
-  TURNSTILE_SECRET_KEY: z.string().optional(),
   RESEND_API_KEY: z.string().optional(),
   UPLOAD_DIR: z.string().default('./uploads'),
   CORS_ORIGIN: z.string().default('http://localhost:8080'),

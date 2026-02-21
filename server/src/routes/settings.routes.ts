@@ -17,6 +17,7 @@ const updateSettingsSchema = z.object({
   resendApiKey: z.string().max(500).nullable().optional(),
   turnstileEnabled: z.boolean().optional(),
   turnstileSiteKey: z.string().max(255).nullable().optional(),
+  turnstileSecretKey: z.string().max(255).nullable().optional(),
 });
 
 settingsRoutes.get('/', requireAuth, requireRole('admin'), async (_req: Request, res: Response, next: NextFunction) => {

@@ -1,15 +1,20 @@
 import { useTheme } from "next-themes";
 import { Toaster as Sonner, toast } from "sonner";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 type ToasterProps = React.ComponentProps<typeof Sonner>;
 
 const Toaster = ({ ...props }: ToasterProps) => {
   const { theme = "system" } = useTheme();
+  const { dir } = useLanguage();
+  const position = dir === 'rtl' ? 'bottom-left' : 'bottom-right';
 
   return (
     <Sonner
       theme={theme as ToasterProps["theme"]}
       className="toaster group"
+      position={position}
+      dir={dir as 'rtl' | 'ltr'}
       toastOptions={{
         classNames: {
           toast:

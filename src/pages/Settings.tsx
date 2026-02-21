@@ -18,6 +18,7 @@ interface SettingsData {
   logoUrl: string | null;
   turnstileEnabled: boolean;
   turnstileSiteKey: string | null;
+  turnstileSecretKey: string | null;
   smtpEnabled: boolean;
   smtpFromEmail: string | null;
   smtpFromName: string | null;
@@ -44,6 +45,7 @@ const Settings = () => {
   const [checking2FA, setChecking2FA] = useState(true);
   const [turnstileEnabled, setTurnstileEnabled] = useState(false);
   const [turnstileSiteKey, setTurnstileSiteKey] = useState('');
+  const [turnstileSecretKey, setTurnstileSecretKey] = useState('');
   const [smtpEnabled, setSmtpEnabled] = useState(false);
   const [smtpFromEmail, setSmtpFromEmail] = useState('');
   const [smtpFromName, setSmtpFromName] = useState('');
@@ -94,6 +96,7 @@ const Settings = () => {
         setSystemLanguage(data.systemLanguage);
         setTurnstileEnabled(data.turnstileEnabled || false);
         setTurnstileSiteKey(data.turnstileSiteKey || '');
+        setTurnstileSecretKey(data.turnstileSecretKey || '');
         setSmtpEnabled(data.smtpEnabled || false);
         setSmtpFromEmail(data.smtpFromEmail || '');
         setSmtpFromName(data.smtpFromName || '');
@@ -156,6 +159,7 @@ const Settings = () => {
         systemLanguage,
         turnstileEnabled,
         turnstileSiteKey: turnstileSiteKey || null,
+        turnstileSecretKey: turnstileSecretKey || null,
         smtpEnabled,
         smtpFromEmail: smtpFromEmail || null,
         smtpFromName: smtpFromName || null,
@@ -193,7 +197,7 @@ const Settings = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/10">
-      <div className="container mx-auto px-3 py-4 sm:p-6 max-w-4xl">
+      <div className="container mx-auto px-3 py-4 sm:p-6">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8">
           <div className="flex items-center gap-3">
             <SettingsIcon className="w-8 h-8 text-primary" />
@@ -250,7 +254,7 @@ const Settings = () => {
                 <Input
                   id="logo"
                   type="file"
-                  accept="image/*"
+                  accept="image/png,image/webp"
                   onChange={handleLogoChange}
                 />
                 {logoFile.preview && (
@@ -330,19 +334,34 @@ const Settings = () => {
                   </div>
 
                   {turnstileEnabled && (
-                    <div className="space-y-2">
-                      <Label htmlFor="turnstile-site-key">{t('captchaSiteKey')}</Label>
-                      <Input
-                        id="turnstile-site-key"
-                        type="text"
-                        placeholder="0x4AAAAAAA..."
-                        value={turnstileSiteKey}
-                        onChange={(e) => setTurnstileSiteKey(e.target.value)}
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        {t('captchaSiteKeyHelp')}
-                      </p>
-                    </div>
+                    <>
+                      <div className="space-y-2">
+                        <Label htmlFor="turnstile-site-key">{t('captchaSiteKey')}</Label>
+                        <Input
+                          id="turnstile-site-key"
+                          type="text"
+                          placeholder="0x4AAAAAAA..."
+                          value={turnstileSiteKey}
+                          onChange={(e) => setTurnstileSiteKey(e.target.value)}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          {t('captchaSiteKeyHelp')}
+                        </p>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="turnstile-secret-key">{t('captchaSecretKey')}</Label>
+                        <Input
+                          id="turnstile-secret-key"
+                          type="password"
+                          placeholder="0x4AAAAAAA..."
+                          value={turnstileSecretKey}
+                          onChange={(e) => setTurnstileSecretKey(e.target.value)}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          {t('captchaSecretKeyHelp')}
+                        </p>
+                      </div>
+                    </>
                   )}
                 </div>
               </div>

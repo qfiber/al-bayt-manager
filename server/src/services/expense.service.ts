@@ -1,8 +1,9 @@
 import { db } from '../config/database.js';
-import { expenses, apartmentExpenses, apartments, buildings } from '../db/schema/index.js';
+import { expenses, apartmentExpenses, apartments, buildings, apartmentLedger } from '../db/schema/index.js';
 import { eq, and, inArray, sql, gte, isNull } from 'drizzle-orm';
 import { AppError } from '../middleware/error-handler.js';
 import * as ledgerService from './ledger.service.js';
+import { generateChildExpenses } from './subscription.service.js';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 type TxOrDb = NodePgDatabase<any> | typeof db;
@@ -19,15 +20,14 @@ export async function listExpenses(filters?: {
     .from(expenses)
     .innerJoin(buildings, eq(expenses.buildingId, buildings.id));
 
-  const conditions: any[] = [];
+  // Always exclude auto-generated child expenses (they have a parentExpenseId)
+  const conditions: any[] = [isNull(expenses.parentExpenseId)];
   if (filters?.buildingId) conditions.push(eq(expenses.buildingId, filters.buildingId));
   if (filters?.allowedBuildingIds?.length) {
     conditions.push(inArray(expenses.buildingId, filters.allowedBuildingIds));
   }
 
-  if (conditions.length > 0) {
-    query = query.where(and(...conditions)) as any;
-  }
+  query = query.where(and(...conditions)) as any;
 
   return query;
 }
@@ -81,7 +81,11 @@ export async function createExpense(data: {
       })
       .returning();
 
-    if (data.apartmentId) {
+    if (data.isRecurring) {
+      // Recurring parent expense: do NOT split the parent itself.
+      // Instead, immediately generate child expenses for all months up to now.
+      await generateChildExpenses(expense, userId, tx);
+    } else if (data.apartmentId) {
       // Single apartment expense
       const [ae] = await tx
         .insert(apartmentExpenses)
@@ -245,7 +249,7 @@ export async function getApartmentExpenses(apartmentId: string) {
     .where(eq(apartmentExpenses.apartmentId, apartmentId));
 
   // Flatten and compute remaining for frontend consumption
-  return rows.map((row) => {
+  const expenseItems = rows.map((row) => {
     const amount = parseFloat(row.apartmentExpense.amount);
     const amountPaid = parseFloat(row.apartmentExpense.amountPaid);
     return {
@@ -261,8 +265,42 @@ export async function getApartmentExpenses(apartmentId: string) {
       category: row.expenseCategory,
       expenseDate: row.expenseDate,
       expenseAmount: row.expenseAmount,
+      isSubscription: false,
     };
   });
+
+  // Also fetch subscription ledger entries for this apartment
+  const subscriptionEntries = await db
+    .select()
+    .from(apartmentLedger)
+    .where(
+      and(
+        eq(apartmentLedger.apartmentId, apartmentId),
+        eq(apartmentLedger.entryType, 'debit'),
+        eq(apartmentLedger.referenceType, 'subscription'),
+      ),
+    );
+
+  const subscriptionItems = subscriptionEntries.map((entry) => {
+    const amount = parseFloat(entry.amount);
+    return {
+      id: entry.id, // ledger entry ID (not allocatable)
+      apartmentId: entry.apartmentId,
+      expenseId: null,
+      amount,
+      amountPaid: 0,
+      remaining: amount,
+      isCanceled: false,
+      createdAt: entry.createdAt,
+      description: entry.description || 'Subscription',
+      category: null,
+      expenseDate: null,
+      expenseAmount: null,
+      isSubscription: true,
+    };
+  });
+
+  return [...expenseItems, ...subscriptionItems];
 }
 
 export async function cancelApartmentExpense(id: string, userId: string) {
@@ -321,12 +359,41 @@ export async function waiveApartmentExpense(id: string, userId: string) {
 }
 
 /**
+ * Get the number of days an apartment was occupied during a given expense's month.
+ * Returns 0 if the apartment wasn't occupied during that month.
+ */
+function getOccupiedDays(occupancyStart: Date, expenseDate: string): { days: number; daysInMonth: number } {
+  // Parse expense date to get the month
+  const [year, month] = expenseDate.split('-').map(Number);
+  const daysInMonth = new Date(year, month, 0).getDate();
+
+  const occYear = occupancyStart.getUTCFullYear();
+  const occMonth = occupancyStart.getUTCMonth() + 1; // 1-based
+  const occDay = occupancyStart.getUTCDate();
+
+  // If occupancy started before or at the start of this expense month → full month
+  if (occYear < year || (occYear === year && occMonth < month)) {
+    return { days: daysInMonth, daysInMonth };
+  }
+
+  // If occupancy started in the same month → partial (remaining days)
+  if (occYear === year && occMonth === month) {
+    const remainingDays = daysInMonth - occDay + 1;
+    return { days: Math.max(0, remainingDays), daysInMonth };
+  }
+
+  // Occupancy started after this expense month → 0 days
+  return { days: 0, daysInMonth };
+}
+
+/**
  * Retroactively charge an apartment for building-wide expenses that occurred
- * since its occupancy start date. Idempotent — skips expenses the apartment
- * already has an apartment_expense for.
+ * since its occupancy start date. Redistributes existing expense splits so
+ * the total collected equals the original expense amount.
  *
- * The new apartment is charged its proportional share (total / (existing_splits + 1)).
- * Existing apartments' shares are NOT adjusted to avoid touching settled records.
+ * Uses day-weighted splitting: each apartment's share is proportional to
+ * how many days it was occupied in the expense's month. This means
+ * mid-month apartments pay a prorated share.
  */
 export async function backfillExpensesForApartment(
   apartmentId: string,
@@ -336,18 +403,21 @@ export async function backfillExpensesForApartment(
   tx: TxOrDb,
 ) {
   const occupancyDateStr = occupancyStart.toISOString().split('T')[0]; // YYYY-MM-DD
+  // Also include expenses in the same month as occupancy start (even if expense date is before occupancy day)
+  const occupancyMonthStr = occupancyDateStr.slice(0, 7) + '-01'; // First day of occupancy month
 
-  // Find all building-wide expenses since occupancy start
-  // Skip recurring template parents (isRecurring=true) — their children are the actual charges
+  // Find all building-wide expenses since the start of the occupancy month
   const buildingExpenses = await tx
     .select()
     .from(expenses)
     .where(
       and(
         eq(expenses.buildingId, buildingId),
-        gte(expenses.expenseDate, occupancyDateStr),
+        gte(expenses.expenseDate, occupancyMonthStr),
       ),
     );
+
+  const affectedApartmentIds = new Set<string>();
 
   for (const expense of buildingExpenses) {
     // Skip recurring template parents — they don't have apartment_expenses
@@ -367,10 +437,14 @@ export async function backfillExpensesForApartment(
 
     if (existing) continue; // Already charged — idempotent skip
 
-    // Count existing non-canceled apartment_expense splits for this expense
-    const [countResult] = await tx
-      .select({ count: sql<number>`count(*)::int` })
+    // Get ALL existing non-canceled apartment_expense splits for this expense (with apartment details)
+    const existingSplits = await tx
+      .select({
+        ae: apartmentExpenses,
+        occupancyStart: apartments.occupancyStart,
+      })
       .from(apartmentExpenses)
+      .innerJoin(apartments, eq(apartmentExpenses.apartmentId, apartments.id))
       .where(
         and(
           eq(apartmentExpenses.expenseId, expense.id),
@@ -378,35 +452,134 @@ export async function backfillExpensesForApartment(
         ),
       );
 
-    const existingCount = countResult?.count || 0;
+    // If no existing splits, this was likely a single-apartment expense — skip
+    if (existingSplits.length === 0) continue;
 
-    // If no existing splits, this was likely a single-apartment expense or had no splits — skip
-    if (existingCount === 0) continue;
+    // Check if the new apartment was occupied during this expense's month
+    const newAptOccupied = getOccupiedDays(occupancyStart, expense.expenseDate);
+    if (newAptOccupied.days <= 0) continue;
 
-    // Calculate share: expense.amount / (existingCount + 1)
     const totalAmount = parseFloat(expense.amount);
-    const share = Math.round((totalAmount / (existingCount + 1)) * 100) / 100;
 
-    if (share <= 0) continue;
+    // Calculate day-weights for all apartments (existing + new)
+    const weights: { apartmentId: string; aeId: string | null; days: number }[] = [];
 
-    const [ae] = await tx
-      .insert(apartmentExpenses)
-      .values({
-        apartmentId,
-        expenseId: expense.id,
-        amount: share.toFixed(2),
-      })
-      .returning();
+    for (const split of existingSplits) {
+      const aptOccStart = split.occupancyStart ? new Date(split.occupancyStart) : null;
+      // If no occupancy start, assume full month (they were split in originally)
+      const occupied = aptOccStart
+        ? getOccupiedDays(aptOccStart, expense.expenseDate)
+        : { days: newAptOccupied.daysInMonth, daysInMonth: newAptOccupied.daysInMonth };
+      weights.push({
+        apartmentId: split.ae.apartmentId,
+        aeId: split.ae.id,
+        days: Math.max(occupied.days, 1), // at least 1 day since they have an existing split
+      });
+    }
 
-    await ledgerService.recordExpenseCharge(
+    // Add the new apartment
+    weights.push({
       apartmentId,
-      ae.id,
-      share,
-      expense.description || 'Retroactive expense charge',
-      userId,
-      tx,
-    );
+      aeId: null, // will be created
+      days: newAptOccupied.days,
+    });
+
+    const totalDays = weights.reduce((sum, w) => sum + w.days, 0);
+
+    // Distribute using floor-based penny distribution for exact total
+    const totalCents = Math.round(totalAmount * 100);
+    const shares: { apartmentId: string; aeId: string | null; cents: number }[] = [];
+
+    // Calculate base cents per weight unit
+    let allocatedCents = 0;
+    for (const w of weights) {
+      const rawCents = (totalCents * w.days) / totalDays;
+      const baseCents = Math.floor(rawCents);
+      shares.push({ ...w, cents: baseCents });
+      allocatedCents += baseCents;
+    }
+
+    // Distribute remaining pennies to apartments with largest fractional parts
+    let remainingCents = totalCents - allocatedCents;
+    if (remainingCents > 0) {
+      const fractionals = weights.map((w, i) => ({
+        index: i,
+        frac: ((totalCents * w.days) / totalDays) - Math.floor((totalCents * w.days) / totalDays),
+      }));
+      fractionals.sort((a, b) => b.frac - a.frac);
+      for (let i = 0; i < remainingCents && i < fractionals.length; i++) {
+        shares[fractionals[i].index].cents += 1;
+      }
+    }
+
+    // Update existing apartment_expense amounts and adjust ledger
+    for (const share of shares) {
+      if (share.aeId) {
+        // Existing split — update amount and adjust ledger
+        const existingSplit = existingSplits.find(s => s.ae.id === share.aeId)!;
+        const oldAmount = parseFloat(existingSplit.ae.amount);
+        const newAmount = share.cents / 100;
+
+        if (Math.abs(oldAmount - newAmount) > 0.001) {
+          // Update apartment_expense amount
+          await tx
+            .update(apartmentExpenses)
+            .set({ amount: newAmount.toFixed(2) })
+            .where(eq(apartmentExpenses.id, share.aeId));
+
+          // Reverse old ledger entry and record new one
+          await ledgerService.recordReversal(
+            share.apartmentId,
+            share.aeId,
+            oldAmount,
+            'debit',
+            `Expense redistribution: reversed old share ₪${oldAmount.toFixed(2)}`,
+            userId,
+            tx,
+          );
+
+          await ledgerService.recordExpenseCharge(
+            share.apartmentId,
+            share.aeId,
+            newAmount,
+            expense.description || 'Expense charge (redistributed)',
+            userId,
+            tx,
+          );
+
+          affectedApartmentIds.add(share.apartmentId);
+        }
+      } else {
+        // New apartment — create apartment_expense and ledger entry
+        const newAmount = share.cents / 100;
+        if (newAmount <= 0) continue;
+
+        const [ae] = await tx
+          .insert(apartmentExpenses)
+          .values({
+            apartmentId,
+            expenseId: expense.id,
+            amount: newAmount.toFixed(2),
+          })
+          .returning();
+
+        await ledgerService.recordExpenseCharge(
+          apartmentId,
+          ae.id,
+          newAmount,
+          expense.description || 'Retroactive expense charge',
+          userId,
+          tx,
+        );
+      }
+    }
   }
 
+  // Refresh cached balance for the new apartment
   await ledgerService.refreshCachedBalance(apartmentId, tx);
+
+  // Refresh cached balance for all existing apartments whose shares changed
+  for (const aptId of affectedApartmentIds) {
+    await ledgerService.refreshCachedBalance(aptId, tx);
+  }
 }

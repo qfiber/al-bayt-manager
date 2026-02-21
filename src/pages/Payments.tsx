@@ -78,8 +78,10 @@ const Payments = () => {
   const [paymentRows, setPaymentRows] = useState<PaymentRow[]>([]);
   const [apartmentRows, setApartmentRows] = useState<ApartmentRow[]>([]);
   const [buildings, setBuildings] = useState<Building[]>([]);
+  const [selectedBuildingFilter, setSelectedBuildingFilter] = useState<string>('all');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
+  const [formBuildingId, setFormBuildingId] = useState('');
   const [formData, setFormData] = useState({
     apartment_id: '',
     amount: '',
@@ -256,6 +258,8 @@ const Payments = () => {
 
   const handleEdit = (payment: Payment) => {
     setEditingPayment(payment);
+    const row = apartmentRows.find(a => a.apartment.id === payment.apartmentId);
+    setFormBuildingId(row?.apartment.buildingId || '');
     setFormData({
       apartment_id: payment.apartmentId,
       amount: payment.amount.toString(),
@@ -268,6 +272,7 @@ const Payments = () => {
       apartment_id: '',
       amount: '',
     });
+    setFormBuildingId('');
     setEditingPayment(null);
     setAllocations({});
     setUnpaidExpenses([]);
@@ -301,7 +306,20 @@ const Payments = () => {
             <CreditCard className="w-8 h-8 text-primary" />
             <h1 className="text-3xl font-bold">{t('payments')}</h1>
           </div>
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-2 flex-wrap items-center">
+            <Select value={selectedBuildingFilter} onValueChange={setSelectedBuildingFilter}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder={t('filterByBuilding')} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t('allBuildings')}</SelectItem>
+                {buildings.map((building) => (
+                  <SelectItem key={building.id} value={building.id}>
+                    {building.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
                 <Button onClick={() => resetForm()} className="w-full sm:w-auto">
@@ -315,17 +333,38 @@ const Payments = () => {
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div>
-                    <Label htmlFor="apartment_id">{t('apartment')}</Label>
-                    <Select value={formData.apartment_id} onValueChange={(value) => setFormData({ ...formData, apartment_id: value })}>
+                    <Label>{t('building')}</Label>
+                    <Select value={formBuildingId} onValueChange={(value) => { setFormBuildingId(value); setFormData({ ...formData, apartment_id: '' }); }}>
                       <SelectTrigger>
-                        <SelectValue placeholder={t('selectApartmentPlaceholder')} />
+                        <SelectValue placeholder={t('selectBuilding')} />
                       </SelectTrigger>
                       <SelectContent>
-                        {apartmentRows.map((row) => (
-                          <SelectItem key={row.apartment.id} value={row.apartment.id}>
-                            {getApartmentInfo(row.apartment.id)}
+                        {buildings.map((building) => (
+                          <SelectItem key={building.id} value={building.id}>
+                            {building.name}
                           </SelectItem>
                         ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>{t('apartment')}</Label>
+                    <Select
+                      value={formData.apartment_id}
+                      onValueChange={(value) => setFormData({ ...formData, apartment_id: value })}
+                      disabled={!formBuildingId}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={formBuildingId ? t('selectApartmentPlaceholder') : t('selectBuilding')} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {apartmentRows
+                          .filter((row) => row.apartment.buildingId === formBuildingId)
+                          .map((row) => (
+                            <SelectItem key={row.apartment.id} value={row.apartment.id}>
+                              {t('apt')} {row.apartment.apartmentNumber}
+                            </SelectItem>
+                          ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -377,26 +416,28 @@ const Payments = () => {
                                     {expense.isSubscription ? t('due') : formatDate(expense.expenseDate)} • {t('remainingAmount')}: ₪{expense.remaining.toFixed(2)}
                                   </p>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                  <Input
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    max={expense.remaining}
-                                    value={allocations[expense.id] || ''}
-                                    onChange={(e) => handleAllocationChange(expense.id, e.target.value)}
-                                    className="w-24"
-                                    placeholder="₪0"
-                                  />
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => handlePayFullAmount(expense.id)}
-                                  >
-                                    {t('paid')}
-                                  </Button>
-                                </div>
+                                {!expense.isSubscription && (
+                                  <div className="flex items-center gap-2">
+                                    <Input
+                                      type="number"
+                                      step="0.01"
+                                      min="0"
+                                      max={expense.remaining}
+                                      value={allocations[expense.id] || ''}
+                                      onChange={(e) => handleAllocationChange(expense.id, e.target.value)}
+                                      className="w-24"
+                                      placeholder="₪0"
+                                    />
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => handlePayFullAmount(expense.id)}
+                                    >
+                                      {t('paid')}
+                                    </Button>
+                                  </div>
+                                )}
                               </div>
                             );
                           })}
@@ -440,14 +481,18 @@ const Payments = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paymentRows.length === 0 ? (
+                {(() => {
+                  const filtered = selectedBuildingFilter === 'all'
+                    ? paymentRows
+                    : paymentRows.filter(r => r.buildingId === selectedBuildingFilter);
+                  return filtered.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={4} className="text-center text-muted-foreground">
                       {t('noPaymentsFound')}
                     </TableCell>
                   </TableRow>
                 ) : (
-                  paymentRows.map((row) => (
+                  filtered.map((row) => (
                     <TableRow key={row.payment.id} className={row.payment.isCanceled ? 'opacity-50' : ''}>
                       <TableCell className="font-medium text-right">
                         {row.buildingName} - {t('apt')} {row.apartmentNumber}
@@ -471,7 +516,8 @@ const Payments = () => {
                       </TableCell>
                     </TableRow>
                   ))
-                )}
+                );
+                })()}
               </TableBody>
             </Table>
           </CardContent>

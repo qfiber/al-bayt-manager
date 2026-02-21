@@ -43,7 +43,7 @@ interface NavLink {
 
 export const AppLayout = ({ children }: AppLayoutProps) => {
   const { user, isAdmin, isModerator, loading, signOut } = useAuth();
-  const { t, language, setLanguage } = useLanguage();
+  const { t, language, setLanguage, dir } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
   const isMobile = useIsMobile();
@@ -149,7 +149,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
                       <ChevronDown className="h-3.5 w-3.5" />
                     </button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="w-48">
+                  <DropdownMenuContent align={dir === 'rtl' ? 'end' : 'start'} className="w-48">
                     {adminDropdownLinks.map((link) => (
                       <DropdownMenuItem
                         key={link.path}
@@ -281,6 +281,21 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
       <main className={`${isMobile ? 'pb-20' : ''}`}>
         {children}
       </main>
+
+      {/* Footer */}
+      {!isMobile && (
+        <footer className="border-t border-border py-4 text-center text-xs text-muted-foreground">
+          {t('footerPoweredBy')}{' '}
+          <a
+            href="https://qfiber.co.il"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-medium text-primary hover:underline"
+          >
+            qFiber LTD
+          </a>
+        </footer>
+      )}
 
       {/* Mobile bottom nav */}
       {isMobile && <MobileBottomNav />}

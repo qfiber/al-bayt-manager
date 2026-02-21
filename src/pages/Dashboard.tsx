@@ -17,6 +17,7 @@ import {
   FileText,
   Users,
   Clock,
+  Info,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -269,7 +270,12 @@ const Dashboard = () => {
         {/* General Information */}
         {generalInfo.length > 0 && (
           <div>
-            <h2 className="text-xl font-bold mb-4">{t('generalInformation')}</h2>
+            <div className="flex items-center gap-2 mb-4">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                <Info className="h-4 w-4 text-primary" />
+              </div>
+              <h2 className="text-xl font-bold">{t('generalInformation')}</h2>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {generalInfo.map((info) => (
                 <GeneralInformationCard
@@ -548,7 +554,12 @@ const Dashboard = () => {
       {/* General Information Section */}
       <div>
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-4">
-          <h2 className="text-xl font-bold">{t('generalInformation')}</h2>
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+              <Info className="h-4 w-4 text-primary" />
+            </div>
+            <h2 className="text-xl font-bold">{t('generalInformation')}</h2>
+          </div>
           {isAdmin && (
             <Button onClick={handleAddInfo} size="sm">
               <Plus className="w-4 h-4 me-2" />
@@ -557,8 +568,8 @@ const Dashboard = () => {
           )}
         </div>
         {generalInfo.length === 0 ? (
-          <Card>
-            <CardContent className="py-8 text-center text-muted-foreground">
+          <Card className="border-dashed">
+            <CardContent className="py-10 text-center text-muted-foreground">
               {t('noInformationAvailable')}
             </CardContent>
           </Card>
