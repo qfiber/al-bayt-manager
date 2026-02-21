@@ -40,7 +40,7 @@ generalInfoRoutes.put('/:id', requireAuth, requireRole('admin'), validate({ para
     const [result] = await db
       .update(generalInformation)
       .set({ ...req.body, updatedAt: new Date() })
-      .where(eq(generalInformation.id, req.params.id))
+      .where(eq(generalInformation.id, req.params.id as string))
       .returning();
     if (!result) throw new AppError(404, 'Not found');
     res.json(result);
@@ -49,7 +49,7 @@ generalInfoRoutes.put('/:id', requireAuth, requireRole('admin'), validate({ para
 
 generalInfoRoutes.delete('/:id', requireAuth, requireRole('admin'), validate({ params: idParams }), auditLog('delete', 'general_information'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const [result] = await db.delete(generalInformation).where(eq(generalInformation.id, req.params.id)).returning();
+    const [result] = await db.delete(generalInformation).where(eq(generalInformation.id, req.params.id as string)).returning();
     if (!result) throw new AppError(404, 'Not found');
     res.json(result);
   } catch (err) { next(err); }

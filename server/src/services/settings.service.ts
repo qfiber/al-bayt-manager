@@ -22,21 +22,35 @@ function maskSensitiveFields(settings: any) {
 }
 
 export async function updateSettings(data: Partial<{
-  monthlyFee: string;
   systemLanguage: string;
-  logoUrl: string;
+  logoUrl: string | null;
   smtpEnabled: boolean;
-  smtpFromEmail: string;
-  smtpFromName: string;
-  resendApiKey: string;
+  smtpFromEmail: string | null;
+  smtpFromName: string | null;
+  resendApiKey: string | null;
   turnstileEnabled: boolean;
-  turnstileSiteKey: string;
+  turnstileSiteKey: string | null;
 }>) {
-  const existing = await getSettings();
+  const existing = await getRawSettings();
+  // Skip updating resendApiKey if it looks like a masked value
+  const updateData = { ...data };
+  if (updateData.resendApiKey && /^\*+/.test(updateData.resendApiKey)) {
+    delete updateData.resendApiKey;
+  }
   const [result] = await db
     .update(settings)
-    .set({ ...data, updatedAt: new Date() })
+    .set({ ...updateData, updatedAt: new Date() })
     .where(eq(settings.id, existing.id))
     .returning();
+  return maskSensitiveFields(result);
+}
+
+/** Internal: get raw settings without masking (for ID lookups, email service, etc.) */
+async function getRawSettings() {
+  const [result] = await db.select().from(settings).limit(1);
+  if (!result) {
+    const [created] = await db.insert(settings).values({}).returning();
+    return created;
+  }
   return result;
 }

@@ -22,6 +22,7 @@ export async function createBuilding(data: {
   address?: string;
   numberOfFloors?: number;
   undergroundFloors?: number;
+  monthlyFee?: string;
   logoUrl?: string;
 }) {
   const [building] = await db.insert(buildings).values(data).returning();
@@ -33,6 +34,7 @@ export async function updateBuilding(id: string, data: Partial<{
   address: string;
   numberOfFloors: number;
   undergroundFloors: number;
+  monthlyFee: string;
   logoUrl: string;
 }>) {
   const [building] = await db

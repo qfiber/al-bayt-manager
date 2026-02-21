@@ -40,10 +40,7 @@ interface Building {
   name: string;
   numberOfFloors: number | null;
   undergroundFloors: number | null;
-}
-
-interface Settings {
-  monthlyFee: string;
+  monthlyFee: string | null;
 }
 
 interface User {
@@ -58,7 +55,6 @@ const Apartments = () => {
   const { toast } = useToast();
   const [apartmentItems, setApartmentItems] = useState<ApartmentListItem[]>([]);
   const [buildings, setBuildings] = useState<Building[]>([]);
-  const [settings, setSettings] = useState<Settings | null>(null);
   const [profiles, setProfiles] = useState<User[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingApartment, setEditingApartment] = useState<Apartment | null>(null);
@@ -86,21 +82,11 @@ const Apartments = () => {
 
   useEffect(() => {
     if (user && isAdmin) {
-      fetchSettings();
       fetchBuildings();
       fetchApartments();
       fetchProfiles();
     }
   }, [user, isAdmin]);
-
-  const fetchSettings = async () => {
-    try {
-      const data = await api.get<Settings>('/settings');
-      setSettings(data);
-    } catch (err: any) {
-      toast({ title: 'Error', description: err.message, variant: 'destructive' });
-    }
-  };
 
   const calculateProratedAmount = (occupancyStart: string, monthlyFee: number): number => {
     if (!occupancyStart || !monthlyFee) return monthlyFee;
@@ -136,14 +122,15 @@ const Apartments = () => {
   };
 
   useEffect(() => {
-    const monthlyFee = parseFloat(settings?.monthlyFee || '0');
-    if (formData.occupancy_start && monthlyFee) {
-      const calculatedAmount = calculateProratedAmount(formData.occupancy_start, monthlyFee);
+    const selectedBuilding = buildings.find(b => b.id === formData.building_id);
+    const buildingFee = parseFloat(selectedBuilding?.monthlyFee || '0');
+    if (formData.occupancy_start && buildingFee) {
+      const calculatedAmount = calculateProratedAmount(formData.occupancy_start, buildingFee);
       setFormData(prev => ({ ...prev, subscription_amount: calculatedAmount.toString() }));
-    } else if (monthlyFee && !formData.occupancy_start) {
-      setFormData(prev => ({ ...prev, subscription_amount: monthlyFee.toString() }));
+    } else if (buildingFee && !formData.occupancy_start) {
+      setFormData(prev => ({ ...prev, subscription_amount: buildingFee.toString() }));
     }
-  }, [formData.occupancy_start, settings?.monthlyFee]);
+  }, [formData.occupancy_start, formData.building_id, buildings]);
 
   const fetchBuildings = async () => {
     try {
@@ -538,7 +525,8 @@ const Apartments = () => {
       .map(a => a.apartment);
   };
 
-  const monthlyFee = parseFloat(settings?.monthlyFee || '0');
+  const selectedBuildingForForm = buildings.find(b => b.id === formData.building_id);
+  const monthlyFee = parseFloat(selectedBuildingForForm?.monthlyFee || '0');
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/10">

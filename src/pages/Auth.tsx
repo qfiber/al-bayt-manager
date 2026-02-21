@@ -32,18 +32,18 @@ const Auth = () => {
     const fetchBranding = async () => {
       try {
         const data = await api.get<{
-          logo_url?: string;
-          turnstile_enabled?: boolean;
-          turnstile_site_key?: string;
+          logoUrl?: string;
+          turnstileEnabled?: boolean;
+          turnstileSiteKey?: string;
         }>('/branding');
 
-        if (data?.logo_url) {
-          setLogoUrl(data.logo_url);
+        if (data?.logoUrl) {
+          setLogoUrl(data.logoUrl);
         }
 
-        if (data?.turnstile_enabled && data?.turnstile_site_key) {
+        if (data?.turnstileEnabled && data?.turnstileSiteKey) {
           setTurnstileEnabled(true);
-          setTurnstileSiteKey(data.turnstile_site_key);
+          setTurnstileSiteKey(data.turnstileSiteKey);
         }
       } catch (error) {
         console.log('Branding fetch error:', error);

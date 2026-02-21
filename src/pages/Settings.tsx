@@ -10,11 +10,10 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { Switch } from '@/components/ui/switch';
-import { Settings as SettingsIcon, Save, DollarSign, Globe, Upload, Shield, Mail } from 'lucide-react';
+import { Settings as SettingsIcon, Save, Globe, Upload, Shield, Mail } from 'lucide-react';
 
 interface SettingsData {
   id: string;
-  monthlyFee: number;
   systemLanguage: string;
   logoUrl: string | null;
   turnstileEnabled: boolean;
@@ -37,7 +36,6 @@ const Settings = () => {
   const { toast } = useToast();
 
   const [settings, setSettings] = useState<SettingsData | null>(null);
-  const [monthlyFee, setMonthlyFee] = useState('');
   const [systemLanguage, setSystemLanguage] = useState('ar');
   const [isSaving, setIsSaving] = useState(false);
   const [logoFile, setLogoFile] = useState<LogoFile>({ file: null, preview: null });
@@ -93,7 +91,6 @@ const Settings = () => {
 
       if (data) {
         setSettings(data);
-        setMonthlyFee(data.monthlyFee.toString());
         setSystemLanguage(data.systemLanguage);
         setTurnstileEnabled(data.turnstileEnabled || false);
         setTurnstileSiteKey(data.turnstileSiteKey || '');
@@ -141,6 +138,11 @@ const Settings = () => {
       return;
     }
 
+    if (smtpEnabled && smtpFromEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(smtpFromEmail)) {
+      toast({ title: 'Error', description: t('invalidEmail'), variant: 'destructive' });
+      return;
+    }
+
     setIsSaving(true);
 
     try {
@@ -149,9 +151,8 @@ const Settings = () => {
         logoUrl = await uploadLogo();
       }
 
-      // Update settings (monthly fee, language, turnstile, and email)
+      // Update settings (language, turnstile, and email)
       await api.put('/settings', {
-        monthlyFee: parseFloat(monthlyFee),
         systemLanguage,
         turnstileEnabled,
         turnstileSiteKey: turnstileSiteKey || null,
@@ -161,10 +162,12 @@ const Settings = () => {
         resendApiKey: resendApiKey || null,
       });
 
-      // Update branding if logo changed
-      if (logoUrl) {
-        await api.put('/branding', { logoUrl });
-      }
+      // Update branding (logo + turnstile config)
+      const brandingUpdate: Record<string, any> = {};
+      if (logoUrl) brandingUpdate.logoUrl = logoUrl;
+      brandingUpdate.turnstileEnabled = turnstileEnabled;
+      brandingUpdate.turnstileSiteKey = turnstileSiteKey || null;
+      await api.put('/branding', brandingUpdate);
 
       toast({ title: 'Success', description: 'Settings updated successfully' });
 
@@ -199,43 +202,6 @@ const Settings = () => {
         </div>
 
         <div className="space-y-6">
-          {/* Financial Settings */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <DollarSign className="w-5 h-5" />
-                {t('financialSettings')}
-              </CardTitle>
-              <CardDescription>
-                {t('financialSettingsDesc')}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="monthly_fee">{t('defaultMonthlyFee')}</Label>
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                      ₪
-                    </span>
-                    <Input
-                      id="monthly_fee"
-                      type="number"
-                      step="0.01"
-                      value={monthlyFee}
-                      onChange={(e) => setMonthlyFee(e.target.value)}
-                      className="pl-7"
-                      placeholder="0.00"
-                    />
-                  </div>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  {t('defaultMonthlyFeeDesc')}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
           {/* Language Settings */}
           <Card>
             <CardHeader>
@@ -484,8 +450,14 @@ const Settings = () => {
               variant="outline"
               onClick={() => {
                 if (settings) {
-                  setMonthlyFee(settings.monthlyFee.toString());
                   setSystemLanguage(settings.systemLanguage);
+                  setTurnstileEnabled(settings.turnstileEnabled || false);
+                  setTurnstileSiteKey(settings.turnstileSiteKey || '');
+                  setSmtpEnabled(settings.smtpEnabled || false);
+                  setSmtpFromEmail(settings.smtpFromEmail || '');
+                  setSmtpFromName(settings.smtpFromName || '');
+                  setResendApiKey(settings.resendApiKey || '');
+                  setLogoFile({ file: null, preview: null });
                 }
               }}
               disabled={isSaving}

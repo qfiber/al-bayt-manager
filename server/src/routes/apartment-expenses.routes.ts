@@ -15,7 +15,7 @@ const idParams = z.object({ id: z.string().uuid() });
 
 apartmentExpenseRoutes.get('/:apartmentId', requireAuth, requireRole('admin', 'moderator'), validate({ params: apartmentIdParams }), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const result = await expenseService.getApartmentExpenses(req.params.apartmentId);
+    const result = await expenseService.getApartmentExpenses(req.params.apartmentId as string);
     res.json(result);
   } catch (err) { next(err); }
 });
@@ -24,14 +24,14 @@ apartmentExpenseRoutes.post('/:id/cancel', requireAuth, requireRole('admin', 'mo
   try {
     // Moderators: verify the apartment_expense belongs to their assigned buildings
     if (req.allowedBuildingIds) {
-      const ae = await expenseService.getApartmentExpenseById(req.params.id);
+      const ae = await expenseService.getApartmentExpenseById(req.params.id as string);
       const apt = await apartmentService.getApartment(ae.apartmentId);
       if (!req.allowedBuildingIds.includes(apt.buildingId)) {
         res.status(403).json({ error: 'Not authorized for this apartment\'s building' });
         return;
       }
     }
-    const result = await expenseService.cancelApartmentExpense(req.params.id, req.user!.userId);
+    const result = await expenseService.cancelApartmentExpense(req.params.id as string, req.user!.userId);
     res.json(result);
   } catch (err) { next(err); }
 });
@@ -40,14 +40,14 @@ apartmentExpenseRoutes.post('/:id/waive', requireAuth, requireRole('admin', 'mod
   try {
     // Moderators: verify the apartment_expense belongs to their assigned buildings
     if (req.allowedBuildingIds) {
-      const ae = await expenseService.getApartmentExpenseById(req.params.id);
+      const ae = await expenseService.getApartmentExpenseById(req.params.id as string);
       const apt = await apartmentService.getApartment(ae.apartmentId);
       if (!req.allowedBuildingIds.includes(apt.buildingId)) {
         res.status(403).json({ error: 'Not authorized for this apartment\'s building' });
         return;
       }
     }
-    const result = await expenseService.waiveApartmentExpense(req.params.id, req.user!.userId);
+    const result = await expenseService.waiveApartmentExpense(req.params.id as string, req.user!.userId);
     res.json(result);
   } catch (err) { next(err); }
 });

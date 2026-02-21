@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
-import { FileText, DollarSign, TrendingUp } from 'lucide-react';
+import { FileText, DollarSign, TrendingUp, RotateCcw } from 'lucide-react';
 
 interface BuildingStats {
   buildingId: string;
@@ -36,6 +36,8 @@ const Reports = () => {
   const [expensesByCategory, setExpensesByCategory] = useState<{ category: string; amount: number }[]>([]);
   const [buildingStats, setBuildingStats] = useState<BuildingStats[]>([]);
   const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([]);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   useEffect(() => {
     if (!loading && !user) {
@@ -47,15 +49,23 @@ const Reports = () => {
     if (user) {
       fetchReportsData();
     }
-  }, [user]);
+  }, [user, startDate, endDate]);
+
+  const buildQuery = (base: string) => {
+    const params = new URLSearchParams();
+    if (startDate) params.set('startDate', startDate);
+    if (endDate) params.set('endDate', endDate);
+    const qs = params.toString();
+    return qs ? `${base}?${qs}` : base;
+  };
 
   const fetchReportsData = async () => {
     try {
       const [summary, buildings, trends, categories] = await Promise.all([
-        api.get('/reports/summary'),
+        api.get(buildQuery('/reports/summary')),
         api.get('/reports/buildings'),
         api.get('/reports/monthly-trends'),
-        api.get('/reports/expenses-by-category'),
+        api.get(buildQuery('/reports/expenses-by-category')),
       ]);
 
       setTotalRevenue(parseFloat(summary.payments.totalPayments));
@@ -86,6 +96,11 @@ const Reports = () => {
     }
   };
 
+  const handleResetFilters = () => {
+    setStartDate('');
+    setEndDate('');
+  };
+
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center">{t('loading')}</div>;
   }
@@ -103,6 +118,31 @@ const Reports = () => {
             <h1 className="text-3xl font-bold">{t('reports')}</h1>
           </div>
         </div>
+
+        {/* Date Range Filter */}
+        <Card className="mb-8">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium">{t('dateRange')}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col sm:flex-row items-end gap-4">
+              <div className="flex-1 w-full">
+                <label className="text-sm text-muted-foreground mb-1 block">{t('startDate')}</label>
+                <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+              </div>
+              <div className="flex-1 w-full">
+                <label className="text-sm text-muted-foreground mb-1 block">{t('endDate')}</label>
+                <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+              </div>
+              {(startDate || endDate) && (
+                <Button variant="outline" size="sm" onClick={handleResetFilters} className="gap-1">
+                  <RotateCcw className="h-4 w-4" />
+                  {t('resetFilters')}
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -160,15 +200,15 @@ const Reports = () => {
                       <span className="font-medium">{building.occupiedApartments}/{building.totalApartments}</span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-sm text-muted-foreground">{t('buildingIncome')}</span>
+                      <span className="text-sm text-muted-foreground">{t('totalOverpayment')}</span>
                       <span className="font-medium text-green-600">₪{credit.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-sm text-muted-foreground">{t('buildingExpenses')}</span>
+                      <span className="text-sm text-muted-foreground">{t('outstandingDebt')}</span>
                       <span className="font-medium text-red-600">₪{debt.toFixed(2)}</span>
                     </div>
                     <div className="pt-2 border-t flex justify-between items-center">
-                      <span className="text-sm font-semibold">{t('buildingNetIncome')}</span>
+                      <span className="text-sm font-semibold">{t('netBalance')}</span>
                       <span className={`font-bold ${credit - debt >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                         ₪{(credit - debt).toFixed(2)}
                       </span>

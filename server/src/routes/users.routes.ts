@@ -50,7 +50,7 @@ userRoutes.get('/2fa-status', requireAuth, requireRole('admin'), async (_req: Re
 
 userRoutes.get('/:id', requireAuth, requireRole('admin'), validate({ params: idParams }), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const result = await userService.getUser(req.params.id);
+    const result = await userService.getUser(req.params.id as string);
     res.json(result);
   } catch (err) { next(err); }
 });
@@ -65,53 +65,53 @@ userRoutes.post('/', requireAuth, requireRole('admin'), validate(createUserSchem
 
 userRoutes.put('/:id', requireAuth, requireRole('admin'), validate({ params: idParams, body: updateUserSchema }), auditLog('update', 'users'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const result = await userService.updateUser(req.params.id, req.body);
+    const result = await userService.updateUser(req.params.id as string, req.body);
     res.json(result);
   } catch (err) { next(err); }
 });
 
 userRoutes.delete('/:id', requireAuth, requireRole('admin'), validate({ params: idParams }), auditLog('delete', 'users'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    if (req.params.id === req.user!.userId) {
+    if (req.params.id as string === req.user!.userId) {
       res.status(400).json({ error: 'Cannot delete your own account' });
       return;
     }
-    const result = await authService.adminDeleteUser(req.params.id);
+    const result = await authService.adminDeleteUser(req.params.id as string);
     res.json(result);
   } catch (err) { next(err); }
 });
 
 userRoutes.post('/:id/change-password', requireAuth, requireRole('admin'), validate({ params: idParams, body: changePasswordSchema }), auditLog('password_change', 'users'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    await authService.adminChangePassword(req.params.id, req.body.newPassword);
+    await authService.adminChangePassword(req.params.id as string, req.body.newPassword);
     res.json({ success: true });
   } catch (err) { next(err); }
 });
 
 userRoutes.post('/:id/disable-2fa', requireAuth, requireRole('admin'), validate({ params: idParams }), auditLog('update', 'users'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    await authService.adminDisable2FA(req.params.id);
+    await authService.adminDisable2FA(req.params.id as string);
     res.json({ success: true });
   } catch (err) { next(err); }
 });
 
 userRoutes.put('/:id/owner-assignments', requireAuth, requireRole('admin'), validate({ params: idParams, body: assignmentSchema }), auditLog('update', 'apartments'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const result = await userService.updateOwnerAssignments(req.params.id, req.body.ids);
+    const result = await userService.updateOwnerAssignments(req.params.id as string, req.body.ids);
     res.json(result);
   } catch (err) { next(err); }
 });
 
 userRoutes.put('/:id/beneficiary-assignments', requireAuth, requireRole('admin'), validate({ params: idParams, body: assignmentSchema }), auditLog('update', 'apartments'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const result = await userService.updateBeneficiaryAssignments(req.params.id, req.body.ids);
+    const result = await userService.updateBeneficiaryAssignments(req.params.id as string, req.body.ids);
     res.json(result);
   } catch (err) { next(err); }
 });
 
 userRoutes.put('/:id/building-assignments', requireAuth, requireRole('admin'), validate({ params: idParams, body: assignmentSchema }), auditLog('role_change', 'moderator_buildings'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const result = await userService.updateBuildingAssignments(req.params.id, req.body.ids);
+    const result = await userService.updateBuildingAssignments(req.params.id as string, req.body.ids);
     res.json(result);
   } catch (err) { next(err); }
 });

@@ -57,7 +57,7 @@ emailRoutes.get('/templates', requireAuth, requireRole('admin'), async (_req: Re
 
 emailRoutes.get('/templates/:id', requireAuth, requireRole('admin'), validate({ params: idParams }), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const result = await emailService.getTemplate(req.params.id);
+    const result = await emailService.getTemplate(req.params.id as string);
     res.json(result);
   } catch (err) { next(err); }
 });
@@ -71,21 +71,21 @@ emailRoutes.post('/templates', requireAuth, requireRole('admin'), validate(creat
 
 emailRoutes.put('/templates/:id', requireAuth, requireRole('admin'), validate({ params: idParams, body: updateTemplateSchema }), auditLog('update', 'email_templates'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const result = await emailService.updateTemplate(req.params.id, req.body);
+    const result = await emailService.updateTemplate(req.params.id as string, req.body);
     res.json(result);
   } catch (err) { next(err); }
 });
 
 emailRoutes.delete('/templates/:id', requireAuth, requireRole('admin'), validate({ params: idParams }), auditLog('delete', 'email_templates'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const result = await emailService.deleteTemplate(req.params.id);
+    const result = await emailService.deleteTemplate(req.params.id as string);
     res.json(result);
   } catch (err) { next(err); }
 });
 
 emailRoutes.put('/templates/:id/translations', requireAuth, requireRole('admin'), validate({ params: idParams, body: translationsSchema }), auditLog('update', 'email_template_translations'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const result = await emailService.updateTranslations(req.params.id, req.body.translations);
+    const result = await emailService.updateTranslations(req.params.id as string, req.body.translations);
     res.json(result);
   } catch (err) { next(err); }
 });

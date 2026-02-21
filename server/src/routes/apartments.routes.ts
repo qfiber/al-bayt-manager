@@ -48,7 +48,7 @@ apartmentRoutes.get('/', requireAuth, scopeToModeratorBuildings, async (req: Req
 
 apartmentRoutes.get('/:id', requireAuth, requireRole('admin', 'moderator'), validate({ params: idParams }), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const result = await apartmentService.getApartment(req.params.id);
+    const result = await apartmentService.getApartment(req.params.id as string);
     res.json(result);
   } catch (err) { next(err); }
 });
@@ -72,28 +72,28 @@ apartmentRoutes.put('/:id', requireAuth, requireRole('admin'), validate({ params
     if (data.occupancyStart !== undefined) {
       data.occupancyStart = data.occupancyStart ? new Date(data.occupancyStart) : null;
     }
-    const result = await apartmentService.updateApartment(req.params.id, data);
+    const result = await apartmentService.updateApartment(req.params.id as string, data);
     res.json(result);
   } catch (err) { next(err); }
 });
 
 apartmentRoutes.delete('/:id', requireAuth, requireRole('admin'), validate({ params: idParams }), auditLog('delete', 'apartments'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const result = await apartmentService.deleteApartment(req.params.id);
+    const result = await apartmentService.deleteApartment(req.params.id as string);
     res.json(result);
   } catch (err) { next(err); }
 });
 
 apartmentRoutes.post('/:id/terminate', requireAuth, requireRole('admin'), validate({ params: idParams }), auditLog('update', 'apartments'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const result = await apartmentService.terminateOccupancy(req.params.id, req.user!.userId);
+    const result = await apartmentService.terminateOccupancy(req.params.id as string, req.user!.userId);
     res.json(result);
   } catch (err) { next(err); }
 });
 
 apartmentRoutes.get('/:id/debt-details', requireAuth, requireRole('admin', 'moderator'), validate({ params: idParams }), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const result = await apartmentService.getDebtDetails(req.params.id);
+    const result = await apartmentService.getDebtDetails(req.params.id as string);
     res.json(result);
   } catch (err) { next(err); }
 });
@@ -106,7 +106,7 @@ const ledgerQuerySchema = z.object({
 apartmentRoutes.get('/:id/ledger', requireAuth, requireRole('admin', 'moderator'), validate({ params: idParams }), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const query = ledgerQuerySchema.parse(req.query);
-    const result = await apartmentService.getApartmentLedger(req.params.id, query.limit, query.offset);
+    const result = await apartmentService.getApartmentLedger(req.params.id as string, query.limit, query.offset);
     res.json(result);
   } catch (err) { next(err); }
 });

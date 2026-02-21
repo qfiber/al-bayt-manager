@@ -46,7 +46,7 @@ paymentRoutes.get('/', requireAuth, requireRole('admin', 'moderator'), scopeToMo
 
 paymentRoutes.get('/:id', requireAuth, requireRole('admin', 'moderator'), validate({ params: idParams }), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const result = await paymentService.getPayment(req.params.id);
+    const result = await paymentService.getPayment(req.params.id as string);
     res.json(result);
   } catch (err) { next(err); }
 });
@@ -68,7 +68,7 @@ paymentRoutes.post('/', requireAuth, requireRole('admin', 'moderator'), scopeToM
 
 paymentRoutes.put('/:id', requireAuth, requireRole('admin', 'moderator'), validate({ params: idParams, body: updatePaymentSchema }), auditLog('update', 'payments'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const result = await paymentService.updatePayment(req.params.id, req.body, req.user!.userId);
+    const result = await paymentService.updatePayment(req.params.id as string, req.body, req.user!.userId);
     res.json(result);
   } catch (err) { next(err); }
 });
@@ -77,14 +77,14 @@ paymentRoutes.post('/:id/cancel', requireAuth, requireRole('admin', 'moderator')
   try {
     // Moderators can only cancel payments for apartments in their assigned buildings
     if (req.allowedBuildingIds) {
-      const payment = await paymentService.getPayment(req.params.id);
+      const payment = await paymentService.getPayment(req.params.id as string);
       const apt = await apartmentService.getApartment(payment.apartmentId);
       if (!req.allowedBuildingIds.includes(apt.buildingId)) {
         res.status(403).json({ error: 'Not authorized for this apartment\'s building' });
         return;
       }
     }
-    const result = await paymentService.cancelPayment(req.params.id, req.user!.userId);
+    const result = await paymentService.cancelPayment(req.params.id as string, req.user!.userId);
     res.json(result);
   } catch (err) { next(err); }
 });

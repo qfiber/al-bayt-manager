@@ -28,14 +28,14 @@ apiKeyRoutes.post('/', requireAuth, requireRole('admin'), validate(createSchema)
 
 apiKeyRoutes.put('/:id', requireAuth, requireRole('admin'), validate({ params: idParams, body: updateSchema }), auditLog('update', 'api_keys'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const result = await apiKeyService.updateApiKey(req.params.id, req.body, req.user!.userId);
+    const result = await apiKeyService.updateApiKey(req.params.id as string, req.body, req.user!.userId);
     res.json(result);
   } catch (err) { next(err); }
 });
 
 apiKeyRoutes.delete('/:id', requireAuth, requireRole('admin'), validate({ params: idParams }), auditLog('api_key_deleted', 'api_keys'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const result = await apiKeyService.deleteApiKey(req.params.id, req.user!.userId);
+    const result = await apiKeyService.deleteApiKey(req.params.id as string, req.user!.userId);
     res.json(result);
   } catch (err) { next(err); }
 });

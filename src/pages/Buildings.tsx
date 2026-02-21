@@ -18,6 +18,7 @@ interface BuildingData {
   address: string;
   numberOfFloors: number | null;
   undergroundFloors: number | null;
+  monthlyFee: string | null;
   logoUrl: string | null;
   createdAt: string | null;
 }
@@ -30,7 +31,7 @@ const Buildings = () => {
   const [buildings, setBuildings] = useState<BuildingData[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingBuilding, setEditingBuilding] = useState<BuildingData | null>(null);
-  const [formData, setFormData] = useState({ name: '', address: '', numberOfFloors: '', undergroundFloors: '' });
+  const [formData, setFormData] = useState({ name: '', address: '', numberOfFloors: '', undergroundFloors: '', monthlyFee: '' });
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
 
@@ -85,6 +86,7 @@ const Buildings = () => {
         address: formData.address,
         numberOfFloors: formData.numberOfFloors ? parseInt(formData.numberOfFloors) : undefined,
         undergroundFloors: formData.undergroundFloors ? parseInt(formData.undergroundFloors) : 0,
+        monthlyFee: formData.monthlyFee || '0',
       };
       if (logoUrl) payload.logoUrl = logoUrl;
 
@@ -122,6 +124,7 @@ const Buildings = () => {
       address: building.address,
       numberOfFloors: building.numberOfFloors?.toString() || '',
       undergroundFloors: building.undergroundFloors?.toString() || '',
+      monthlyFee: building.monthlyFee || '',
     });
     if (building.logoUrl) {
       setLogoPreview(building.logoUrl);
@@ -130,7 +133,7 @@ const Buildings = () => {
   };
 
   const resetForm = () => {
-    setFormData({ name: '', address: '', numberOfFloors: '', undergroundFloors: '' });
+    setFormData({ name: '', address: '', numberOfFloors: '', undergroundFloors: '', monthlyFee: '' });
     setLogoFile(null);
     setLogoPreview(null);
     setEditingBuilding(null);
@@ -206,6 +209,22 @@ const Buildings = () => {
                     <p className="text-xs text-muted-foreground mt-1">{t('undergroundFloorsHelp')}</p>
                   </div>
                   <div>
+                    <Label htmlFor="monthlyFee">{t('buildingMonthlyFee')}</Label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₪</span>
+                      <Input
+                        id="monthlyFee"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={formData.monthlyFee}
+                        onChange={(e) => setFormData({ ...formData, monthlyFee: e.target.value })}
+                        className="pl-7"
+                        placeholder="0.00"
+                      />
+                    </div>
+                  </div>
+                  <div>
                     <Label htmlFor="logo">{t('logoOptional')}</Label>
                     <Input
                       id="logo"
@@ -244,6 +263,7 @@ const Buildings = () => {
                   <TableHead className="text-right">{t('nameLabel')}</TableHead>
                   <TableHead className="text-right">{t('address')}</TableHead>
                   <TableHead className="text-right">{t('numberOfFloors')}</TableHead>
+                  <TableHead className="text-right">{t('buildingMonthlyFee')}</TableHead>
                   <TableHead className="text-right">{t('logo')}</TableHead>
                   <TableHead className="text-right">{t('actions')}</TableHead>
                 </TableRow>
@@ -251,7 +271,7 @@ const Buildings = () => {
               <TableBody>
                 {buildings.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground">
+                    <TableCell colSpan={6} className="text-center text-muted-foreground">
                       {t('noBuildingsFound')}
                     </TableCell>
                   </TableRow>
@@ -262,6 +282,9 @@ const Buildings = () => {
                       <TableCell className="text-right">{building.address}</TableCell>
                       <TableCell className="text-right">
                         {building.numberOfFloors || '-'}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        ₪{parseFloat(building.monthlyFee || '0').toFixed(2)}
                       </TableCell>
                       <TableCell className="text-right">
                         {building.logoUrl ? (

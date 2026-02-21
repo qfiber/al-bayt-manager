@@ -51,7 +51,7 @@ expenseRoutes.get('/', requireAuth, requireRole('admin', 'moderator'), scopeToMo
 
 expenseRoutes.get('/:id', requireAuth, requireRole('admin', 'moderator'), validate({ params: idParams }), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const result = await expenseService.getExpense(req.params.id);
+    const result = await expenseService.getExpense(req.params.id as string);
     res.json(result);
   } catch (err) { next(err); }
 });
@@ -70,14 +70,14 @@ expenseRoutes.post('/', requireAuth, requireRole('admin', 'moderator'), scopeToM
 
 expenseRoutes.put('/:id', requireAuth, requireRole('admin', 'moderator'), validate({ params: idParams, body: updateExpenseSchema }), auditLog('update', 'expenses'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const result = await expenseService.updateExpense(req.params.id, req.body);
+    const result = await expenseService.updateExpense(req.params.id as string, req.body);
     res.json(result);
   } catch (err) { next(err); }
 });
 
 expenseRoutes.delete('/:id', requireAuth, requireRole('admin'), validate({ params: idParams }), auditLog('delete', 'expenses'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const result = await expenseService.deleteExpense(req.params.id, req.user!.userId);
+    const result = await expenseService.deleteExpense(req.params.id as string, req.user!.userId);
     res.json(result);
   } catch (err) { next(err); }
 });
