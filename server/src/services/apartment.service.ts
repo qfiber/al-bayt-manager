@@ -210,6 +210,46 @@ export async function getApartmentLedger(apartmentId: string, limit: number = 50
 }
 
 /**
+ * Write off the remaining balance of an apartment (creates a waiver credit/debit
+ * to bring the balance to zero). Works for both debt (negative balance → credit waiver)
+ * and overpayment (positive balance → debit adjustment).
+ */
+export async function writeOffBalance(id: string, userId: string) {
+  return await db.transaction(async (tx) => {
+    const [apt] = await tx.select().from(apartments).where(eq(apartments.id, id)).limit(1);
+    if (!apt) throw new AppError(404, 'Apartment not found');
+
+    const balance = await ledgerService.getBalance(id, tx);
+    if (balance === 0) throw new AppError(400, 'Balance is already zero');
+
+    if (balance < 0) {
+      // Debt: create a credit waiver to zero it out
+      await ledgerService.recordWaiver(
+        id,
+        Math.abs(balance),
+        'Balance write-off (debt cleared)',
+        userId,
+        tx,
+      );
+    } else {
+      // Overpayment: create a debit adjustment to zero it out
+      await tx.insert(apartmentLedger).values({
+        apartmentId: id,
+        entryType: 'debit',
+        amount: balance.toFixed(2),
+        referenceType: 'waiver',
+        referenceId: null,
+        description: 'Balance write-off (overpayment cleared)',
+        createdBy: userId,
+      });
+    }
+
+    await ledgerService.refreshCachedBalance(id, tx);
+    return { success: true, previousBalance: balance };
+  });
+}
+
+/**
  * Get apartments for a specific user (via user_apartments).
  */
 export async function getMyApartments(userId: string) {

@@ -91,6 +91,13 @@ apartmentRoutes.post('/:id/terminate', requireAuth, requireRole('admin'), valida
   } catch (err) { next(err); }
 });
 
+apartmentRoutes.post('/:id/write-off-balance', requireAuth, requireRole('admin'), validate({ params: idParams }), auditLog('update', 'apartments'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const result = await apartmentService.writeOffBalance(req.params.id as string, req.user!.userId);
+    res.json(result);
+  } catch (err) { next(err); }
+});
+
 apartmentRoutes.get('/:id/debt-details', requireAuth, requireRole('admin', 'moderator'), validate({ params: idParams }), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await apartmentService.getDebtDetails(req.params.id as string);

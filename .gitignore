@@ -23,8 +23,15 @@ dist-ssr
 *.sln
 *.sw?
 
+# Environment files
+.env
+.env.*
+!.env.example
+
 # Server
 server/.env
+server/.env.*
+!server/.env.example
 server/node_modules
 server/dist
 server/uploads

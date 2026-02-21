@@ -14,7 +14,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { useToast } from '@/hooks/use-toast';
-import { Home, Plus, Pencil, Trash2, Eye, XCircle, Calendar as CalendarIcon } from 'lucide-react';
+import { Home, Plus, Pencil, Trash2, Eye, XCircle, Calendar as CalendarIcon, Eraser } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 
@@ -319,6 +319,9 @@ const Apartments = () => {
     return Math.max(0, -balance);
   };
 
+  const [writeOffDialogOpen, setWriteOffDialogOpen] = useState(false);
+  const [apartmentToWriteOff, setApartmentToWriteOff] = useState<Apartment | null>(null);
+
   const [debtDialogOpen, setDebtDialogOpen] = useState(false);
   const [selectedApartment, setSelectedApartment] = useState<Apartment | null>(null);
   const [debtDetails, setDebtDetails] = useState<any[]>([]);
@@ -484,6 +487,25 @@ const Apartments = () => {
           await showDebtDetails(updatedItem.apartment);
         }
       }
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+    }
+  };
+
+  const openWriteOffDialog = (apartment: Apartment) => {
+    setApartmentToWriteOff(apartment);
+    setWriteOffDialogOpen(true);
+  };
+
+  const handleWriteOffBalance = async () => {
+    if (!apartmentToWriteOff) return;
+
+    try {
+      await api.post(`/apartments/${apartmentToWriteOff.id}/write-off-balance`);
+      toast({ title: t('success'), description: t('balanceWrittenOff') });
+      fetchApartments();
+      setWriteOffDialogOpen(false);
+      setApartmentToWriteOff(null);
     } catch (err: any) {
       toast({ title: 'Error', description: err.message, variant: 'destructive' });
     }
@@ -749,6 +771,17 @@ const Apartments = () => {
                                         <XCircle className="w-4 h-4" />
                                       </Button>
                                     )}
+                                    {parseFloat(apartment.cachedBalance) !== 0 && isAdmin && (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => openWriteOffDialog(apartment)}
+                                        title={t('writeOffBalance')}
+                                        className="text-purple-600 hover:text-purple-700"
+                                      >
+                                        <Eraser className="w-4 h-4" />
+                                      </Button>
+                                    )}
                                     <Button size="sm" variant="outline" onClick={() => handleEdit(apartment)}>
                                       <Pencil className="w-4 h-4" />
                                     </Button>
@@ -969,6 +1002,30 @@ const Apartments = () => {
                 {t('cancel')}
               </AlertDialogCancel>
               <AlertDialogAction onClick={handleTerminateOccupancy}>
+                {t('confirm')}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <AlertDialog open={writeOffDialogOpen} onOpenChange={setWriteOffDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{t('writeOffBalance')}</AlertDialogTitle>
+              <AlertDialogDescription>
+                {t('writeOffBalanceConfirm')
+                  .replace('{apartment}', apartmentToWriteOff?.apartmentNumber || '')
+                  .replace('{balance}', Math.abs(parseFloat(apartmentToWriteOff?.cachedBalance || '0')).toFixed(2))}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => {
+                setWriteOffDialogOpen(false);
+                setApartmentToWriteOff(null);
+              }}>
+                {t('cancel')}
+              </AlertDialogCancel>
+              <AlertDialogAction onClick={handleWriteOffBalance}>
                 {t('confirm')}
               </AlertDialogAction>
             </AlertDialogFooter>
