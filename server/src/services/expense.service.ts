@@ -3,7 +3,6 @@ import { expenses, apartmentExpenses, apartments, buildings } from '../db/schema
 import { eq, and, inArray, sql, gte, isNull } from 'drizzle-orm';
 import { AppError } from '../middleware/error-handler.js';
 import * as ledgerService from './ledger.service.js';
-import { customRound } from '../utils/rounding.js';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 type TxOrDb = NodePgDatabase<any> | typeof db;
@@ -115,17 +114,15 @@ export async function createExpense(data: {
       }
 
       const count = occupiedApartments.length;
-      const shareRaw = data.amount / count;
-      const share = customRound(shareRaw * 100) / 100; // Round to 2 decimal places using custom rounding
-
-      // Calculate remainder so the sum of shares exactly equals the expense amount
-      const totalFromShares = share * count;
-      const remainder = Math.round((data.amount - totalFromShares) * 100) / 100;
+      // Use floor for base share, then distribute remaining pennies
+      const totalCents = Math.round(data.amount * 100);
+      const baseCents = Math.floor(totalCents / count);
+      const extraPennies = totalCents - baseCents * count; // 0..count-1
 
       for (let i = 0; i < occupiedApartments.length; i++) {
         const apt = occupiedApartments[i];
-        // Assign remainder to the last apartment
-        const aptShare = i === count - 1 ? share + remainder : share;
+        // First N apartments get 1 extra penny to make sum exact
+        const aptShare = (baseCents + (i < extraPennies ? 1 : 0)) / 100;
 
         const [ae] = await tx
           .insert(apartmentExpenses)
@@ -388,7 +385,7 @@ export async function backfillExpensesForApartment(
 
     // Calculate share: expense.amount / (existingCount + 1)
     const totalAmount = parseFloat(expense.amount);
-    const share = customRound((totalAmount / (existingCount + 1)) * 100) / 100;
+    const share = Math.round((totalAmount / (existingCount + 1)) * 100) / 100;
 
     if (share <= 0) continue;
 

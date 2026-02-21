@@ -525,7 +525,7 @@ const UserManagement = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/10">
-      <div className="container mx-auto p-6">
+      <div className="container mx-auto px-3 py-4 sm:p-6">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8">
           <div className="flex items-center gap-3">
             <Users className="w-8 h-8 text-primary" />

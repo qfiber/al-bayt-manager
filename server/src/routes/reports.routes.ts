@@ -48,3 +48,10 @@ reportRoutes.get('/expenses-by-category', requireAuth, requireRole('admin', 'mod
     res.json(result);
   } catch (err) { next(err); }
 });
+
+reportRoutes.get('/reconciliation', requireAuth, requireRole('admin'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const result = await reportService.getReconciliation();
+    res.json(result);
+  } catch (err) { next(err); }
+});

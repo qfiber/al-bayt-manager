@@ -13,8 +13,16 @@ export const apartmentExpenseRoutes = Router();
 const apartmentIdParams = z.object({ apartmentId: z.string().uuid() });
 const idParams = z.object({ id: z.string().uuid() });
 
-apartmentExpenseRoutes.get('/:apartmentId', requireAuth, requireRole('admin', 'moderator'), validate({ params: apartmentIdParams }), async (req: Request, res: Response, next: NextFunction) => {
+apartmentExpenseRoutes.get('/:apartmentId', requireAuth, requireRole('admin', 'moderator'), scopeToModeratorBuildings, validate({ params: apartmentIdParams }), async (req: Request, res: Response, next: NextFunction) => {
   try {
+    // Moderators: verify apartment belongs to their assigned buildings
+    if (req.allowedBuildingIds) {
+      const apt = await apartmentService.getApartment(req.params.apartmentId as string);
+      if (!req.allowedBuildingIds.includes(apt.buildingId)) {
+        res.status(403).json({ error: 'Not authorized for this apartment\'s building' });
+        return;
+      }
+    }
     const result = await expenseService.getApartmentExpenses(req.params.apartmentId as string);
     res.json(result);
   } catch (err) { next(err); }

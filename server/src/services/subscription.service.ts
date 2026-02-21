@@ -4,24 +4,24 @@ import { logger } from '../config/logger.js';
 import { apartments, expenses, apartmentExpenses } from '../db/schema/index.js';
 import { eq, and, gt, isNull } from 'drizzle-orm';
 import * as ledgerService from './ledger.service.js';
-import { customRound } from '../utils/rounding.js';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 type TxOrDb = NodePgDatabase<any> | typeof db;
 
 /**
  * Generate an array of YYYY-MM strings from startDate to endDate (inclusive).
+ * Uses UTC to avoid timezone-dependent month boundaries.
  */
 export function generateMonthRange(startDate: Date, endDate: Date): string[] {
   const months: string[] = [];
-  const current = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
-  const end = new Date(endDate.getFullYear(), endDate.getMonth(), 1);
+  const current = new Date(Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth(), 1));
+  const end = new Date(Date.UTC(endDate.getUTCFullYear(), endDate.getUTCMonth(), 1));
 
   while (current <= end) {
-    const yyyy = current.getFullYear();
-    const mm = String(current.getMonth() + 1).padStart(2, '0');
+    const yyyy = current.getUTCFullYear();
+    const mm = String(current.getUTCMonth() + 1).padStart(2, '0');
     months.push(`${yyyy}-${mm}`);
-    current.setMonth(current.getMonth() + 1);
+    current.setUTCMonth(current.getUTCMonth() + 1);
   }
 
   return months;
@@ -60,7 +60,7 @@ export async function backfillSubscriptions(apartmentId: string, tx: TxOrDb) {
       // First month: prorate based on occupancy start day
       const [yyyy, mm] = month.split('-').map(Number);
       const daysInMonth = new Date(yyyy, mm, 0).getDate();
-      const startDay = occupancyStart.getDate();
+      const startDay = occupancyStart.getUTCDate();
       const remainingDays = daysInMonth - startDay + 1;
 
       if (remainingDays >= daysInMonth) {
@@ -68,7 +68,7 @@ export async function backfillSubscriptions(apartmentId: string, tx: TxOrDb) {
         chargeAmount = amount;
       } else {
         const dailyRate = amount / daysInMonth;
-        chargeAmount = customRound(dailyRate * remainingDays * 100) / 100;
+        chargeAmount = Math.round(dailyRate * remainingDays * 100) / 100;
       }
     } else {
       // Full month charge
@@ -197,14 +197,13 @@ async function processRecurringExpenses() {
             if (occupiedApartments.length === 0) return;
 
             const count = occupiedApartments.length;
-            const shareRaw = amount / count;
-            const share = customRound(shareRaw * 100) / 100;
-            const totalFromShares = share * count;
-            const remainder = Math.round((amount - totalFromShares) * 100) / 100;
+            const totalCents = Math.round(amount * 100);
+            const baseCents = Math.floor(totalCents / count);
+            const extraPennies = totalCents - baseCents * count;
 
             for (let i = 0; i < occupiedApartments.length; i++) {
               const apt = occupiedApartments[i];
-              const aptShare = i === count - 1 ? share + remainder : share;
+              const aptShare = (baseCents + (i < extraPennies ? 1 : 0)) / 100;
 
               const [ae] = await tx
                 .insert(apartmentExpenses)

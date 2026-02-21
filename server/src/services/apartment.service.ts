@@ -6,7 +6,6 @@ import {
 import { eq, and, inArray, sql, desc } from 'drizzle-orm';
 import { AppError } from '../middleware/error-handler.js';
 import * as ledgerService from './ledger.service.js';
-import { customRound } from '../utils/rounding.js';
 import { backfillSubscriptions } from './subscription.service.js';
 import { backfillExpensesForApartment } from './expense.service.js';
 
@@ -145,7 +144,7 @@ export async function terminateOccupancy(id: string, userId: string) {
 
     if (subscriptionAmount > 0 && remainingDays > 0) {
       const dailyRate = subscriptionAmount / daysInMonth;
-      const proratedCredit = customRound(dailyRate * remainingDays);
+      const proratedCredit = Math.round(dailyRate * remainingDays * 100) / 100;
 
       if (proratedCredit > 0) {
         await ledgerService.recordOccupancyCredit(id, proratedCredit, userId, tx);
@@ -233,15 +232,13 @@ export async function writeOffBalance(id: string, userId: string) {
       );
     } else {
       // Overpayment: create a debit adjustment to zero it out
-      await tx.insert(apartmentLedger).values({
-        apartmentId: id,
-        entryType: 'debit',
-        amount: balance.toFixed(2),
-        referenceType: 'waiver',
-        referenceId: null,
-        description: 'Balance write-off (overpayment cleared)',
-        createdBy: userId,
-      });
+      await ledgerService.recordDebitAdjustment(
+        id,
+        balance,
+        'Balance write-off (overpayment cleared)',
+        userId,
+        tx,
+      );
     }
 
     await ledgerService.refreshCachedBalance(id, tx);

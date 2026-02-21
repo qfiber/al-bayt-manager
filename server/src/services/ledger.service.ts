@@ -122,6 +122,27 @@ export async function recordWaiver(
 }
 
 /**
+ * Record a debit adjustment (e.g. write off overpayment).
+ */
+export async function recordDebitAdjustment(
+  apartmentId: string,
+  amount: number,
+  description: string,
+  userId: string,
+  txOrDb: TxOrDb = db,
+) {
+  await txOrDb.insert(apartmentLedger).values({
+    apartmentId,
+    entryType: 'debit',
+    amount: amount.toFixed(2),
+    referenceType: 'waiver',
+    referenceId: null,
+    description,
+    createdBy: userId,
+  });
+}
+
+/**
  * Record occupancy credit (prorated refund on termination).
  */
 export async function recordOccupancyCredit(

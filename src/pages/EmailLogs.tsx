@@ -181,7 +181,7 @@ const EmailLogs = () => {
   }
 
   return (
-    <div className="container mx-auto p-6 max-w-7xl" dir={isRTL ? 'rtl' : 'ltr'}>
+    <div className="container mx-auto px-3 py-4 sm:p-6 max-w-7xl" dir={isRTL ? 'rtl' : 'ltr'}>
       <div className="mb-6">
         <div className="flex justify-between items-center mb-4">
           <h1 className="text-3xl font-bold flex items-center gap-2">

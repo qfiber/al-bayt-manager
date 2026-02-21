@@ -135,7 +135,7 @@ export default function ApiKeys() {
   const apiBaseUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:3000/api'}/v1`;
 
   return (
-    <div className="container mx-auto p-6 space-y-6" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+    <div className="container mx-auto px-3 py-4 sm:p-6 space-y-6" dir={language === 'ar' ? 'rtl' : 'ltr'}>
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">
           {language === 'ar' ? 'مفاتيح API' : 'API Keys'}

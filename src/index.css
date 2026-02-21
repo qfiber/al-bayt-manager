@@ -186,6 +186,20 @@ All colors MUST be HSL.
   }
 }
 
+/* Responsive table styles for mobile */
+@media (max-width: 640px) {
+  th,
+  td {
+    padding: 0.375rem 0.5rem !important;
+    font-size: 0.75rem;
+    line-height: 1.25rem;
+  }
+
+  th {
+    height: auto !important;
+  }
+}
+
 /* Print styles for RTL languages */
 @media print {
   html[dir="rtl"],

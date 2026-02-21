@@ -108,16 +108,7 @@ const Apartments = () => {
     const daysRemaining = daysInMonth - dayOfMonth + 1;
 
     const proratedAmount = (monthlyFee / daysInMonth) * daysRemaining;
-
-    // Custom rounding: 0.01-0.5 rounds down, 0.51+ rounds up
-    const wholePart = Math.floor(proratedAmount);
-    const fractionalPart = proratedAmount - wholePart;
-
-    if (fractionalPart >= 0.51) {
-      return wholePart + 1;
-    } else {
-      return wholePart;
-    }
+    return Math.round(proratedAmount * 100) / 100;
   };
 
   useEffect(() => {
@@ -338,16 +329,7 @@ const Apartments = () => {
 
     const subscriptionAmount = parseFloat(apartment.subscriptionAmount);
     const creditForRemainingDays = (subscriptionAmount / daysInMonth) * daysRemaining;
-
-    // Custom rounding: 0.01-0.5 rounds down, 0.51+ rounds up
-    const wholePart = Math.floor(creditForRemainingDays);
-    const fractionalPart = creditForRemainingDays - wholePart;
-
-    if (fractionalPart >= 0.51) {
-      return wholePart + 1;
-    } else {
-      return wholePart;
-    }
+    return Math.round(creditForRemainingDays * 100) / 100;
   };
 
   const handleTerminateOccupancy = async () => {
@@ -532,7 +514,7 @@ const Apartments = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/10">
-      <div className="container mx-auto p-6">
+      <div className="container mx-auto px-3 py-4 sm:p-6">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8">
           <div className="flex items-center gap-3">
             <Home className="w-8 h-8 text-primary" />
@@ -709,7 +691,7 @@ const Apartments = () => {
                     {buildingApartments.length === 0 ? (
                       <p className="text-center text-muted-foreground py-4">{t('noApartmentsInBuilding')}</p>
                     ) : (
-                      <Table>
+                      <Table className="min-w-[900px]">
                         <TableHeader>
                           <TableRow>
                             <TableHead className="text-right">{t('apartmentHash')}</TableHead>

@@ -103,7 +103,7 @@ const MyApartments = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/10">
-      <div className="container mx-auto p-6">
+      <div className="container mx-auto px-3 py-4 sm:p-6">
         <div className="flex items-center gap-3 mb-8">
           <Home className="w-8 h-8 text-primary" />
           <h1 className="text-3xl font-bold">My Apartments</h1>

@@ -113,16 +113,18 @@ export async function updatePayment(id: string, data: { month?: string; amount?:
     if (!existing) throw new AppError(404, 'Payment not found');
     if (existing.isCanceled) throw new AppError(400, 'Cannot update a canceled payment');
 
-    // If amount is changing, block when allocations exist (similar to expense amount changes)
+    // If amount is changing, block when new amount is below total already-allocated
     if (data.amount !== undefined && data.amount !== parseFloat(existing.amount)) {
-      const existingAllocations = await tx
-        .select()
+      const [allocSum] = await tx
+        .select({
+          total: sql<string>`COALESCE(SUM(${paymentAllocations.amountAllocated}::numeric), 0)`,
+        })
         .from(paymentAllocations)
-        .where(eq(paymentAllocations.paymentId, id))
-        .limit(1);
+        .where(eq(paymentAllocations.paymentId, id));
 
-      if (existingAllocations.length > 0) {
-        throw new AppError(400, 'Cannot change amount on a payment that has allocations. Cancel and recreate instead.');
+      const totalAllocated = parseFloat(allocSum.total);
+      if (totalAllocated > 0 && data.amount < totalAllocated) {
+        throw new AppError(400, `Cannot reduce payment below total allocated amount (₪${totalAllocated.toFixed(2)}). Cancel allocations first.`);
       }
     }
 

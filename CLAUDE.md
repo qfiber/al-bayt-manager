@@ -37,7 +37,6 @@ src/
 │   ├── GeneralInformationDialog.tsx
 │   └── NavLink.tsx
 ├── hooks/
-│   ├── useExpenseRecalculation.ts  # CRITICAL: Core financial calculation engine
 │   ├── use-mobile.tsx
 │   └── use-toast.ts
 ├── integrations/supabase/
@@ -101,7 +100,7 @@ supabase/
 ### Financial Logic (CRITICAL)
 - **Balance formula:** `credit = totalPayments - totalExpenses - totalSubscription`
 - Negative credit = debt, positive credit = overpayment
-- All financial recalculation lives in `src/hooks/useExpenseRecalculation.ts`
+- All financial recalculation lives in `server/src/services/ledger.service.ts`
 - Expenses are split among occupied apartments when created
 - Payments can be allocated to specific expenses via `payment_allocations`
 - Soft delete pattern: `is_canceled` flag instead of actual deletion
@@ -166,7 +165,7 @@ supabase/
 3. Add RLS policies as needed
 
 ### Modifying financial calculations
-- **ALWAYS** update `src/hooks/useExpenseRecalculation.ts`
+- **ALWAYS** update `server/src/services/ledger.service.ts` and related services
 - Test with: occupied apartments, vacant apartments, canceled payments, canceled expenses
 - Verify credit recalculation after changes
 
@@ -174,6 +173,6 @@ supabase/
 - `src/components/ui/` files are shadcn/ui generated - avoid manual edits
 - `src/integrations/supabase/types.ts` is auto-generated from DB schema
 - Currency is Israeli Shekel (₪)
-- Custom rounding: 0.01-0.50 rounds down, 0.51+ rounds up
+- Standard rounding: `Math.round(x * 100) / 100` for all financial amounts
 - Role updates use delete+insert pattern (not update)
 - The `.env` file is committed (contains only public keys)

@@ -49,9 +49,14 @@ expenseRoutes.get('/', requireAuth, requireRole('admin', 'moderator'), scopeToMo
   } catch (err) { next(err); }
 });
 
-expenseRoutes.get('/:id', requireAuth, requireRole('admin', 'moderator'), validate({ params: idParams }), async (req: Request, res: Response, next: NextFunction) => {
+expenseRoutes.get('/:id', requireAuth, requireRole('admin', 'moderator'), scopeToModeratorBuildings, validate({ params: idParams }), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await expenseService.getExpense(req.params.id as string);
+    // Moderators: verify expense belongs to their assigned buildings
+    if (req.allowedBuildingIds && !req.allowedBuildingIds.includes(result.buildingId)) {
+      res.status(403).json({ error: 'Not authorized for this building' });
+      return;
+    }
     res.json(result);
   } catch (err) { next(err); }
 });
@@ -68,8 +73,16 @@ expenseRoutes.post('/', requireAuth, requireRole('admin', 'moderator'), scopeToM
   } catch (err) { next(err); }
 });
 
-expenseRoutes.put('/:id', requireAuth, requireRole('admin', 'moderator'), validate({ params: idParams, body: updateExpenseSchema }), auditLog('update', 'expenses'), async (req: Request, res: Response, next: NextFunction) => {
+expenseRoutes.put('/:id', requireAuth, requireRole('admin', 'moderator'), scopeToModeratorBuildings, validate({ params: idParams, body: updateExpenseSchema }), auditLog('update', 'expenses'), async (req: Request, res: Response, next: NextFunction) => {
   try {
+    // Moderators: verify expense belongs to their assigned buildings
+    if (req.allowedBuildingIds) {
+      const existing = await expenseService.getExpense(req.params.id as string);
+      if (!req.allowedBuildingIds.includes(existing.buildingId)) {
+        res.status(403).json({ error: 'Not authorized for this building' });
+        return;
+      }
+    }
     const result = await expenseService.updateExpense(req.params.id as string, req.body);
     res.json(result);
   } catch (err) { next(err); }

@@ -244,7 +244,7 @@ const Dashboard = () => {
   // User role: simple welcome view
   if (!canViewFinancials) {
     return (
-      <div className="container mx-auto p-6 space-y-6">
+      <div className="container mx-auto px-3 py-4 sm:p-6 space-y-6">
         <div>
           <h1 className="text-2xl font-bold">{t('welcomeBack')}, {user.name || user.email}</h1>
         </div>
@@ -300,7 +300,7 @@ const Dashboard = () => {
   const occupancyPct = totalApartments > 0 ? ((occupiedApartments / totalApartments) * 100).toFixed(1) : '0';
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="container mx-auto px-3 py-4 sm:p-6 space-y-6">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold">{t('dashboard')}</h1>
@@ -329,7 +329,7 @@ const Dashboard = () => {
                 </div>
                 <div className="min-w-0">
                   <p className="text-xs text-muted-foreground truncate">{t('totalBuildings')}</p>
-                  <p className="text-2xl font-bold tabular-nums">{summary?.buildings ?? 0}</p>
+                  <p className="text-lg sm:text-2xl font-bold tabular-nums">{summary?.buildings ?? 0}</p>
                 </div>
               </div>
             </CardContent>
@@ -344,7 +344,7 @@ const Dashboard = () => {
                 </div>
                 <div className="min-w-0">
                   <p className="text-xs text-muted-foreground truncate">{t('occupiedUnits')}</p>
-                  <p className="text-2xl font-bold tabular-nums">{occupancyPct}%</p>
+                  <p className="text-lg sm:text-2xl font-bold tabular-nums">{occupancyPct}%</p>
                   <p className="text-xs text-muted-foreground">
                     {occupiedApartments} / {totalApartments}
                   </p>
@@ -362,7 +362,7 @@ const Dashboard = () => {
                 </div>
                 <div className="min-w-0">
                   <p className="text-xs text-muted-foreground truncate">{t('monthlyIncome')}</p>
-                  <p className="text-2xl font-bold tabular-nums">{formatCurrency(totalPayments)}</p>
+                  <p className="text-lg sm:text-2xl font-bold tabular-nums">{formatCurrency(totalPayments)}</p>
                 </div>
               </div>
             </CardContent>
@@ -377,7 +377,7 @@ const Dashboard = () => {
                 </div>
                 <div className="min-w-0">
                   <p className="text-xs text-muted-foreground truncate">{t('outstandingBalance')}</p>
-                  <p className={`text-2xl font-bold tabular-nums ${totalDebt > 0 ? 'text-red-600' : ''}`}>
+                  <p className={`text-lg sm:text-2xl font-bold tabular-nums ${totalDebt > 0 ? 'text-red-600' : ''}`}>
                     {formatCurrency(totalDebt)}
                   </p>
                 </div>

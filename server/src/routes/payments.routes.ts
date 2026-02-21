@@ -44,9 +44,17 @@ paymentRoutes.get('/', requireAuth, requireRole('admin', 'moderator'), scopeToMo
   } catch (err) { next(err); }
 });
 
-paymentRoutes.get('/:id', requireAuth, requireRole('admin', 'moderator'), validate({ params: idParams }), async (req: Request, res: Response, next: NextFunction) => {
+paymentRoutes.get('/:id', requireAuth, requireRole('admin', 'moderator'), scopeToModeratorBuildings, validate({ params: idParams }), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await paymentService.getPayment(req.params.id as string);
+    // Moderators: verify payment belongs to their assigned buildings
+    if (req.allowedBuildingIds) {
+      const apt = await apartmentService.getApartment(result.apartmentId);
+      if (!req.allowedBuildingIds.includes(apt.buildingId)) {
+        res.status(403).json({ error: 'Not authorized for this apartment\'s building' });
+        return;
+      }
+    }
     res.json(result);
   } catch (err) { next(err); }
 });
@@ -66,8 +74,17 @@ paymentRoutes.post('/', requireAuth, requireRole('admin', 'moderator'), scopeToM
   } catch (err) { next(err); }
 });
 
-paymentRoutes.put('/:id', requireAuth, requireRole('admin', 'moderator'), validate({ params: idParams, body: updatePaymentSchema }), auditLog('update', 'payments'), async (req: Request, res: Response, next: NextFunction) => {
+paymentRoutes.put('/:id', requireAuth, requireRole('admin', 'moderator'), scopeToModeratorBuildings, validate({ params: idParams, body: updatePaymentSchema }), auditLog('update', 'payments'), async (req: Request, res: Response, next: NextFunction) => {
   try {
+    // Moderators: verify payment belongs to their assigned buildings
+    if (req.allowedBuildingIds) {
+      const payment = await paymentService.getPayment(req.params.id as string);
+      const apt = await apartmentService.getApartment(payment.apartmentId);
+      if (!req.allowedBuildingIds.includes(apt.buildingId)) {
+        res.status(403).json({ error: 'Not authorized for this apartment\'s building' });
+        return;
+      }
+    }
     const result = await paymentService.updatePayment(req.params.id as string, req.body, req.user!.userId);
     res.json(result);
   } catch (err) { next(err); }
