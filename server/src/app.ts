@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
+import cookieParser from 'cookie-parser';
 import pinoHttp from 'pino-http';
 import crypto from 'crypto';
 import path from 'path';
@@ -44,6 +45,7 @@ export function createApp() {
     autoLogging: { ignore: (req) => req.url === '/api/health' },
   }));
   app.use(express.json());
+  app.use(cookieParser());
 
   // Static uploads — with security headers to prevent XSS via uploaded files
   app.use('/api/uploads', (_req, res, next) => {

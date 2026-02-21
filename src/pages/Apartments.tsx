@@ -11,8 +11,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
 import { useToast } from '@/hooks/use-toast';
-import { Home, Plus, Pencil, Trash2, Eye, XCircle } from 'lucide-react';
+import { Home, Plus, Pencil, Trash2, Eye, XCircle, Calendar as CalendarIcon } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { format } from 'date-fns';
 
 interface Apartment {
   id: string;
@@ -62,12 +66,13 @@ const Apartments = () => {
   const [terminateDialogOpen, setTerminateDialogOpen] = useState(false);
   const [apartmentToTerminate, setApartmentToTerminate] = useState<Apartment | null>(null);
   const [calculatedTerminationCredit, setCalculatedTerminationCredit] = useState(0);
+  const [occupancyDate, setOccupancyDate] = useState<Date | undefined>();
+  const [openPopover, setOpenPopover] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     apartment_number: '',
     building_id: '',
     floor: '',
     status: 'vacant',
-    occupancy_start: '',
     subscription_amount: '',
     subscription_status: 'inactive',
   });
@@ -88,23 +93,17 @@ const Apartments = () => {
     }
   }, [user, isAdmin]);
 
-  const calculateProratedAmount = (occupancyStart: string, monthlyFee: number): number => {
-    if (!occupancyStart || !monthlyFee) return monthlyFee;
+  const calculateProratedAmount = (startDate: Date, monthlyFee: number): number => {
+    if (!monthlyFee) return monthlyFee;
 
-    // Convert dd/mm/yyyy to Date object
-    const parts = occupancyStart.split('/');
-    if (parts.length !== 3) return monthlyFee;
-
-    const [day, month, year] = parts.map(p => parseInt(p, 10));
-    if (isNaN(day) || isNaN(month) || isNaN(year)) return monthlyFee;
-
-    const startDate = new Date(year, month - 1, day);
     const dayOfMonth = startDate.getDate();
 
     // If occupancy starts on the 1st, use full monthly fee
     if (dayOfMonth === 1) return monthlyFee;
 
     // Calculate prorated amount based on days left in month
+    const year = startDate.getFullYear();
+    const month = startDate.getMonth() + 1;
     const daysInMonth = new Date(year, month, 0).getDate();
     const daysRemaining = daysInMonth - dayOfMonth + 1;
 
@@ -124,13 +123,13 @@ const Apartments = () => {
   useEffect(() => {
     const selectedBuilding = buildings.find(b => b.id === formData.building_id);
     const buildingFee = parseFloat(selectedBuilding?.monthlyFee || '0');
-    if (formData.occupancy_start && buildingFee) {
-      const calculatedAmount = calculateProratedAmount(formData.occupancy_start, buildingFee);
+    if (occupancyDate && buildingFee) {
+      const calculatedAmount = calculateProratedAmount(occupancyDate, buildingFee);
       setFormData(prev => ({ ...prev, subscription_amount: calculatedAmount.toString() }));
-    } else if (buildingFee && !formData.occupancy_start) {
+    } else if (buildingFee && !occupancyDate) {
       setFormData(prev => ({ ...prev, subscription_amount: buildingFee.toString() }));
     }
-  }, [formData.occupancy_start, formData.building_id, buildings]);
+  }, [occupancyDate, formData.building_id, buildings]);
 
   const fetchBuildings = async () => {
     try {
@@ -162,15 +161,7 @@ const Apartments = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Convert dd/mm/yyyy to yyyy-mm-dd for the API
-    let dbDate: string | null = null;
-    if (formData.occupancy_start) {
-      const parts = formData.occupancy_start.split('/');
-      if (parts.length === 3) {
-        const [day, month, year] = parts;
-        dbDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-      }
-    }
+    const dbDate = occupancyDate ? format(occupancyDate, 'yyyy-MM-dd') : null;
 
     const subscriptionAmount = parseFloat(formData.subscription_amount) || 0;
 
@@ -219,27 +210,15 @@ const Apartments = () => {
 
   const handleEdit = (apartment: Apartment) => {
     setEditingApartment(apartment);
-    // Convert ISO date from API to dd/mm/yyyy for display
-    let displayDate = '';
-    if (apartment.occupancyStart) {
-      const date = new Date(apartment.occupancyStart);
-      const day = String(date.getDate()).padStart(2, '0');
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const year = date.getFullYear();
-      displayDate = `${day}/${month}/${year}`;
-    }
-
-    // Temporarily disable auto-calculation for editing
-    const currentFormData = {
+    setOccupancyDate(apartment.occupancyStart ? new Date(apartment.occupancyStart + 'T00:00:00') : undefined);
+    setFormData({
       apartment_number: apartment.apartmentNumber,
       building_id: apartment.buildingId,
       floor: apartment.floor != null ? (apartment.floor === 0 ? 'Ground' : apartment.floor.toString()) : '',
       status: apartment.status,
-      occupancy_start: displayDate,
       subscription_amount: apartment.subscriptionAmount,
       subscription_status: apartment.subscriptionStatus,
-    };
-    setFormData(currentFormData);
+    });
     setIsDialogOpen(true);
   };
 
@@ -249,10 +228,11 @@ const Apartments = () => {
       building_id: '',
       floor: '',
       status: 'vacant',
-      occupancy_start: '',
       subscription_amount: '',
       subscription_status: 'inactive',
     });
+    setOccupancyDate(undefined);
+    setOpenPopover(null);
     setEditingApartment(null);
     setIsDialogOpen(false);
   };
@@ -617,20 +597,30 @@ const Apartments = () => {
                     </Select>
                   </div>
                   <div className={formData.status !== 'occupied' ? 'opacity-50' : ''}>
-                    <Label htmlFor="occupancy_start">{t('occupancyStart')}</Label>
-                    <Input
-                      id="occupancy_start"
-                      type="text"
-                      placeholder="dd/mm/yyyy"
-                      value={formData.status === 'occupied' ? formData.occupancy_start : ''}
-                      onChange={(e) => {
-                        const value = e.target.value.replace(/[^\d/]/g, '');
-                        if (value.length <= 10) {
-                          setFormData({ ...formData, occupancy_start: value });
-                        }
-                      }}
-                      disabled={formData.status !== 'occupied'}
-                    />
+                    <Label>{t('occupancyStart')}</Label>
+                    <Popover open={openPopover === 'occupancy-start'} onOpenChange={(open) => setOpenPopover(open ? 'occupancy-start' : null)}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={formData.status !== 'occupied'}
+                          className={cn("w-full justify-start text-left font-normal", !occupancyDate && "text-muted-foreground")}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {formData.status === 'occupied' && occupancyDate
+                            ? format(occupancyDate, 'dd/MM/yyyy')
+                            : t('selectDate')}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={occupancyDate}
+                          onSelect={(date) => { setOccupancyDate(date); setOpenPopover(null); }}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
                   </div>
                   <div className={formData.status !== 'occupied' ? 'opacity-50' : ''}>
                     <Label htmlFor="subscription_amount">{t('monthlySubscription')}</Label>

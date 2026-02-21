@@ -23,5 +23,5 @@ COPY --from=build /app/src/db/migrations ./dist/db/migrations
 # Ensure uploads directory exists
 RUN mkdir -p uploads/logos
 
-EXPOSE 3000
+EXPOSE 4010
 CMD ["node", "dist/index.js"]

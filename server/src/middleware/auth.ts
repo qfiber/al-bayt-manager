@@ -12,14 +12,17 @@ declare global {
 }
 
 export function requireAuth(req: Request, _res: Response, next: NextFunction): void {
+  // Prefer httpOnly cookie, fall back to Authorization header
+  const cookieToken = req.cookies?.access_token as string | undefined;
   const header = req.headers.authorization;
-  if (!header?.startsWith('Bearer ')) {
+  const token = cookieToken || (header?.startsWith('Bearer ') ? header.slice(7) : undefined);
+
+  if (!token) {
     next(new AppError(401, 'Authentication required'));
     return;
   }
 
   try {
-    const token = header.slice(7);
     req.user = verifyAccessToken(token);
     next();
   } catch {

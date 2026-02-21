@@ -1,57 +1,22 @@
-import { solveChallenge } from './pow.js';
+import { solveChallenge, type PowProgress } from './pow.js';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+const API_URL = import.meta.env.VITE_API_URL || '/api';
 
-interface TokenPair {
-  accessToken: string;
-  refreshToken: string;
-}
+let refreshPromise: Promise<boolean> | null = null;
 
-function getTokens(): TokenPair | null {
-  const accessToken = localStorage.getItem('accessToken');
-  const refreshToken = localStorage.getItem('refreshToken');
-  if (!accessToken || !refreshToken) return null;
-  return { accessToken, refreshToken };
-}
-
-function setTokens(tokens: TokenPair) {
-  localStorage.setItem('accessToken', tokens.accessToken);
-  localStorage.setItem('refreshToken', tokens.refreshToken);
-}
-
-function clearTokens() {
-  localStorage.removeItem('accessToken');
-  localStorage.removeItem('refreshToken');
-}
-
-let refreshPromise: Promise<TokenPair | null> | null = null;
-
-async function refreshTokens(): Promise<TokenPair | null> {
+async function refreshTokens(): Promise<boolean> {
   // Deduplicate concurrent refresh calls
   if (refreshPromise) return refreshPromise;
 
   refreshPromise = (async () => {
-    const tokens = getTokens();
-    if (!tokens) return null;
-
     try {
       const res = await fetch(`${API_URL}/auth/refresh`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken: tokens.refreshToken }),
+        credentials: 'include',
       });
-
-      if (!res.ok) {
-        clearTokens();
-        return null;
-      }
-
-      const data = await res.json();
-      setTokens(data);
-      return data;
+      return res.ok;
     } catch {
-      clearTokens();
-      return null;
+      return false;
     } finally {
       refreshPromise = null;
     }
@@ -64,7 +29,6 @@ async function request<T = any>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
-  const tokens = getTokens();
   const headers: Record<string, string> = {
     ...(options.headers as Record<string, string> || {}),
   };
@@ -74,21 +38,22 @@ async function request<T = any>(
     headers['Content-Type'] = 'application/json';
   }
 
-  if (tokens?.accessToken) {
-    headers['Authorization'] = `Bearer ${tokens.accessToken}`;
-  }
-
-  let res = await fetch(`${API_URL}${path}`, { ...options, headers });
+  let res = await fetch(`${API_URL}${path}`, {
+    ...options,
+    headers,
+    credentials: 'include',
+  });
 
   // Auto-refresh on 401
-  if (res.status === 401 && tokens) {
-    const newTokens = await refreshTokens();
-    if (newTokens) {
-      headers['Authorization'] = `Bearer ${newTokens.accessToken}`;
-      res = await fetch(`${API_URL}${path}`, { ...options, headers });
+  if (res.status === 401) {
+    const refreshed = await refreshTokens();
+    if (refreshed) {
+      res = await fetch(`${API_URL}${path}`, {
+        ...options,
+        headers,
+        credentials: 'include',
+      });
     } else {
-      // Refresh failed - redirect to login
-      clearTokens();
       window.location.href = '/auth';
       throw new Error('Session expired');
     }
@@ -144,26 +109,17 @@ export const api = {
 
 // Auth helpers
 export const auth = {
-  login: async (email: string, password: string) => {
-    const pow = await solveChallenge();
-    const result = await api.post<{
-      accessToken?: string;
-      refreshToken?: string;
+  login: async (email: string, password: string, onPowProgress?: (p: PowProgress) => void) => {
+    const pow = await solveChallenge(onPowProgress);
+    return api.post<{
+      success?: boolean;
       requires2FA?: boolean;
       sessionToken?: string;
     }>('/auth/login', { email, password, ...pow });
-
-    if (result.accessToken && result.refreshToken) {
-      setTokens({ accessToken: result.accessToken, refreshToken: result.refreshToken });
-    }
-
-    return result;
   },
 
   login2FA: async (sessionToken: string, code: string) => {
-    const result = await api.post<TokenPair>('/auth/login/2fa', { sessionToken, code });
-    setTokens(result);
-    return result;
+    return api.post<{ success: boolean }>('/auth/login/2fa', { sessionToken, code });
   },
 
   register: async (email: string, password: string, name: string, phone?: string) => {
@@ -172,22 +128,14 @@ export const auth = {
   },
 
   logout: async () => {
-    const tokens = getTokens();
-    if (tokens?.refreshToken) {
-      try {
-        await api.post('/auth/logout', { refreshToken: tokens.refreshToken });
-      } catch {
-        // Ignore errors on logout
-      }
+    try {
+      await api.post('/auth/logout');
+    } catch {
+      // Ignore errors on logout
     }
-    clearTokens();
   },
 
   getMe: () => api.get('/auth/me'),
 
-  isAuthenticated: () => !!getTokens()?.accessToken,
-
-  setTokens,
-  clearTokens,
-  getTokens,
+  isAuthenticated: () => document.cookie.split(';').some(c => c.trim().startsWith('session=')),
 };

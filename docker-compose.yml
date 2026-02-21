@@ -4,50 +4,45 @@ services:
     environment:
       POSTGRES_DB: albayt
       POSTGRES_USER: albayt
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-albayt_dev_password}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
       - pgdata:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U albayt"]
       interval: 5s
       timeout: 5s
       retries: 5
 
+  frontend-build:
+    image: node:20-alpine
+    working_dir: /app
+    volumes:
+      - .:/app
+      - frontend_node_modules:/app/node_modules
+    environment:
+      VITE_API_URL: ${VITE_API_URL:-/api}
+      VITE_TURNSTILE_SITE_KEY: ${VITE_TURNSTILE_SITE_KEY:-}
+    command: sh -c "npm ci && npm run build"
+
   server:
     build: ./server
     ports:
-      - "3000:3000"
+      - "127.0.0.1:4010:4010"
     depends_on:
       postgres:
         condition: service_healthy
+    env_file:
+      - ./server/.env
     environment:
+      # Override DATABASE_URL to use Docker's internal hostname
       NODE_ENV: production
-      PORT: 3000
-      DATABASE_URL: postgresql://albayt:${DB_PASSWORD:-albayt_dev_password}@postgres:5432/albayt
-      JWT_SECRET: ${JWT_SECRET:-}
-      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-}
-      JWT_ACCESS_EXPIRY: 15m
-      JWT_REFRESH_EXPIRY: 7d
-      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:8080}
-      UPLOAD_DIR: ./uploads
-      TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:-}
-      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      DATABASE_URL: postgresql://albayt:${DB_PASSWORD}@postgres:5432/albayt
     volumes:
       - uploads:/app/uploads
-
-  frontend:
-    build:
-      context: .
-      args:
-        VITE_API_URL: ${VITE_API_URL:-http://localhost:3000/api}
-        VITE_TURNSTILE_SITE_KEY: ${VITE_TURNSTILE_SITE_KEY:-}
-    ports:
-      - "8080:80"
-    depends_on:
-      - server
 
 volumes:
   pgdata:
   uploads:
+  frontend_node_modules:

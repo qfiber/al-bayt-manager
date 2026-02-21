@@ -1,9 +1,12 @@
 import { db } from '../config/database.js';
 import { expenses, apartmentExpenses, apartments, buildings } from '../db/schema/index.js';
-import { eq, and, inArray, sql } from 'drizzle-orm';
+import { eq, and, inArray, sql, gte, isNull } from 'drizzle-orm';
 import { AppError } from '../middleware/error-handler.js';
 import * as ledgerService from './ledger.service.js';
 import { customRound } from '../utils/rounding.js';
+import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
+
+type TxOrDb = NodePgDatabase<any> | typeof db;
 
 export async function listExpenses(filters?: {
   buildingId?: string;
@@ -318,4 +321,95 @@ export async function waiveApartmentExpense(id: string, userId: string) {
 
     return { success: true };
   });
+}
+
+/**
+ * Retroactively charge an apartment for building-wide expenses that occurred
+ * since its occupancy start date. Idempotent — skips expenses the apartment
+ * already has an apartment_expense for.
+ *
+ * The new apartment is charged its proportional share (total / (existing_splits + 1)).
+ * Existing apartments' shares are NOT adjusted to avoid touching settled records.
+ */
+export async function backfillExpensesForApartment(
+  apartmentId: string,
+  buildingId: string,
+  occupancyStart: Date,
+  userId: string,
+  tx: TxOrDb,
+) {
+  const occupancyDateStr = occupancyStart.toISOString().split('T')[0]; // YYYY-MM-DD
+
+  // Find all building-wide expenses since occupancy start
+  // Skip recurring template parents (isRecurring=true) — their children are the actual charges
+  const buildingExpenses = await tx
+    .select()
+    .from(expenses)
+    .where(
+      and(
+        eq(expenses.buildingId, buildingId),
+        gte(expenses.expenseDate, occupancyDateStr),
+      ),
+    );
+
+  for (const expense of buildingExpenses) {
+    // Skip recurring template parents — they don't have apartment_expenses
+    if (expense.isRecurring) continue;
+
+    // Check if this apartment already has an apartment_expense for this expense
+    const [existing] = await tx
+      .select({ id: apartmentExpenses.id })
+      .from(apartmentExpenses)
+      .where(
+        and(
+          eq(apartmentExpenses.apartmentId, apartmentId),
+          eq(apartmentExpenses.expenseId, expense.id),
+        ),
+      )
+      .limit(1);
+
+    if (existing) continue; // Already charged — idempotent skip
+
+    // Count existing non-canceled apartment_expense splits for this expense
+    const [countResult] = await tx
+      .select({ count: sql<number>`count(*)::int` })
+      .from(apartmentExpenses)
+      .where(
+        and(
+          eq(apartmentExpenses.expenseId, expense.id),
+          eq(apartmentExpenses.isCanceled, false),
+        ),
+      );
+
+    const existingCount = countResult?.count || 0;
+
+    // If no existing splits, this was likely a single-apartment expense or had no splits — skip
+    if (existingCount === 0) continue;
+
+    // Calculate share: expense.amount / (existingCount + 1)
+    const totalAmount = parseFloat(expense.amount);
+    const share = customRound((totalAmount / (existingCount + 1)) * 100) / 100;
+
+    if (share <= 0) continue;
+
+    const [ae] = await tx
+      .insert(apartmentExpenses)
+      .values({
+        apartmentId,
+        expenseId: expense.id,
+        amount: share.toFixed(2),
+      })
+      .returning();
+
+    await ledgerService.recordExpenseCharge(
+      apartmentId,
+      ae.id,
+      share,
+      expense.description || 'Retroactive expense charge',
+      userId,
+      tx,
+    );
+  }
+
+  await ledgerService.refreshCachedBalance(apartmentId, tx);
 }

@@ -1,14 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { api, auth } from '@/lib/api';
+import { type PowProgress } from '@/lib/pow';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Building } from 'lucide-react';
+import { Building, Shield } from 'lucide-react';
 import { Turnstile } from '@marsidev/react-turnstile';
 
 
@@ -23,7 +24,12 @@ const Auth = () => {
   const [turnstileEnabled, setTurnstileEnabled] = useState(false);
   const [turnstileSiteKey, setTurnstileSiteKey] = useState<string | null>(null);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
-  const { user, loading } = useAuth();
+  const [powActive, setPowActive] = useState(false);
+  const [powHash, setPowHash] = useState('');
+  const [powNonce, setPowNonce] = useState('');
+  const [powDone, setPowDone] = useState(false);
+  const hashContainerRef = useRef<HTMLDivElement>(null);
+  const { user, loading, refreshUser } = useAuth();
   const { t, language } = useLanguage();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -60,9 +66,26 @@ const Auth = () => {
     }
   }, [user, loading, navigate, require2FA, isLoading]);
 
+  // Auto-scroll hash container to bottom
+  useEffect(() => {
+    if (hashContainerRef.current) {
+      hashContainerRef.current.scrollTop = hashContainerRef.current.scrollHeight;
+    }
+  }, [powHash]);
+
+  const handlePowProgress = (p: PowProgress) => {
+    setPowHash(p.hash);
+    setPowNonce(p.nonce);
+    if (p.done) setPowDone(true);
+  };
+
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setPowActive(false);
+    setPowDone(false);
+    setPowHash('');
+    setPowNonce('');
 
     try {
       // Verify CAPTCHA if enabled
@@ -102,16 +125,21 @@ const Auth = () => {
         }
       }
 
-      // Sign in with email and password
-      const result = await auth.login(email, password);
+      // Show PoW overlay
+      setPowActive(true);
+
+      // Sign in with email and password (with PoW progress)
+      const result = await auth.login(email, password, handlePowProgress);
 
       if (result.requires2FA && result.sessionToken) {
         // User has 2FA enabled — store session token and show 2FA form
+        setPowActive(false);
         setSessionToken(result.sessionToken);
         setRequire2FA(true);
         setIsLoading(false);
       } else {
-        // No 2FA — tokens are already stored by auth.login
+        // No 2FA — cookies set by server
+        await refreshUser();
         toast({
           title: t('success'),
           description: t('signedInSuccessfully'),
@@ -120,6 +148,7 @@ const Auth = () => {
       }
     } catch (error: any) {
       console.error('Sign in error:', error);
+      setPowActive(false);
       toast({
         title: t('error'),
         description: error?.message || t('errorDuringSignIn'),
@@ -139,6 +168,7 @@ const Auth = () => {
       }
 
       await auth.login2FA(sessionToken, verificationCode);
+      await refreshUser();
 
       toast({
         title: t('success'),
@@ -167,7 +197,29 @@ const Auth = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-secondary/10 p-4">
-      <Card className="w-full max-w-md">
+      <Card className="w-full max-w-md relative overflow-hidden">
+        {/* PoW Overlay */}
+        {powActive && (
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/95 backdrop-blur-sm p-6 animate-in fade-in duration-300">
+            <Shield className="w-10 h-10 text-primary mb-4 animate-pulse" />
+            <h3 className="text-lg font-semibold mb-1">{t('securingConnection')}</h3>
+            <p className="text-sm text-muted-foreground mb-4" dir="ltr">
+              nonce: {powNonce}
+            </p>
+            <div
+              ref={hashContainerRef}
+              className="w-full h-32 overflow-hidden rounded-lg bg-muted/50 border p-3 font-mono text-xs leading-relaxed"
+              dir="ltr"
+            >
+              {powHash && (
+                <span className={powDone ? 'text-green-500 font-bold' : 'text-muted-foreground'}>
+                  {powHash}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
         <CardHeader className="space-y-1 text-center">
           <div className="flex justify-center mb-4">
             {logoUrl ? (

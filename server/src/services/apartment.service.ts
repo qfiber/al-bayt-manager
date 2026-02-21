@@ -7,6 +7,8 @@ import { eq, and, inArray, sql, desc } from 'drizzle-orm';
 import { AppError } from '../middleware/error-handler.js';
 import * as ledgerService from './ledger.service.js';
 import { customRound } from '../utils/rounding.js';
+import { backfillSubscriptions } from './subscription.service.js';
+import { backfillExpensesForApartment } from './expense.service.js';
 
 export async function listApartments(buildingId?: string, allowedBuildingIds?: string[]) {
   let query = db
@@ -56,16 +58,25 @@ export async function createApartment(data: {
   ownerId?: string;
   beneficiaryId?: string;
   occupancyStart?: Date;
-}) {
-  // Verify building exists
-  const [building] = await db.select({ id: buildings.id }).from(buildings).where(eq(buildings.id, data.buildingId)).limit(1);
-  if (!building) throw new AppError(404, 'Building not found');
+}, userId: string) {
+  return await db.transaction(async (tx) => {
+    // Verify building exists
+    const [building] = await tx.select({ id: buildings.id }).from(buildings).where(eq(buildings.id, data.buildingId)).limit(1);
+    if (!building) throw new AppError(404, 'Building not found');
 
-  const [apt] = await db.insert(apartments).values({
-    ...data,
-    cachedBalance: '0',
-  }).returning();
-  return apt;
+    const [apt] = await tx.insert(apartments).values({
+      ...data,
+      cachedBalance: '0',
+    }).returning();
+
+    // Backfill subscriptions and expenses if apartment is occupied with a past date
+    if (apt.status === 'occupied' && apt.occupancyStart) {
+      await backfillSubscriptions(apt.id, tx);
+      await backfillExpensesForApartment(apt.id, apt.buildingId, new Date(apt.occupancyStart), userId, tx);
+    }
+
+    return apt;
+  });
 }
 
 export async function updateApartment(id: string, data: Partial<{
@@ -77,14 +88,29 @@ export async function updateApartment(id: string, data: Partial<{
   ownerId: string | null;
   beneficiaryId: string | null;
   occupancyStart: Date | null;
-}>) {
-  const [apt] = await db
-    .update(apartments)
-    .set({ ...data, updatedAt: new Date() })
-    .where(eq(apartments.id, id))
-    .returning();
-  if (!apt) throw new AppError(404, 'Apartment not found');
-  return apt;
+}>, userId: string) {
+  return await db.transaction(async (tx) => {
+    // Fetch old state before update
+    const [oldApt] = await tx.select().from(apartments).where(eq(apartments.id, id)).limit(1);
+    if (!oldApt) throw new AppError(404, 'Apartment not found');
+
+    const [apt] = await tx
+      .update(apartments)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(apartments.id, id))
+      .returning();
+
+    // Trigger backfills if apartment transitioned to occupied
+    const wasOccupied = oldApt.status === 'occupied';
+    const isNowOccupied = apt.status === 'occupied';
+
+    if (!wasOccupied && isNowOccupied && apt.occupancyStart) {
+      await backfillSubscriptions(apt.id, tx);
+      await backfillExpensesForApartment(apt.id, apt.buildingId, new Date(apt.occupancyStart), userId, tx);
+    }
+
+    return apt;
+  });
 }
 
 export async function deleteApartment(id: string) {

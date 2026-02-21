@@ -18,7 +18,7 @@ const createApartmentSchema = z.object({
   subscriptionStatus: z.enum(['active', 'inactive']).optional(),
   ownerId: z.string().uuid().nullable().optional(),
   beneficiaryId: z.string().uuid().nullable().optional(),
-  occupancyStart: z.string().regex(/^\d{4}-\d{2}-\d{2}/).optional(),
+  occupancyStart: z.string().regex(/^\d{4}-\d{2}-\d{2}/).nullable().optional(),
 });
 
 const updateApartmentSchema = z.object({
@@ -59,7 +59,7 @@ apartmentRoutes.post('/', requireAuth, requireRole('admin'), validate(createApar
       ...req.body,
       occupancyStart: req.body.occupancyStart ? new Date(req.body.occupancyStart) : undefined,
     };
-    const result = await apartmentService.createApartment(data);
+    const result = await apartmentService.createApartment(data, req.user!.userId);
     res.status(201).json(result);
   } catch (err) { next(err); }
 });
@@ -72,7 +72,7 @@ apartmentRoutes.put('/:id', requireAuth, requireRole('admin'), validate({ params
     if (data.occupancyStart !== undefined) {
       data.occupancyStart = data.occupancyStart ? new Date(data.occupancyStart) : null;
     }
-    const result = await apartmentService.updateApartment(req.params.id as string, data);
+    const result = await apartmentService.updateApartment(req.params.id as string, data, req.user!.userId);
     res.json(result);
   } catch (err) { next(err); }
 });

@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 interface ChallengeResponse {
   challengeId: string;
@@ -6,8 +6,16 @@ interface ChallengeResponse {
   prefix: string;
 }
 
-export async function solveChallenge(): Promise<{ challengeId: string; nonce: string }> {
-  const res = await fetch(`${API_URL}/auth/challenge`);
+export interface PowProgress {
+  nonce: string;
+  hash: string;
+  done: boolean;
+}
+
+export async function solveChallenge(
+  onProgress?: (progress: PowProgress) => void,
+): Promise<{ challengeId: string; nonce: string }> {
+  const res = await fetch(`${API_URL}/auth/challenge`, { credentials: 'include' });
   if (!res.ok) throw new Error('Failed to fetch challenge');
   const challenge: ChallengeResponse = await res.json();
 
@@ -22,10 +30,14 @@ export async function solveChallenge(): Promise<{ challengeId: string; nonce: st
       reject(new Error('PoW timeout'));
     }, 30_000);
 
-    worker.onmessage = (e: MessageEvent<{ nonce: string }>) => {
-      clearTimeout(timeout);
-      worker.terminate();
-      resolve({ challengeId: challenge.challengeId, nonce: e.data.nonce });
+    worker.onmessage = (e: MessageEvent<PowProgress>) => {
+      onProgress?.(e.data);
+
+      if (e.data.done) {
+        clearTimeout(timeout);
+        worker.terminate();
+        resolve({ challengeId: challenge.challengeId, nonce: e.data.nonce });
+      }
     };
 
     worker.onerror = (err) => {

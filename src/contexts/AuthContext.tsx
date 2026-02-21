@@ -49,7 +49,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser(me);
     } catch {
       setUser(null);
-      auth.clearTokens();
     } finally {
       setLoading(false);
     }
@@ -74,7 +73,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         };
       }
 
-      // Tokens already stored by auth.login
+      // Cookies set by server
       await fetchUser();
       navigate('/dashboard');
       return {};

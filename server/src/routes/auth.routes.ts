@@ -7,6 +7,7 @@ import { authRateLimit, refreshRateLimit } from '../middleware/rate-limit.js';
 import { createChallenge } from '../services/pow.service.js';
 import * as authService from '../services/auth.service.js';
 import { logAuditEvent } from '../services/audit.service.js';
+import { setAuthCookies, clearAuthCookies } from '../utils/cookie.js';
 
 export const authRoutes = Router();
 
@@ -31,14 +32,6 @@ const registerSchema = z.object({
   nonce: z.string(),
 });
 
-const refreshSchema = z.object({
-  refreshToken: z.string().min(1),
-});
-
-const logoutSchema = z.object({
-  refreshToken: z.string().min(1),
-});
-
 const verify2FASchema = z.object({
   factorId: z.string().uuid(),
   code: z.string().length(6),
@@ -57,22 +50,32 @@ authRoutes.get('/challenge', (_req: Request, res: Response) => {
 authRoutes.post('/login', authRateLimit, requirePow, validate(loginSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await authService.signIn(req.body.email, req.body.password);
-    if (!result.requires2FA) {
-      logAuditEvent({
-        userEmail: req.body.email,
-        actionType: 'login',
-        actionDetails: { method: 'password' },
-        ipAddress: req.ip || req.socket.remoteAddress,
-        userAgent: req.headers['user-agent']?.slice(0, 500),
-      }).catch(() => {});
+
+    if (result.requires2FA) {
+      res.json({ requires2FA: true, sessionToken: result.sessionToken });
+      return;
     }
-    res.json(result);
+
+    setAuthCookies(res, result.accessToken!, result.refreshToken!);
+
+    logAuditEvent({
+      userEmail: req.body.email,
+      actionType: 'login',
+      actionDetails: { method: 'password' },
+      ipAddress: req.ip || req.socket.remoteAddress,
+      userAgent: req.headers['user-agent']?.slice(0, 500),
+    }).catch(() => {});
+
+    res.json({ success: true });
   } catch (err) { next(err); }
 });
 
 authRoutes.post('/login/2fa', authRateLimit, validate(login2FASchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await authService.verifyTotpLogin(req.body.sessionToken, req.body.code);
+
+    setAuthCookies(res, result.accessToken, result.refreshToken);
+
     logAuditEvent({
       userId: result.userId,
       actionType: 'login',
@@ -80,7 +83,8 @@ authRoutes.post('/login/2fa', authRateLimit, validate(login2FASchema), async (re
       ipAddress: req.ip || req.socket.remoteAddress,
       userAgent: req.headers['user-agent']?.slice(0, 500),
     }).catch(() => {});
-    res.json({ accessToken: result.accessToken, refreshToken: result.refreshToken });
+
+    res.json({ success: true });
   } catch (err) { next(err); }
 });
 
@@ -98,21 +102,35 @@ authRoutes.post('/register', authRateLimit, requirePow, validate(registerSchema)
   } catch (err) { next(err); }
 });
 
-authRoutes.post('/refresh', refreshRateLimit, validate(refreshSchema), async (req: Request, res: Response, next: NextFunction) => {
+authRoutes.post('/refresh', refreshRateLimit, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const result = await authService.refreshTokensService(req.body.refreshToken);
-    res.json(result);
+    const refreshToken = req.cookies?.refresh_token as string | undefined;
+    if (!refreshToken) {
+      res.status(401).json({ error: 'No refresh token' });
+      return;
+    }
+
+    const result = await authService.refreshTokensService(refreshToken);
+    setAuthCookies(res, result.accessToken, result.refreshToken);
+    res.json({ success: true });
   } catch (err) { next(err); }
 });
 
-authRoutes.post('/logout', validate(logoutSchema), async (req: Request, res: Response, next: NextFunction) => {
+authRoutes.post('/logout', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    await authService.signOut(req.body.refreshToken);
+    const refreshToken = req.cookies?.refresh_token as string | undefined;
+    if (refreshToken) {
+      await authService.signOut(refreshToken);
+    }
+
+    clearAuthCookies(res);
+
     logAuditEvent({
       actionType: 'logout',
       ipAddress: req.ip || req.socket.remoteAddress,
       userAgent: req.headers['user-agent']?.slice(0, 500),
     }).catch(() => {});
+
     res.json({ success: true });
   } catch (err) { next(err); }
 });

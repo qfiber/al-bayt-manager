@@ -12,6 +12,7 @@ export const translations = {
     logout: "התנתקות",
     signInToAccount: "התחבר לחשבונך",
     signingIn: "מתחבר...",
+    securingConnection: "מאבטח חיבור...",
     signInButton: "התחבר",
     needAccountContact: "צריך חשבון? צור קשר עם המנהל.",
 
@@ -168,6 +169,14 @@ export const translations = {
     recurringEndDateOptional: "תאריך סיום חזרה (אופציונלי)",
     recurringEndDateNote: "השאר ריק לחזרה ללא הגבלה",
     recurring: "חוזר",
+    expenseType: "סוג ההוצאה",
+    oneTimeExpense: "הוצאה חד-פעמית",
+    oneTimeExpenseDesc: "הוצאה שמוחלת פעם אחת",
+    recurringExpenseDesc: "הוצאה שחוזרת באופן אוטומטי",
+    selectDate: "בחר תאריך",
+    entireBuilding: "כל הבניין",
+    specificApartment: "דירה ספציפית",
+    applyTo: "החל על",
 
     // Reports
     apartmentReport: "דוח דירות",
@@ -497,6 +506,7 @@ export const translations = {
     logout: "تسجيل الخروج",
     signInToAccount: "تسجيل الدخول إلى حسابك",
     signingIn: "جاري تسجيل الدخول...",
+    securingConnection: "تأمين الاتصال...",
     signInButton: "تسجيل الدخول",
     needAccountContact: "بحاجة إلى حساب؟ اتصل بالمسؤول.",
 
@@ -653,6 +663,14 @@ export const translations = {
     recurringEndDateOptional: "تاريخ نهاية التكرار (اختياري)",
     recurringEndDateNote: "اتركه فارغاً للتكرار إلى أجل غير مسمى",
     recurring: "متكرر",
+    expenseType: "نوع المصروف",
+    oneTimeExpense: "مصروف لمرة واحدة",
+    oneTimeExpenseDesc: "مصروف يتم تطبيقه مرة واحدة",
+    recurringExpenseDesc: "مصروف يتكرر تلقائيًا",
+    selectDate: "اختر تاريخ",
+    entireBuilding: "المبنى بالكامل",
+    specificApartment: "شقة محددة",
+    applyTo: "تطبيق على",
 
     // Reports
     apartmentReport: "تقرير الشقة",
@@ -982,6 +1000,7 @@ export const translations = {
     logout: "Logout",
     signInToAccount: "Sign in to your account",
     signingIn: "Signing in...",
+    securingConnection: "Securing connection...",
     signInButton: "Sign In",
     needAccountContact: "Need an account? Contact your administrator.",
 
@@ -1138,6 +1157,14 @@ export const translations = {
     recurringEndDateOptional: "Recurring End Date (optional)",
     recurringEndDateNote: "Leave empty to recur indefinitely",
     recurring: "Recurring",
+    expenseType: "Expense Type",
+    oneTimeExpense: "One-time Expense",
+    oneTimeExpenseDesc: "A single expense applied once",
+    recurringExpenseDesc: "An expense that repeats automatically",
+    selectDate: "Select date",
+    entireBuilding: "Entire building",
+    specificApartment: "Specific apartment",
+    applyTo: "Apply to",
 
     // Reports
     apartmentReport: "Apartment Report",

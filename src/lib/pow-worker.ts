@@ -1,7 +1,15 @@
 // Web Worker: brute-force PoW nonce
-// Receives { prefix, difficulty }, posts back { nonce }
+// Receives { prefix, difficulty }, posts back { nonce } or { progress }
 
 const ctx = self as unknown as Worker;
+
+function toHex(bytes: Uint8Array): string {
+  let hex = '';
+  for (let i = 0; i < bytes.length; i++) {
+    hex += bytes[i].toString(16).padStart(2, '0');
+  }
+  return hex;
+}
 
 ctx.onmessage = async (e: MessageEvent<{ prefix: string; difficulty: number }>) => {
   const { prefix, difficulty } = e.data;
@@ -14,8 +22,13 @@ ctx.onmessage = async (e: MessageEvent<{ prefix: string; difficulty: number }>) 
     const hash = new Uint8Array(hashBuf);
 
     if (hasLeadingZeroBits(hash, difficulty)) {
-      ctx.postMessage({ nonce: String(nonce) });
+      ctx.postMessage({ nonce: String(nonce), hash: toHex(hash), done: true });
       return;
+    }
+
+    // Send progress every 500 iterations
+    if (nonce % 500 === 0) {
+      ctx.postMessage({ nonce: String(nonce), hash: toHex(hash), done: false });
     }
 
     nonce++;

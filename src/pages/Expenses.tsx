@@ -10,10 +10,14 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useToast } from '@/hooks/use-toast';
-import { FileText, Plus, Pencil, Trash2 } from 'lucide-react';
-import { formatDate } from '@/lib/utils';
+import { FileText, Plus, Pencil, Trash2, Calendar as CalendarIcon, ArrowLeft, Repeat, Receipt } from 'lucide-react';
+import { formatDate, cn } from '@/lib/utils';
+import { format } from 'date-fns';
 
 interface Expense {
   id: string;
@@ -55,17 +59,18 @@ const Expenses = () => {
   const [apartments, setApartments] = useState<ApartmentOption[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+  const [expenseMode, setExpenseMode] = useState<'one-time' | 'recurring' | null>(null);
+  const [expenseDate, setExpenseDate] = useState<Date | undefined>();
+  const [recurringStartDate, setRecurringStartDate] = useState<Date | undefined>();
+  const [recurringEndDate, setRecurringEndDate] = useState<Date | undefined>();
+  const [openPopover, setOpenPopover] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     building_id: '',
     description: '',
     amount: '',
-    expense_date: '',
     category: '',
-    is_recurring: false,
-    recurring_type: '',
-    recurring_start_date: '',
-    recurring_end_date: '',
-    is_single_apartment: false,
+
+    apply_to: 'building' as 'building' | 'apartment',
     apartment_id: '',
   });
 
@@ -115,13 +120,9 @@ const Expenses = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Convert dd/mm/yyyy to yyyy-mm-dd for the API
-    let dbDate = formData.expense_date;
-    const parts = formData.expense_date.split('/');
-    if (parts.length === 3) {
-      const [day, month, year] = parts;
-      dbDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-    }
+    // For recurring expenses, use recurringStartDate as the expense date
+    const dateForDb = expenseMode === 'recurring' ? recurringStartDate : expenseDate;
+    const dbDate = dateForDb ? format(dateForDb, 'yyyy-MM-dd') : '';
 
     if (editingExpense) {
       try {
@@ -139,26 +140,26 @@ const Expenses = () => {
       }
     } else {
       try {
+        const isRecurring = expenseMode === 'recurring';
         const payload: any = {
           buildingId: formData.building_id,
           description: formData.description,
           amount: parseFloat(formData.amount),
           expenseDate: dbDate,
           category: formData.category || undefined,
-          isRecurring: formData.is_recurring,
-          recurringType: formData.is_recurring ? formData.recurring_type || undefined : undefined,
-          recurringStartDate: formData.is_recurring && formData.recurring_start_date ? formData.recurring_start_date : undefined,
-          recurringEndDate: formData.is_recurring && formData.recurring_end_date ? formData.recurring_end_date : undefined,
+          isRecurring,
+          recurringType: isRecurring ? 'monthly' : undefined,
+          recurringStartDate: isRecurring && recurringStartDate ? format(recurringStartDate, 'yyyy-MM-dd') : undefined,
+          recurringEndDate: isRecurring && recurringEndDate ? format(recurringEndDate, 'yyyy-MM-dd') : undefined,
         };
 
-        // If single apartment mode, include apartmentId so the server assigns the expense to that apartment only
-        if (formData.is_single_apartment && formData.apartment_id) {
+        if (formData.apply_to === 'apartment' && formData.apartment_id) {
           payload.apartmentId = formData.apartment_id;
         }
 
         await api.post('/expenses', payload);
 
-        if (formData.is_single_apartment && formData.apartment_id) {
+        if (formData.apply_to === 'apartment' && formData.apartment_id) {
           toast({
             title: t('success'),
             description: t('expenseAppliedToApartment')
@@ -192,25 +193,16 @@ const Expenses = () => {
 
   const handleEdit = (expense: Expense) => {
     setEditingExpense(expense);
-    // Convert yyyy-mm-dd from API to dd/mm/yyyy for display
-    let displayDate = expense.expenseDate;
-    const parts = expense.expenseDate.split('-');
-    if (parts.length === 3) {
-      const [year, month, day] = parts;
-      displayDate = `${day}/${month}/${year}`;
-    }
-
+    setExpenseMode(expense.isRecurring ? 'recurring' : 'one-time');
+    setExpenseDate(new Date(expense.expenseDate + 'T00:00:00'));
+    setRecurringStartDate(expense.recurringStartDate ? new Date(expense.recurringStartDate + 'T00:00:00') : undefined);
+    setRecurringEndDate(expense.recurringEndDate ? new Date(expense.recurringEndDate + 'T00:00:00') : undefined);
     setFormData({
       building_id: expense.buildingId,
       description: expense.description,
       amount: expense.amount.toString(),
-      expense_date: displayDate,
       category: expense.category || '',
-      is_recurring: expense.isRecurring,
-      recurring_type: expense.recurringType || '',
-      recurring_start_date: expense.recurringStartDate || '',
-      recurring_end_date: expense.recurringEndDate || '',
-      is_single_apartment: false,
+      apply_to: 'building',
       apartment_id: '',
     });
     setIsDialogOpen(true);
@@ -221,15 +213,16 @@ const Expenses = () => {
       building_id: '',
       description: '',
       amount: '',
-      expense_date: '',
       category: '',
-      is_recurring: false,
-      recurring_type: '',
-      recurring_start_date: '',
-      recurring_end_date: '',
-      is_single_apartment: false,
+  
+      apply_to: 'building',
       apartment_id: '',
     });
+    setExpenseMode(null);
+    setExpenseDate(undefined);
+    setRecurringStartDate(undefined);
+    setRecurringEndDate(undefined);
+    setOpenPopover(null);
     setEditingExpense(null);
     setIsDialogOpen(false);
   };
@@ -253,186 +246,279 @@ const Expenses = () => {
             <h1 className="text-3xl font-bold">{t('expenses')}</h1>
           </div>
           <div className="flex gap-2 flex-wrap">
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-              <DialogTrigger asChild>
-                <Button onClick={() => resetForm()} className="w-full sm:w-auto">
-                  <Plus className="w-4 h-4 mr-2" />
-                  {t('addExpense')}
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>{editingExpense ? t('editExpense') : t('addExpense')}</DialogTitle>
-                </DialogHeader>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div>
-                    <Label htmlFor="building_id">{t('building')}</Label>
-                    <Select value={formData.building_id} onValueChange={(value) => setFormData({ ...formData, building_id: value })}>
-                      <SelectTrigger>
-                        <SelectValue placeholder={t('selectBuilding')} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {buildings.map((building) => (
-                          <SelectItem key={building.id} value={building.id}>
-                            {building.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label htmlFor="description">{t('description')}</Label>
-                    <Textarea
-                      id="description"
-                      value={formData.description}
-                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="amount">{t('amount')}</Label>
-                    <Input
-                      id="amount"
-                      type="number"
-                      step="0.01"
-                      value={formData.amount}
-                      onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="expense_date">{t('date')}</Label>
-                    <Input
-                      id="expense_date"
-                      type="text"
-                      placeholder="dd/mm/yyyy"
-                      value={formData.expense_date}
-                      onChange={(e) => {
-                        const value = e.target.value.replace(/[^\d/]/g, '');
-                        if (value.length <= 10) {
-                          setFormData({ ...formData, expense_date: value });
-                        }
-                      }}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="category">{t('categoryOptional')}</Label>
-                    <Input
-                      id="category"
-                      value={formData.category}
-                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                      placeholder={t('categoryPlaceholder')}
-                    />
-                  </div>
-
-                  {/* Recurring Expense Options */}
-                  <div className="space-y-4 border-t pt-4">
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id="is_recurring"
-                        checked={formData.is_recurring}
-                        onChange={(e) => setFormData({ ...formData, is_recurring: e.target.checked })}
-                        className="rounded"
-                      />
-                      <Label htmlFor="is_recurring" className="cursor-pointer">
-                        {t('recurringExpense')}
-                      </Label>
-                    </div>
-
-                    {formData.is_recurring && (
-                      <>
-                        <div>
-                          <Label htmlFor="recurring_type">{t('recurringType')}</Label>
-                          <Select value={formData.recurring_type} onValueChange={(value) => setFormData({ ...formData, recurring_type: value })}>
-                            <SelectTrigger>
-                              <SelectValue placeholder={t('selectRecurringType')} />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="monthly">{t('monthly')}</SelectItem>
-                              <SelectItem value="yearly">{t('yearly')}</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        <div>
-                          <Label htmlFor="recurring_start_date">{t('recurringStartDate')}</Label>
-                          <Input
-                            id="recurring_start_date"
-                            type="date"
-                            value={formData.recurring_start_date}
-                            onChange={(e) => setFormData({ ...formData, recurring_start_date: e.target.value })}
-                          />
-                        </div>
-
-                        <div>
-                          <Label htmlFor="recurring_end_date">{t('recurringEndDateOptional')}</Label>
-                          <Input
-                            id="recurring_end_date"
-                            type="date"
-                            value={formData.recurring_end_date}
-                            onChange={(e) => setFormData({ ...formData, recurring_end_date: e.target.value })}
-                          />
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {t('recurringEndDateNote')}
-                          </p>
-                        </div>
-                      </>
-                    )}
-                  </div>
-
-                  {/* Single Apartment Expense Option */}
-                  {!editingExpense && formData.building_id && (
-                    <div className="space-y-4 border-t pt-4">
-                      <div className="flex items-center space-x-2">
-                        <input
-                          type="checkbox"
-                          id="is_single_apartment"
-                          checked={formData.is_single_apartment}
-                          onChange={(e) => setFormData({ ...formData, is_single_apartment: e.target.checked, apartment_id: '' })}
-                          className="rounded"
-                        />
-                        <Label htmlFor="is_single_apartment" className="cursor-pointer">
-                          {t('applyToSingleApartment')}
-                        </Label>
-                      </div>
-
-                      {formData.is_single_apartment && (
-                        <div>
-                          <Label htmlFor="apartment_id">{t('selectApartment')}</Label>
-                          <Select value={formData.apartment_id} onValueChange={(value) => setFormData({ ...formData, apartment_id: value })}>
-                            <SelectTrigger>
-                              <SelectValue placeholder={t('selectApartment')} />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {apartments
-                                .filter(apt => apt.buildingId === formData.building_id)
-                                .map((apt) => (
-                                  <SelectItem key={apt.id} value={apt.id}>
-                                    {apt.apartmentNumber}
-                                  </SelectItem>
-                                ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  <div className="flex gap-2">
-                    <Button type="submit" className="flex-1">
-                      {editingExpense ? t('update') : t('create')}
-                    </Button>
-                    <Button type="button" variant="outline" onClick={resetForm}>
-                      {t('cancel')}
-                    </Button>
-                  </div>
-                </form>
-              </DialogContent>
-            </Dialog>
+            <Button
+              onClick={() => {
+                setEditingExpense(null);
+                setExpenseMode(null);
+                setExpenseDate(undefined);
+                setRecurringStartDate(undefined);
+                setRecurringEndDate(undefined);
+                setOpenPopover(null);
+                setFormData({
+                  building_id: '',
+                  description: '',
+                  amount: '',
+                  category: '',
+              
+                  apply_to: 'building',
+                  apartment_id: '',
+                });
+                setIsDialogOpen(true);
+              }}
+              className="w-full sm:w-auto"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              {t('addExpense')}
+            </Button>
           </div>
         </div>
+
+        <Dialog open={isDialogOpen} onOpenChange={(open) => { if (!open) resetForm(); }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>
+                {editingExpense
+                  ? t('editExpense')
+                  : expenseMode
+                    ? (expenseMode === 'one-time' ? t('oneTimeExpense') : t('recurringExpense'))
+                    : t('addExpense')
+                }
+              </DialogTitle>
+            </DialogHeader>
+
+            {/* Step 1: Type selection (create mode only) */}
+            {!editingExpense && !expenseMode ? (
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">{t('expenseType')}</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setExpenseMode('one-time')}
+                    className="flex flex-col items-center gap-3 p-6 rounded-lg border-2 border-muted hover:border-primary hover:bg-primary/5 transition-colors cursor-pointer text-center"
+                  >
+                    <Receipt className="w-8 h-8 text-primary" />
+                    <div>
+                      <h3 className="font-semibold">{t('oneTimeExpense')}</h3>
+                      <p className="text-sm text-muted-foreground mt-1">{t('oneTimeExpenseDesc')}</p>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setExpenseMode('recurring')}
+                    className="flex flex-col items-center gap-3 p-6 rounded-lg border-2 border-muted hover:border-primary hover:bg-primary/5 transition-colors cursor-pointer text-center"
+                  >
+                    <Repeat className="w-8 h-8 text-primary" />
+                    <div>
+                      <h3 className="font-semibold">{t('recurringExpense')}</h3>
+                      <p className="text-sm text-muted-foreground mt-1">{t('recurringExpenseDesc')}</p>
+                    </div>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* Step 2: Expense form */
+              <form onSubmit={handleSubmit} className="space-y-4">
+                {!editingExpense && (
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setExpenseMode(null)} className="gap-1 -mt-2">
+                    <ArrowLeft className="w-4 h-4" />
+                    {t('back')}
+                  </Button>
+                )}
+
+                {/* Building */}
+                <div>
+                  <Label>{t('building')}</Label>
+                  <Select
+                    value={formData.building_id}
+                    onValueChange={(value) => setFormData({ ...formData, building_id: value, apartment_id: '' })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={t('selectBuilding')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {buildings.map((building) => (
+                        <SelectItem key={building.id} value={building.id}>
+                          {building.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Description */}
+                <div>
+                  <Label htmlFor="description">{t('description')}</Label>
+                  <Textarea
+                    id="description"
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    required
+                  />
+                </div>
+
+                {/* Amount */}
+                <div>
+                  <Label htmlFor="amount">{t('amount')}</Label>
+                  <Input
+                    id="amount"
+                    type="number"
+                    step="0.01"
+                    value={formData.amount}
+                    onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                    required
+                  />
+                </div>
+
+                {/* Date Picker (one-time only; recurring uses start date) */}
+                {expenseMode !== 'recurring' && (
+                  <div>
+                    <Label>{t('date')}</Label>
+                    <Popover open={openPopover === 'expense-date'} onOpenChange={(open) => setOpenPopover(open ? 'expense-date' : null)}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className={cn("w-full justify-start text-left font-normal", !expenseDate && "text-muted-foreground")}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {expenseDate ? format(expenseDate, 'dd/MM/yyyy') : t('selectDate')}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={expenseDate}
+                          onSelect={(date) => { setExpenseDate(date); setOpenPopover(null); }}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                )}
+
+                {/* Category */}
+                <div>
+                  <Label htmlFor="category">{t('categoryOptional')}</Label>
+                  <Input
+                    id="category"
+                    value={formData.category}
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                    placeholder={t('categoryPlaceholder')}
+                  />
+                </div>
+
+                {/* Recurring fields */}
+                {expenseMode === 'recurring' && (
+                  <>
+                    <div>
+                      <Label>{t('recurringStartDate')}</Label>
+                      <Popover open={openPopover === 'recurring-start'} onOpenChange={(open) => setOpenPopover(open ? 'recurring-start' : null)}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className={cn("w-full justify-start text-left font-normal", !recurringStartDate && "text-muted-foreground")}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {recurringStartDate ? format(recurringStartDate, 'dd/MM/yyyy') : t('selectDate')}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={recurringStartDate}
+                            onSelect={(date) => { setRecurringStartDate(date); setOpenPopover(null); }}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+
+                    <div>
+                      <Label>{t('recurringEndDateOptional')}</Label>
+                      <Popover open={openPopover === 'recurring-end'} onOpenChange={(open) => setOpenPopover(open ? 'recurring-end' : null)}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className={cn("w-full justify-start text-left font-normal", !recurringEndDate && "text-muted-foreground")}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {recurringEndDate ? format(recurringEndDate, 'dd/MM/yyyy') : t('selectDate')}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={recurringEndDate}
+                            onSelect={(date) => { setRecurringEndDate(date); setOpenPopover(null); }}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {t('recurringEndDateNote')}
+                      </p>
+                    </div>
+                  </>
+                )}
+
+                {/* Apply to (create mode only, after building selected) */}
+                {!editingExpense && formData.building_id && (
+                  <div className="space-y-3 border-t pt-4">
+                    <Label>{t('applyTo')}</Label>
+                    <RadioGroup
+                      value={formData.apply_to}
+                      onValueChange={(value: string) => setFormData({ ...formData, apply_to: value as 'building' | 'apartment', apartment_id: '' })}
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="building" id="apply-building" />
+                        <Label htmlFor="apply-building" className="cursor-pointer font-normal">
+                          {t('entireBuilding')}
+                        </Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="apartment" id="apply-apartment" />
+                        <Label htmlFor="apply-apartment" className="cursor-pointer font-normal">
+                          {t('specificApartment')}
+                        </Label>
+                      </div>
+                    </RadioGroup>
+
+                    {formData.apply_to === 'apartment' && (
+                      <div>
+                        <Label>{t('selectApartment')}</Label>
+                        <Select value={formData.apartment_id} onValueChange={(value) => setFormData({ ...formData, apartment_id: value })}>
+                          <SelectTrigger>
+                            <SelectValue placeholder={t('selectApartment')} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {apartments
+                              .filter(apt => apt.buildingId === formData.building_id)
+                              .map((apt) => (
+                                <SelectItem key={apt.id} value={apt.id}>
+                                  {apt.apartmentNumber}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="flex gap-2">
+                  <Button type="submit" className="flex-1">
+                    {editingExpense ? t('update') : t('create')}
+                  </Button>
+                  <Button type="button" variant="outline" onClick={resetForm}>
+                    {t('cancel')}
+                  </Button>
+                </div>
+              </form>
+            )}
+          </DialogContent>
+        </Dialog>
 
         <Card>
           <CardHeader>
