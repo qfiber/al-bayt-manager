@@ -298,7 +298,7 @@ const Setup2FA = () => {
                 onClick={handleEnroll}
                 disabled={isLoading}
               >
-                <QrCode className="w-4 h-4 mr-2" />
+                <QrCode className="w-4 h-4 me-2" />
                 {isLoading ? t('settingUp') : t('startSetup')}
               </Button>
 

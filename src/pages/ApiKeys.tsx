@@ -247,7 +247,7 @@ export default function ApiKeys() {
             </CardDescription>
           </div>
           <Button onClick={() => setIsDialogOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
+            <Plus className="h-4 w-4 me-2" />
             {language === 'ar' ? 'إنشاء مفتاح جديد' : 'Create New Key'}
           </Button>
         </CardHeader>
@@ -255,11 +255,11 @@ export default function ApiKeys() {
           <Table dir="rtl">
             <TableHeader>
               <TableRow>
-                <TableHead className="text-right">{language === 'ar' ? 'الاسم' : 'Name'}</TableHead>
-                <TableHead className="text-right">{language === 'ar' ? 'الحالة' : 'Status'}</TableHead>
-                <TableHead className="text-right">{language === 'ar' ? 'آخر استخدام' : 'Last Used'}</TableHead>
-                <TableHead className="text-right">{language === 'ar' ? 'تاريخ الإنشاء' : 'Created'}</TableHead>
-                <TableHead className="text-right">{language === 'ar' ? 'الإجراءات' : 'Actions'}</TableHead>
+                <TableHead className="text-start">{language === 'ar' ? 'الاسم' : 'Name'}</TableHead>
+                <TableHead className="text-start">{language === 'ar' ? 'الحالة' : 'Status'}</TableHead>
+                <TableHead className="text-start">{language === 'ar' ? 'آخر استخدام' : 'Last Used'}</TableHead>
+                <TableHead className="text-start">{language === 'ar' ? 'تاريخ الإنشاء' : 'Created'}</TableHead>
+                <TableHead className="text-start">{language === 'ar' ? 'الإجراءات' : 'Actions'}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -272,23 +272,23 @@ export default function ApiKeys() {
               ) : (
                 apiKeys.map((key) => (
                   <TableRow key={key.id}>
-                    <TableCell className="font-medium text-right">{key.name}</TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="font-medium text-start">{key.name}</TableCell>
+                    <TableCell className="text-start">
                       <Badge variant={key.isActive ? "default" : "secondary"}>
                         {key.isActive
                           ? (language === 'ar' ? 'نشط' : 'Active')
                           : (language === 'ar' ? 'معطل' : 'Disabled')}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-start">
                       {key.lastUsedAt
                         ? formatDateTime(key.lastUsedAt)
                         : (language === 'ar' ? 'لم يستخدم' : 'Never')}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-start">
                       {formatDateTime(key.createdAt)}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-start">
                       <div className="flex gap-2 justify-end">
                         <Button
                           size="sm"
@@ -341,7 +341,7 @@ export default function ApiKeys() {
               />
             </div>
             <Button onClick={generateApiKey} className="w-full">
-              <Key className="h-4 w-4 mr-2" />
+              <Key className="h-4 w-4 me-2" />
               {language === 'ar' ? 'إنشاء المفتاح' : 'Generate Key'}
             </Button>
           </div>
@@ -369,7 +369,7 @@ export default function ApiKeys() {
               className="w-full"
               variant="outline"
             >
-              <Copy className="h-4 w-4 mr-2" />
+              <Copy className="h-4 w-4 me-2" />
               {language === 'ar' ? 'نسخ المفتاح' : 'Copy Key'}
             </Button>
           </div>

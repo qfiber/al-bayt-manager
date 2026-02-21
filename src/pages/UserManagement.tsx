@@ -533,7 +533,7 @@ const UserManagement = () => {
           </div>
           <div className="flex gap-2 flex-wrap">
             <Button onClick={() => setIsCreateDialogOpen(true)} className="w-full sm:w-auto">
-              <UserPlus className="w-4 h-4 mr-2" />
+              <UserPlus className="w-4 h-4 me-2" />
               {t('createUser')}
             </Button>
           </div>
@@ -547,11 +547,11 @@ const UserManagement = () => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="text-right">{t('nameLabel')}</TableHead>
-                  <TableHead className="text-right">{t('phoneLabel')}</TableHead>
-                  <TableHead className="text-right">{t('role')}</TableHead>
-                  <TableHead className="text-right">{t('assignedBuildings')}</TableHead>
-                  <TableHead className="text-right">{t('actions')}</TableHead>
+                  <TableHead className="text-start">{t('nameLabel')}</TableHead>
+                  <TableHead className="text-start">{t('phoneLabel')}</TableHead>
+                  <TableHead className="text-start">{t('role')}</TableHead>
+                  <TableHead className="text-start">{t('assignedBuildings')}</TableHead>
+                  <TableHead className="text-start">{t('actions')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -564,14 +564,14 @@ const UserManagement = () => {
                 ) : (
                   users.map((userProfile) => (
                     <TableRow key={userProfile.id}>
-                      <TableCell className="font-medium text-right">{userProfile.name}</TableCell>
-                      <TableCell className="text-right">{userProfile.phone || '-'}</TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="font-medium text-start">{userProfile.name}</TableCell>
+                      <TableCell className="text-start">{userProfile.phone || '-'}</TableCell>
+                      <TableCell className="text-start">
                         <Badge variant={userProfile.role === 'admin' ? 'default' : userProfile.role === 'moderator' ? 'outline' : 'secondary'}>
                           {t(userProfile.role as 'admin' | 'moderator' | 'user')}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-start">
                         {userProfile.role === 'moderator' ? (
                           moderatorBuildings.get(userProfile.id) && moderatorBuildings.get(userProfile.id)!.length > 0 ? (
                             <div className="flex flex-wrap gap-1 justify-end">
@@ -593,7 +593,7 @@ const UserManagement = () => {
                           <span className="text-muted-foreground text-sm">-</span>
                         )}
                       </TableCell>
-                       <TableCell className="text-right">
+                       <TableCell className="text-start">
                         <div className="flex justify-end gap-2">
                           <Button
                             size="sm"
@@ -883,7 +883,7 @@ const UserManagement = () => {
                   return (
                     <div key={building.id} className="space-y-2">
                       <h3 className="font-semibold text-sm">{building.name}</h3>
-                      <div className="grid grid-cols-3 gap-2 pl-4">
+                      <div className="grid grid-cols-3 gap-2 ps-4">
                         {buildingApartments.map(apartment => {
                           const isSelected = selectedOwnerApartments.includes(apartment.id);
 
@@ -1001,7 +1001,7 @@ const UserManagement = () => {
                   return (
                     <div key={building.id} className="space-y-2">
                       <h3 className="font-semibold text-sm">{building.name}</h3>
-                      <div className="grid grid-cols-3 gap-2 pl-4">
+                      <div className="grid grid-cols-3 gap-2 ps-4">
                         {buildingApartments.map(apartment => {
                           const isSelected = selectedBeneficiaryApartments.includes(apartment.id);
 

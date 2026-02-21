@@ -281,7 +281,7 @@ const Expenses = () => {
               }}
               className="w-full sm:w-auto"
             >
-              <Plus className="w-4 h-4 mr-2" />
+              <Plus className="w-4 h-4 me-2" />
               {t('addExpense')}
             </Button>
           </div>
@@ -392,9 +392,9 @@ const Expenses = () => {
                         <Button
                           type="button"
                           variant="outline"
-                          className={cn("w-full justify-start text-left font-normal", !expenseDate && "text-muted-foreground")}
+                          className={cn("w-full justify-start text-start font-normal", !expenseDate && "text-muted-foreground")}
                         >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          <CalendarIcon className="me-2 h-4 w-4" />
                           {expenseDate ? format(expenseDate, 'dd/MM/yyyy') : t('selectDate')}
                         </Button>
                       </PopoverTrigger>
@@ -431,9 +431,9 @@ const Expenses = () => {
                           <Button
                             type="button"
                             variant="outline"
-                            className={cn("w-full justify-start text-left font-normal", !recurringStartDate && "text-muted-foreground")}
+                            className={cn("w-full justify-start text-start font-normal", !recurringStartDate && "text-muted-foreground")}
                           >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            <CalendarIcon className="me-2 h-4 w-4" />
                             {recurringStartDate ? format(recurringStartDate, 'dd/MM/yyyy') : t('selectDate')}
                           </Button>
                         </PopoverTrigger>
@@ -455,9 +455,9 @@ const Expenses = () => {
                           <Button
                             type="button"
                             variant="outline"
-                            className={cn("w-full justify-start text-left font-normal", !recurringEndDate && "text-muted-foreground")}
+                            className={cn("w-full justify-start text-start font-normal", !recurringEndDate && "text-muted-foreground")}
                           >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            <CalendarIcon className="me-2 h-4 w-4" />
                             {recurringEndDate ? format(recurringEndDate, 'dd/MM/yyyy') : t('selectDate')}
                           </Button>
                         </PopoverTrigger>
@@ -485,13 +485,13 @@ const Expenses = () => {
                       value={formData.apply_to}
                       onValueChange={(value: string) => setFormData({ ...formData, apply_to: value as 'building' | 'apartment', apartment_id: '' })}
                     >
-                      <div className="flex items-center space-x-2">
+                      <div className="flex items-center gap-2">
                         <RadioGroupItem value="building" id="apply-building" />
                         <Label htmlFor="apply-building" className="cursor-pointer font-normal">
                           {t('entireBuilding')}
                         </Label>
                       </div>
-                      <div className="flex items-center space-x-2">
+                      <div className="flex items-center gap-2">
                         <RadioGroupItem value="apartment" id="apply-apartment" />
                         <Label htmlFor="apply-apartment" className="cursor-pointer font-normal">
                           {t('specificApartment')}
@@ -542,13 +542,13 @@ const Expenses = () => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="text-right">{t('building')}</TableHead>
-                  <TableHead className="text-right">{t('description')}</TableHead>
-                  <TableHead className="text-right">{t('category')}</TableHead>
-                  <TableHead className="text-right">{t('amount')}</TableHead>
-                  <TableHead className="text-right">{t('date')}</TableHead>
-                  <TableHead className="text-right">{t('recurring')}</TableHead>
-                  <TableHead className="text-right">{t('actions')}</TableHead>
+                  <TableHead className="text-start">{t('building')}</TableHead>
+                  <TableHead className="text-start">{t('description')}</TableHead>
+                  <TableHead className="text-start">{t('category')}</TableHead>
+                  <TableHead className="text-start">{t('amount')}</TableHead>
+                  <TableHead className="text-start">{t('date')}</TableHead>
+                  <TableHead className="text-start">{t('recurring')}</TableHead>
+                  <TableHead className="text-start">{t('actions')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -565,12 +565,12 @@ const Expenses = () => {
                 ) : (
                   filtered.map((row) => (
                     <TableRow key={row.expense.id}>
-                      <TableCell className="font-medium text-right">{row.buildingName || getBuildingName(row.expense.buildingId)}</TableCell>
-                      <TableCell className="text-right">{row.expense.description}</TableCell>
-                      <TableCell className="text-right">{row.expense.category || '-'}</TableCell>
-                      <TableCell className="text-right">₪{Number(row.expense.amount).toFixed(2)}</TableCell>
-                      <TableCell className="text-right">{formatDate(row.expense.expenseDate)}</TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="font-medium text-start">{row.buildingName || getBuildingName(row.expense.buildingId)}</TableCell>
+                      <TableCell className="text-start">{row.expense.description}</TableCell>
+                      <TableCell className="text-start">{row.expense.category || '-'}</TableCell>
+                      <TableCell className="text-start">₪{Number(row.expense.amount).toFixed(2)}</TableCell>
+                      <TableCell className="text-start">{formatDate(row.expense.expenseDate)}</TableCell>
+                      <TableCell className="text-start">
                         {row.expense.isRecurring ? (
                           <span className="text-xs px-2 py-1 bg-primary/10 text-primary rounded">
                             {t(row.expense.recurringType || 'recurring')}
@@ -579,7 +579,7 @@ const Expenses = () => {
                           '-'
                         )}
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-start">
                         <div className="flex justify-end gap-2">
                           <Button size="sm" variant="outline" onClick={() => handleEdit(row.expense)}>
                             <Pencil className="w-4 h-4" />

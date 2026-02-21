@@ -212,7 +212,7 @@ const MyApartments = () => {
                               <TableHead>Date</TableHead>
                               <TableHead>Description</TableHead>
                               <TableHead>Type</TableHead>
-                              <TableHead className="text-right">Amount (₪)</TableHead>
+                              <TableHead className="text-start">Amount (₪)</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -241,7 +241,7 @@ const MyApartments = () => {
                                 <TableCell>
                                   {transaction.description}
                                   {transaction.isCanceled && (
-                                    <span className="ml-2 text-xs text-muted-foreground">(Canceled)</span>
+                                    <span className="ms-2 text-xs text-muted-foreground">(Canceled)</span>
                                   )}
                                 </TableCell>
                                 <TableCell>
@@ -255,7 +255,7 @@ const MyApartments = () => {
                                     {transaction.type === 'payment' ? 'Payment' : transaction.isCanceled ? 'Canceled Expense' : 'Expense'}
                                   </span>
                                 </TableCell>
-                                <TableCell className={`text-right font-medium ${
+                                <TableCell className={`text-start font-medium ${
                                   transaction.type === 'payment' ? 'text-green-600' : transaction.isCanceled ? 'text-gray-600' : 'text-red-600'
                                 }`}>
                                   {transaction.type === 'payment' ? '+' : '-'}₪{transaction.amount.toFixed(2)}

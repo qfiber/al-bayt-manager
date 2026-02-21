@@ -381,7 +381,7 @@ const EmailTemplates = () => {
                       <Label>{t('emailSubject')}</Label>
                       {(formData[`${lang}_subject` as keyof typeof formData] || formData[`${lang}_body` as keyof typeof formData]) && (
                         <Button variant="outline" size="sm" onClick={() => handlePreview(lang as 'ar' | 'en' | 'he')}>
-                          <Eye className="h-4 w-4 mr-1" />
+                          <Eye className="h-4 w-4 me-1" />
                           {t('preview')}
                         </Button>
                       )}

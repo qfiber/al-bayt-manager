@@ -537,7 +537,7 @@ const Apartments = () => {
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
                 <Button onClick={() => resetForm()} className="w-full sm:w-auto">
-                  <Plus className="w-4 h-4 mr-2" />
+                  <Plus className="w-4 h-4 me-2" />
                   {t('addApartment')}
                 </Button>
               </DialogTrigger>
@@ -608,9 +608,9 @@ const Apartments = () => {
                           type="button"
                           variant="outline"
                           disabled={formData.status !== 'occupied'}
-                          className={cn("w-full justify-start text-left font-normal", !occupancyDate && "text-muted-foreground")}
+                          className={cn("w-full justify-start text-start font-normal", !occupancyDate && "text-muted-foreground")}
                         >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          <CalendarIcon className="me-2 h-4 w-4" />
                           {formData.status === 'occupied' && occupancyDate
                             ? format(occupancyDate, 'dd/MM/yyyy')
                             : t('selectDate')}
@@ -694,15 +694,15 @@ const Apartments = () => {
                       <Table className="min-w-[900px]">
                         <TableHeader>
                           <TableRow>
-                            <TableHead className="text-right">{t('apartmentHash')}</TableHead>
-                            <TableHead className="text-right">{t('floor')}</TableHead>
-                            <TableHead className="text-right">{t('status')}</TableHead>
-                            <TableHead className="text-right">{t('owner')} / {t('beneficiary')}</TableHead>
-                            <TableHead className="text-right">{t('monthlySubscription')}</TableHead>
-                            <TableHead className="text-right">{t('monthsOccupied')}</TableHead>
-                            <TableHead className="text-right">{t('totalDebt')}</TableHead>
-                            <TableHead className="text-right">{t('credit')}</TableHead>
-                            <TableHead className="text-right">{t('actions')}</TableHead>
+                            <TableHead className="text-start">{t('apartmentHash')}</TableHead>
+                            <TableHead className="text-start">{t('floor')}</TableHead>
+                            <TableHead className="text-start">{t('status')}</TableHead>
+                            <TableHead className="text-start">{t('owner')} / {t('beneficiary')}</TableHead>
+                            <TableHead className="text-start">{t('monthlySubscription')}</TableHead>
+                            <TableHead className="text-start">{t('monthsOccupied')}</TableHead>
+                            <TableHead className="text-start">{t('totalDebt')}</TableHead>
+                            <TableHead className="text-start">{t('credit')}</TableHead>
+                            <TableHead className="text-start">{t('actions')}</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -711,34 +711,34 @@ const Apartments = () => {
                             const subscriptionAmount = parseFloat(apartment.subscriptionAmount);
                             return (
                               <TableRow key={apartment.id}>
-                                <TableCell className="font-medium text-right">{apartment.apartmentNumber}</TableCell>
-                                <TableCell className="text-right">
+                                <TableCell className="font-medium text-start">{apartment.apartmentNumber}</TableCell>
+                                <TableCell className="text-start">
                                   {apartment.floor != null ? getFloorDisplayName(apartment.floor === 0 ? 'Ground' : apartment.floor.toString()) : '-'}
                                 </TableCell>
-                                <TableCell className="text-right">
+                                <TableCell className="text-start">
                                   <span className={`px-2 py-1 rounded text-xs ${apartment.status === 'vacant' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
                                     {t(apartment.status as 'vacant' | 'occupied')}
                                   </span>
                                 </TableCell>
-                                <TableCell className={`text-right ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>
+                                <TableCell className={`text-start ${language === 'ar' || language === 'he' ? 'text-start' : ''}`}>
                                   <div className="text-sm">
                                     <div>{t('owner')}: {getOwnerName(apartment.id)}</div>
                                     <div className="text-muted-foreground">{t('beneficiary')}: {getBeneficiaryName(apartment.id)}</div>
                                   </div>
                                 </TableCell>
-                                <TableCell className={`text-right ${apartment.status !== 'occupied' ? 'text-muted-foreground/50' : ''}`}>
+                                <TableCell className={`text-start ${apartment.status !== 'occupied' ? 'text-muted-foreground/50' : ''}`}>
                                   {apartment.status === 'occupied' ? `₪${subscriptionAmount.toFixed(2)}` : '-'}
                                 </TableCell>
-                                <TableCell className={`text-right ${apartment.status !== 'occupied' ? 'text-muted-foreground/50' : ''}`}>
+                                <TableCell className={`text-start ${apartment.status !== 'occupied' ? 'text-muted-foreground/50' : ''}`}>
                                   {apartment.status === 'occupied' ? calculateMonthsOccupied(apartment.occupancyStart) : '-'}
                                 </TableCell>
-                                <TableCell className={`text-right font-semibold ${calculateTotalDebt(apartment) > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                <TableCell className={`text-start font-semibold ${calculateTotalDebt(apartment) > 0 ? 'text-red-600' : 'text-green-600'}`}>
                                   ₪{Math.abs(calculateTotalDebt(apartment)).toFixed(2)}
                                 </TableCell>
-                                <TableCell className={`text-right ${balance > 0 ? 'text-green-600 font-semibold' : balance < 0 ? 'text-red-600 font-semibold' : ''}`}>
+                                <TableCell className={`text-start ${balance > 0 ? 'text-green-600 font-semibold' : balance < 0 ? 'text-red-600 font-semibold' : ''}`}>
                                   ₪{balance.toFixed(2)}
                                 </TableCell>
-                                <TableCell className="text-right">
+                                <TableCell className="text-start">
                                   <div className="flex justify-end gap-2">
                                     <Button size="sm" variant="outline" onClick={() => showDebtDetails(apartment)}>
                                       <Eye className="w-4 h-4" />
@@ -799,10 +799,10 @@ const Apartments = () => {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="text-right">{t('monthYear')}</TableHead>
-                      <TableHead className="text-right">{t('amount')}</TableHead>
-                      <TableHead className="text-right">{t('status')}</TableHead>
-                      {(isAdmin || isModerator) && <TableHead className="text-right">{t('actions')}</TableHead>}
+                      <TableHead className="text-start">{t('monthYear')}</TableHead>
+                      <TableHead className="text-start">{t('amount')}</TableHead>
+                      <TableHead className="text-start">{t('status')}</TableHead>
+                      {(isAdmin || isModerator) && <TableHead className="text-start">{t('actions')}</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -815,9 +815,9 @@ const Apartments = () => {
                     ) : (
                       apartmentPayments.map((payment) => (
                         <TableRow key={payment.id} className={payment.isCanceled ? 'opacity-50' : ''}>
-                          <TableCell className="text-right font-medium">{payment.month}</TableCell>
-                          <TableCell className="text-right text-green-600">₪{parseFloat(payment.amount).toFixed(2)}</TableCell>
-                          <TableCell className="text-right">
+                          <TableCell className="text-start font-medium">{payment.month}</TableCell>
+                          <TableCell className="text-start text-green-600">₪{parseFloat(payment.amount).toFixed(2)}</TableCell>
+                          <TableCell className="text-start">
                             <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
                               payment.isCanceled
                                 ? 'bg-gray-100 text-gray-800'
@@ -827,7 +827,7 @@ const Apartments = () => {
                             </span>
                           </TableCell>
                           {(isAdmin || isModerator) && (
-                            <TableCell className="text-right">
+                            <TableCell className="text-start">
                               {!payment.isCanceled && (
                                 <Button
                                   size="sm"
@@ -835,7 +835,7 @@ const Apartments = () => {
                                   onClick={() => handleCancelPayment(payment.id, payment.apartmentId, parseFloat(payment.amount))}
                                   className="text-orange-600 hover:text-orange-700"
                                 >
-                                  <XCircle className="w-4 h-4 mr-1" />
+                                  <XCircle className="w-4 h-4 me-1" />
                                   {t('cancel')}
                                 </Button>
                               )}
@@ -854,11 +854,11 @@ const Apartments = () => {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="text-right">{t('monthYear')}</TableHead>
-                      <TableHead className="text-right">{t('amountDue')}</TableHead>
-                      <TableHead className="text-right">{t('amountPaid')}</TableHead>
-                      <TableHead className="text-right">{t('balance')}</TableHead>
-                      {(isAdmin || isModerator) && <TableHead className="text-right">{t('actions')}</TableHead>}
+                      <TableHead className="text-start">{t('monthYear')}</TableHead>
+                      <TableHead className="text-start">{t('amountDue')}</TableHead>
+                      <TableHead className="text-start">{t('amountPaid')}</TableHead>
+                      <TableHead className="text-start">{t('balance')}</TableHead>
+                      {(isAdmin || isModerator) && <TableHead className="text-start">{t('actions')}</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -871,14 +871,14 @@ const Apartments = () => {
                     ) : (
                       debtDetails.map((detail, index) => (
                         <TableRow key={index}>
-                          <TableCell className="text-right font-medium">{detail.month}</TableCell>
-                          <TableCell className="text-right">₪{detail.amount_due.toFixed(2)}</TableCell>
-                          <TableCell className="text-right">₪{detail.amount_paid.toFixed(2)}</TableCell>
-                          <TableCell className={`text-right font-semibold ${detail.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                          <TableCell className="text-start font-medium">{detail.month}</TableCell>
+                          <TableCell className="text-start">₪{detail.amount_due.toFixed(2)}</TableCell>
+                          <TableCell className="text-start">₪{detail.amount_paid.toFixed(2)}</TableCell>
+                          <TableCell className={`text-start font-semibold ${detail.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>
                             ₪{Math.abs(detail.balance).toFixed(2)}
                           </TableCell>
                           {(isAdmin || isModerator) && (
-                            <TableCell className="text-right">
+                            <TableCell className="text-start">
                               {detail.balance > 0 && !detail.payment_id && (
                                 <Button
                                   size="sm"
@@ -886,7 +886,7 @@ const Apartments = () => {
                                   onClick={() => handleWaiveSubscription(detail.month, detail.amount_due)}
                                   className="text-orange-600 hover:text-orange-700"
                                 >
-                                  <XCircle className="w-4 h-4 mr-1" />
+                                  <XCircle className="w-4 h-4 me-1" />
                                   {t('waive')}
                                 </Button>
                               )}
@@ -897,7 +897,7 @@ const Apartments = () => {
                                   onClick={() => handleCancelPayment(detail.payment_id, selectedApartment!.id, detail.amount_paid)}
                                   className="text-orange-600 hover:text-orange-700"
                                 >
-                                  <XCircle className="w-4 h-4 mr-1" />
+                                  <XCircle className="w-4 h-4 me-1" />
                                   {t('cancelPayment')}
                                 </Button>
                               )}
@@ -916,20 +916,20 @@ const Apartments = () => {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="text-right">{t('description')}</TableHead>
-                        <TableHead className="text-right">{t('date')}</TableHead>
-                        <TableHead className="text-right">{t('amount')}</TableHead>
-                        <TableHead className="text-right">{t('status')}</TableHead>
-                        {(isAdmin || isModerator) && <TableHead className="text-right">{t('actions')}</TableHead>}
+                        <TableHead className="text-start">{t('description')}</TableHead>
+                        <TableHead className="text-start">{t('date')}</TableHead>
+                        <TableHead className="text-start">{t('amount')}</TableHead>
+                        <TableHead className="text-start">{t('status')}</TableHead>
+                        {(isAdmin || isModerator) && <TableHead className="text-start">{t('actions')}</TableHead>}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {apartmentExpenses.map((expense) => (
                         <TableRow key={expense.id}>
-                          <TableCell className="text-right">{expense.description || '-'}</TableCell>
-                          <TableCell className="text-right">{expense.expenseDate || (expense.createdAt ? new Date(expense.createdAt).toLocaleDateString() : '-')}</TableCell>
-                          <TableCell className="text-right text-red-600 font-medium">₪{parseFloat(expense.amount).toFixed(2)}</TableCell>
-                          <TableCell className="text-right">
+                          <TableCell className="text-start">{expense.description || '-'}</TableCell>
+                          <TableCell className="text-start">{expense.expenseDate || (expense.createdAt ? new Date(expense.createdAt).toLocaleDateString() : '-')}</TableCell>
+                          <TableCell className="text-start text-red-600 font-medium">₪{parseFloat(expense.amount).toFixed(2)}</TableCell>
+                          <TableCell className="text-start">
                             <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
                               expense.isCanceled
                                 ? 'bg-gray-100 text-gray-800'
@@ -939,7 +939,7 @@ const Apartments = () => {
                             </span>
                           </TableCell>
                           {(isAdmin || isModerator) && (
-                            <TableCell className="text-right">
+                            <TableCell className="text-start">
                               {!expense.isCanceled && (
                                 <Button
                                   size="sm"
@@ -947,7 +947,7 @@ const Apartments = () => {
                                   onClick={() => handleCancelExpense(expense.id, expense.apartmentId, parseFloat(expense.amount))}
                                   className="text-orange-600 hover:text-orange-700"
                                 >
-                                  <XCircle className="w-4 h-4 mr-1" />
+                                  <XCircle className="w-4 h-4 me-1" />
                                   {t('cancel')}
                                 </Button>
                               )}

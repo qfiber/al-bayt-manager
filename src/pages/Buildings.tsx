@@ -130,7 +130,7 @@ const Buildings = () => {
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
                 <Button onClick={() => resetForm()} className="w-full sm:w-auto">
-                  <Plus className="w-4 h-4 mr-2" />
+                  <Plus className="w-4 h-4 me-2" />
                   {t('addBuilding')}
                 </Button>
               </DialogTrigger>
@@ -183,7 +183,7 @@ const Buildings = () => {
                   <div>
                     <Label htmlFor="monthlyFee">{t('buildingMonthlyFee')}</Label>
                     <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₪</span>
+                      <span className="absolute start-3 top-1/2 -translate-y-1/2 text-muted-foreground">₪</span>
                       <Input
                         id="monthlyFee"
                         type="number"
@@ -191,7 +191,7 @@ const Buildings = () => {
                         min="0"
                         value={formData.monthlyFee}
                         onChange={(e) => setFormData({ ...formData, monthlyFee: e.target.value })}
-                        className="pl-7"
+                        className="ps-7"
                         placeholder="0.00"
                       />
                     </div>
@@ -218,11 +218,11 @@ const Buildings = () => {
             <Table className="min-w-[700px]">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="text-right">{t('nameLabel')}</TableHead>
-                  <TableHead className="text-right">{t('address')}</TableHead>
-                  <TableHead className="text-right">{t('numberOfFloors')}</TableHead>
-                  <TableHead className="text-right">{t('buildingMonthlyFee')}</TableHead>
-                  <TableHead className="text-right">{t('actions')}</TableHead>
+                  <TableHead className="text-start">{t('nameLabel')}</TableHead>
+                  <TableHead className="text-start">{t('address')}</TableHead>
+                  <TableHead className="text-start">{t('numberOfFloors')}</TableHead>
+                  <TableHead className="text-start">{t('buildingMonthlyFee')}</TableHead>
+                  <TableHead className="text-start">{t('actions')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -235,15 +235,15 @@ const Buildings = () => {
                 ) : (
                   buildings.map((building) => (
                     <TableRow key={building.id}>
-                      <TableCell className="font-medium text-right">{building.name}</TableCell>
-                      <TableCell className="text-right">{building.address}</TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="font-medium text-start">{building.name}</TableCell>
+                      <TableCell className="text-start">{building.address}</TableCell>
+                      <TableCell className="text-start">
                         {building.numberOfFloors || '-'}
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-start">
                         ₪{parseFloat(building.monthlyFee || '0').toFixed(2)}
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-start">
                         <div className="flex justify-end gap-2">
                           <Button size="sm" variant="outline" onClick={() => handleEdit(building)}>
                             <Pencil className="w-4 h-4" />

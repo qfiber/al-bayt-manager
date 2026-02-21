@@ -484,7 +484,7 @@ const Settings = () => {
               {t('resetChanges')}
             </Button>
             <Button onClick={handleSave} disabled={isSaving}>
-              <Save className="w-4 h-4 mr-2" />
+              <Save className="w-4 h-4 me-2" />
               {isSaving ? t('saving') : t('saveSettings')}
             </Button>
           </div>

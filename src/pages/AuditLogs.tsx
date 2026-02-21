@@ -198,12 +198,12 @@ const AuditLogs = () => {
             {/* Filters */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
               <div className="relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Search className="absolute start-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder={t('search')}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-9"
+                  className="ps-9"
                 />
               </div>
 
@@ -239,7 +239,7 @@ const AuditLogs = () => {
                 variant="outline"
                 onClick={handleResetFilters}
               >
-                <Filter className="mr-2 h-4 w-4" />
+                <Filter className="me-2 h-4 w-4" />
                 {t('resetFilters')}
               </Button>
             </div>
@@ -266,11 +266,11 @@ const AuditLogs = () => {
               <Table className="min-w-[600px]">
                 <TableHeader className="bg-muted/50">
                   <TableRow>
-                    <TableHead className={`whitespace-nowrap ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>{t('timestamp')}</TableHead>
-                    <TableHead className={`whitespace-nowrap ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>{t('user')}</TableHead>
-                    <TableHead className={`whitespace-nowrap ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>Action Type</TableHead>
-                    <TableHead className={`whitespace-nowrap ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>{t('table')}</TableHead>
-                    <TableHead className={`whitespace-nowrap ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>{t('actions')}</TableHead>
+                    <TableHead className={`whitespace-nowrap text-start`}>{t('timestamp')}</TableHead>
+                    <TableHead className={`whitespace-nowrap text-start`}>{t('user')}</TableHead>
+                    <TableHead className={`whitespace-nowrap text-start`}>Action Type</TableHead>
+                    <TableHead className={`whitespace-nowrap text-start`}>{t('table')}</TableHead>
+                    <TableHead className={`whitespace-nowrap text-start`}>{t('actions')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -283,10 +283,10 @@ const AuditLogs = () => {
                   ) : (
                     filteredLogs.map((log) => (
                       <TableRow key={log.id}>
-                        <TableCell className={`font-mono text-sm ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>
+                        <TableCell className={`font-mono text-sm text-start`}>
                           {format(new Date(log.createdAt), 'yyyy-MM-dd HH:mm:ss')}
                         </TableCell>
-                        <TableCell className={language === 'ar' || language === 'he' ? 'text-right' : ''}>
+                        <TableCell className="text-start">
                           <div className="flex flex-col">
                             <span className="font-medium">{log.userEmail || t('system')}</span>
                             {log.ipAddress && (
@@ -294,15 +294,15 @@ const AuditLogs = () => {
                             )}
                           </div>
                         </TableCell>
-                        <TableCell className={language === 'ar' || language === 'he' ? 'text-right' : ''}>
+                        <TableCell className="text-start">
                           <Badge className={getActionColor(log.actionType)}>
                             {log.actionType}
                           </Badge>
                         </TableCell>
-                        <TableCell className={language === 'ar' || language === 'he' ? 'text-right' : ''}>
+                        <TableCell className="text-start">
                           <code className="text-sm">{log.tableName || '-'}</code>
                         </TableCell>
-                        <TableCell className={language === 'ar' || language === 'he' ? 'text-right' : ''}>
+                        <TableCell className="text-start">
                           <Button
                             variant="ghost"
                             size="sm"
@@ -353,25 +353,25 @@ const AuditLogs = () => {
               <ScrollArea className="max-h-[60vh]" dir="ltr">
                 <div className="space-y-4 pe-6 ps-2" dir={language === 'ar' || language === 'he' ? 'rtl' : 'ltr'}>
                   <div>
-                    <h4 className={`font-semibold mb-2 ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>
+                    <h4 className={`font-semibold mb-2 text-start`}>
                       {t('timestamp')}
                     </h4>
-                    <p className={`text-sm font-mono ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>
+                    <p className={`text-sm font-mono text-start`}>
                       {format(new Date(selectedLog.createdAt), 'PPpp')}
                     </p>
                   </div>
 
                   <div>
-                    <h4 className={`font-semibold mb-2 ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>
+                    <h4 className={`font-semibold mb-2 text-start`}>
                       {t('user')}
                     </h4>
-                    <p className={`text-sm ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>
+                    <p className={`text-sm text-start`}>
                       {selectedLog.userEmail || t('system')}
                     </p>
                   </div>
 
                   <div>
-                    <h4 className={`font-semibold mb-2 ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>
+                    <h4 className={`font-semibold mb-2 text-start`}>
                       {t('actions')}
                     </h4>
                     <Badge className={getActionColor(selectedLog.actionType)}>
@@ -381,10 +381,10 @@ const AuditLogs = () => {
 
                   {selectedLog.tableName && (
                     <div>
-                      <h4 className={`font-semibold mb-2 ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>
+                      <h4 className={`font-semibold mb-2 text-start`}>
                         {t('table')}
                       </h4>
-                      <code className={`text-sm ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>
+                      <code className={`text-sm text-start`}>
                         {selectedLog.tableName}
                       </code>
                     </div>
@@ -392,10 +392,10 @@ const AuditLogs = () => {
 
                   {selectedLog.recordId && (
                     <div>
-                      <h4 className={`font-semibold mb-2 ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>
+                      <h4 className={`font-semibold mb-2 text-start`}>
                         {t('recordId')}
                       </h4>
-                      <code className={`text-sm font-mono ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>
+                      <code className={`text-sm font-mono text-start`}>
                         {selectedLog.recordId}
                       </code>
                     </div>
@@ -403,10 +403,10 @@ const AuditLogs = () => {
 
                   {selectedLog.ipAddress && (
                     <div>
-                      <h4 className={`font-semibold mb-2 ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>
+                      <h4 className={`font-semibold mb-2 text-start`}>
                         {t('ipAddress')}
                       </h4>
-                      <code className={`text-sm font-mono ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>
+                      <code className={`text-sm font-mono text-start`}>
                         {selectedLog.ipAddress}
                       </code>
                     </div>
@@ -414,10 +414,10 @@ const AuditLogs = () => {
 
                   {selectedLog.userAgent && (
                     <div>
-                      <h4 className={`font-semibold mb-2 ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>
+                      <h4 className={`font-semibold mb-2 text-start`}>
                         {t('userAgent')}
                       </h4>
-                      <p className={`text-sm text-muted-foreground break-all ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>
+                      <p className={`text-sm text-muted-foreground break-all text-start`}>
                         {selectedLog.userAgent}
                       </p>
                     </div>
@@ -425,7 +425,7 @@ const AuditLogs = () => {
 
                   {selectedLog.actionDetails && (
                     <div>
-                      <h4 className={`font-semibold mb-2 ${language === 'ar' || language === 'he' ? 'text-right' : ''}`}>
+                      <h4 className={`font-semibold mb-2 text-start`}>
                         {t('actionDetails')}
                       </h4>
                       <pre className="text-xs bg-muted p-4 rounded-lg overflow-auto text-left" dir="ltr">

@@ -323,7 +323,7 @@ const Payments = () => {
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
                 <Button onClick={() => resetForm()} className="w-full sm:w-auto">
-                  <Plus className="w-4 h-4 mr-2" />
+                  <Plus className="w-4 h-4 me-2" />
                   {t('addPayment')}
                 </Button>
               </DialogTrigger>
@@ -474,10 +474,10 @@ const Payments = () => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="text-right">{t('apartment')}</TableHead>
-                  <TableHead className="text-right">{t('amountLabel')}</TableHead>
-                  <TableHead className="text-right">{t('month')}</TableHead>
-                  <TableHead className="text-right">{t('actions')}</TableHead>
+                  <TableHead className="text-start">{t('apartment')}</TableHead>
+                  <TableHead className="text-start">{t('amountLabel')}</TableHead>
+                  <TableHead className="text-start">{t('month')}</TableHead>
+                  <TableHead className="text-start">{t('actions')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -494,15 +494,15 @@ const Payments = () => {
                 ) : (
                   filtered.map((row) => (
                     <TableRow key={row.payment.id} className={row.payment.isCanceled ? 'opacity-50' : ''}>
-                      <TableCell className="font-medium text-right">
+                      <TableCell className="font-medium text-start">
                         {row.buildingName} - {t('apt')} {row.apartmentNumber}
                       </TableCell>
-                      <TableCell className="text-right">₪{row.payment.amount.toFixed(2)}</TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-start">₪{row.payment.amount.toFixed(2)}</TableCell>
+                      <TableCell className="text-start">
                         {row.payment.month}
-                        {row.payment.isCanceled && <Badge variant="destructive" className="mr-2">{t('canceled')}</Badge>}
+                        {row.payment.isCanceled && <Badge variant="destructive" className="me-2">{t('canceled')}</Badge>}
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-start">
                         <div className="flex justify-end gap-2">
                           <Button size="sm" variant="outline" onClick={() => handleEdit(row.payment)} disabled={row.payment.isCanceled}>
                             <Pencil className="w-4 h-4" />
