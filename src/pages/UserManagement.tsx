@@ -12,7 +12,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Users, Pencil, Trash2, UserPlus, Key, Building2, ShieldOff } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { Users, Pencil, Trash2, UserPlus, Key, Building2, ShieldOff, Home } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 interface UserProfile {
@@ -64,7 +65,10 @@ const UserManagement = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
-  const [formData, setFormData] = useState<{ name: string; phone: string; role: 'admin' | 'moderator' | 'user' }>({ name: '', phone: '', role: 'user' });
+  const [formData, setFormData] = useState<{
+    name: string; phone: string; role: 'admin' | 'moderator' | 'user';
+    email: string; idNumber: string; birthDate: string; adminNotes: string;
+  }>({ name: '', phone: '', role: 'user', email: '', idNumber: '', birthDate: '', adminNotes: '' });
   const [createFormData, setCreateFormData] = useState({ email: '', password: '', name: '', phone: '', role: 'user' as 'admin' | 'moderator' | 'user' });
   const [isCreating, setIsCreating] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -86,6 +90,10 @@ const UserManagement = () => {
   const [assigningBuildingsUser, setAssigningBuildingsUser] = useState<UserProfile | null>(null);
   const [selectedBuildings, setSelectedBuildings] = useState<string[]>([]);
   const [moderatorBuildings, setModeratorBuildings] = useState<Map<string, string[]>>(new Map());
+
+  const [isTenantAptDialogOpen, setIsTenantAptDialogOpen] = useState(false);
+  const [assigningTenantAptUser, setAssigningTenantAptUser] = useState<UserProfile | null>(null);
+  const [selectedTenantApartments, setSelectedTenantApartments] = useState<string[]>([]);
 
   const [isDisable2FADialogOpen, setIsDisable2FADialogOpen] = useState(false);
   const [disable2FAUser, setDisable2FAUser] = useState<UserProfile | null>(null);
@@ -128,7 +136,7 @@ const UserManagement = () => {
       const data = await api.get<Building[]>('/buildings');
       setBuildings(data || []);
     } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      toast({ title: t('error'), description: error.message, variant: 'destructive' });
     }
   };
 
@@ -137,7 +145,7 @@ const UserManagement = () => {
       const data = await api.get<Apartment[]>('/apartments');
       setApartments(data || []);
     } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      toast({ title: t('error'), description: error.message, variant: 'destructive' });
     }
   };
 
@@ -158,7 +166,7 @@ const UserManagement = () => {
       // Fetch moderator building assignments
       fetchModeratorBuildings(usersWithDetails);
     } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      toast({ title: t('error'), description: error.message, variant: 'destructive' });
     }
   };
 
@@ -170,9 +178,10 @@ const UserManagement = () => {
       await Promise.all(
         moderators.map(async (mod) => {
           try {
-            const userData = await api.get<{ buildingAssignments?: string[] }>(`/users/${mod.id}`);
-            if (userData.buildingAssignments && userData.buildingAssignments.length > 0) {
-              buildingsMap.set(mod.id, userData.buildingAssignments);
+            const userData = await api.get<{ buildings?: { buildingId: string }[] }>(`/users/${mod.id}`);
+            const ids = (userData.buildings || []).map(b => b.buildingId);
+            if (ids.length > 0) {
+              buildingsMap.set(mod.id, ids);
             }
           } catch {
             // Ignore errors for individual moderators
@@ -186,14 +195,32 @@ const UserManagement = () => {
     setModeratorBuildings(buildingsMap);
   };
 
-  const handleEdit = (userProfile: UserProfile) => {
+  const handleEdit = async (userProfile: UserProfile) => {
     setEditingUser(userProfile);
     setFormData({
       name: userProfile.name,
       phone: userProfile.phone || '',
-      role: (userProfile.role || 'user') as 'admin' | 'user',
+      role: (userProfile.role || 'user') as 'admin' | 'moderator' | 'user',
+      email: userProfile.email || '',
+      idNumber: '',
+      birthDate: '',
+      adminNotes: '',
     });
     setIsDialogOpen(true);
+
+    // Fetch full user details for new fields
+    try {
+      const fullUser = await api.get<any>(`/users/${userProfile.id}`);
+      setFormData((prev) => ({
+        ...prev,
+        email: fullUser.email || prev.email,
+        idNumber: fullUser.idNumber || '',
+        birthDate: fullUser.birthDate || '',
+        adminNotes: fullUser.adminNotes || '',
+      }));
+    } catch {
+      // Continue with partial data
+    }
   };
 
   const handleSaveUser = async () => {
@@ -205,19 +232,23 @@ const UserManagement = () => {
         name: formData.name,
         phone: formData.phone || null,
         role: formData.role,
+        email: formData.email || undefined,
+        idNumber: formData.idNumber || null,
+        birthDate: formData.birthDate || null,
+        adminNotes: formData.adminNotes || null,
       });
 
-      toast({ title: 'Success', description: 'User updated successfully' });
+      toast({ title: t('success'), description: t('userUpdatedSuccess') });
       fetchUsers();
       resetForm();
     } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      toast({ title: t('error'), description: error.message, variant: 'destructive' });
     }
   };
 
   const handleCreateUser = async () => {
     if (!createFormData.email || !createFormData.password || !createFormData.name) {
-      toast({ title: 'Error', description: 'Email, password, and name are required', variant: 'destructive' });
+      toast({ title: t('error'), description: t('emailPasswordNameRequired'), variant: 'destructive' });
       return;
     }
 
@@ -232,7 +263,7 @@ const UserManagement = () => {
         role: createFormData.role,
       });
 
-      toast({ title: 'Success', description: 'User created successfully' });
+      toast({ title: t('success'), description: t('userCreatedSuccess') });
       fetchUsers();
       resetCreateForm();
     } catch (error: any) {
@@ -241,7 +272,7 @@ const UserManagement = () => {
       const errorMessage = error.message || 'Failed to create user';
 
       toast({
-        title: 'Error',
+        title: t('error'),
         description: errorMessage,
         variant: 'destructive'
       });
@@ -251,7 +282,7 @@ const UserManagement = () => {
   };
 
   const resetForm = () => {
-    setFormData({ name: '', phone: '', role: 'user' });
+    setFormData({ name: '', phone: '', role: 'user', email: '', idNumber: '', birthDate: '', adminNotes: '' });
     setEditingUser(null);
     setIsDialogOpen(false);
   };
@@ -320,7 +351,7 @@ const UserManagement = () => {
 
     // Prevent deleting yourself
     if (deletingUser.id === user?.id) {
-      toast({ title: 'Error', description: 'You cannot delete your own account', variant: 'destructive' });
+      toast({ title: t('error'), description: t('cannotDeleteOwnAccount'), variant: 'destructive' });
       return;
     }
 
@@ -329,12 +360,12 @@ const UserManagement = () => {
     try {
       await api.delete(`/users/${deletingUser.id}`);
 
-      toast({ title: 'Success', description: 'User deleted successfully' });
+      toast({ title: t('success'), description: t('userDeletedSuccess') });
       fetchUsers();
       setIsDeleteDialogOpen(false);
       setDeletingUser(null);
     } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      toast({ title: t('error'), description: error.message, variant: 'destructive' });
     } finally {
       setIsDeleting(false);
     }
@@ -356,12 +387,11 @@ const UserManagement = () => {
     setAssigningOwnerUser(userProfile);
 
     try {
-      // Fetch user details to get current owner assignments
-      const userData = await api.get<{ ownerAssignments?: string[] }>(`/users/${userProfile.id}`);
-      setSelectedOwnerApartments(userData.ownerAssignments || []);
+      const userData = await api.get<{ ownerApartments?: { id: string }[] }>(`/users/${userProfile.id}`);
+      setSelectedOwnerApartments((userData.ownerApartments || []).map(a => a.id));
       setIsOwnerDialogOpen(true);
     } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      toast({ title: t('error'), description: error.message, variant: 'destructive' });
     }
   };
 
@@ -369,12 +399,11 @@ const UserManagement = () => {
     setAssigningBeneficiaryUser(userProfile);
 
     try {
-      // Fetch user details to get current beneficiary assignments
-      const userData = await api.get<{ beneficiaryAssignments?: string[] }>(`/users/${userProfile.id}`);
-      setSelectedBeneficiaryApartments(userData.beneficiaryAssignments || []);
+      const userData = await api.get<{ beneficiaryApartments?: { id: string }[] }>(`/users/${userProfile.id}`);
+      setSelectedBeneficiaryApartments((userData.beneficiaryApartments || []).map(a => a.id));
       setIsBeneficiaryDialogOpen(true);
     } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      toast({ title: t('error'), description: error.message, variant: 'destructive' });
     }
   };
 
@@ -386,12 +415,12 @@ const UserManagement = () => {
         ids: selectedOwnerApartments,
       });
 
-      toast({ title: 'Success', description: 'Owner assignments updated successfully' });
+      toast({ title: t('success'), description: t('ownerAssignmentsUpdated') });
       setIsOwnerDialogOpen(false);
       setAssigningOwnerUser(null);
       setSelectedOwnerApartments([]);
     } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      toast({ title: t('error'), description: error.message, variant: 'destructive' });
     }
   };
 
@@ -403,12 +432,12 @@ const UserManagement = () => {
         ids: selectedBeneficiaryApartments,
       });
 
-      toast({ title: 'Success', description: 'Beneficiary assignments updated successfully' });
+      toast({ title: t('success'), description: t('beneficiaryAssignmentsUpdated') });
       setIsBeneficiaryDialogOpen(false);
       setAssigningBeneficiaryUser(null);
       setSelectedBeneficiaryApartments([]);
     } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      toast({ title: t('error'), description: error.message, variant: 'destructive' });
     }
   };
 
@@ -432,8 +461,8 @@ const UserManagement = () => {
     // Only allow assigning buildings to moderators
     if (userProfile.role !== 'moderator') {
       toast({
-        title: 'Error',
-        description: 'Buildings can only be assigned to moderators',
+        title: t('error'),
+        description: t('buildingsOnlyForModerators'),
         variant: 'destructive'
       });
       return;
@@ -443,11 +472,11 @@ const UserManagement = () => {
 
     try {
       // Fetch user details to get current building assignments
-      const userData = await api.get<{ buildingAssignments?: string[] }>(`/users/${userProfile.id}`);
-      setSelectedBuildings(userData.buildingAssignments || []);
+      const userData = await api.get<{ buildings?: { buildingId: string }[] }>(`/users/${userProfile.id}`);
+      setSelectedBuildings((userData.buildings || []).map(b => b.buildingId));
       setIsBuildingsDialogOpen(true);
     } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      toast({ title: t('error'), description: error.message, variant: 'destructive' });
     }
   };
 
@@ -459,13 +488,13 @@ const UserManagement = () => {
         ids: selectedBuildings,
       });
 
-      toast({ title: 'Success', description: 'Building assignments updated successfully' });
+      toast({ title: t('success'), description: t('buildingAssignmentsUpdated') });
       fetchModeratorBuildings();
       setIsBuildingsDialogOpen(false);
       setAssigningBuildingsUser(null);
       setSelectedBuildings([]);
     } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      toast({ title: t('error'), description: error.message, variant: 'destructive' });
     }
   };
 
@@ -477,12 +506,46 @@ const UserManagement = () => {
     );
   };
 
+  const handleAssignTenantApartments = async (userProfile: UserProfile) => {
+    setAssigningTenantAptUser(userProfile);
+    try {
+      const userData = await api.get<{ apartments?: { apartmentId: string }[] }>(`/users/${userProfile.id}`);
+      setSelectedTenantApartments((userData.apartments || []).map((a) => a.apartmentId));
+      setIsTenantAptDialogOpen(true);
+    } catch (error: any) {
+      toast({ title: t('error'), description: error.message, variant: 'destructive' });
+    }
+  };
+
+  const handleSaveTenantAptAssignments = async () => {
+    if (!assigningTenantAptUser) return;
+    try {
+      await api.put(`/users/${assigningTenantAptUser.id}/apartment-assignments`, {
+        ids: selectedTenantApartments,
+      });
+      toast({ title: t('success'), description: t('tenantAssignmentsUpdated') });
+      setIsTenantAptDialogOpen(false);
+      setAssigningTenantAptUser(null);
+      setSelectedTenantApartments([]);
+    } catch (error: any) {
+      toast({ title: t('error'), description: error.message, variant: 'destructive' });
+    }
+  };
+
+  const toggleTenantApartmentSelection = (apartmentId: string) => {
+    setSelectedTenantApartments((prev) =>
+      prev.includes(apartmentId)
+        ? prev.filter((id) => id !== apartmentId)
+        : [...prev, apartmentId],
+    );
+  };
+
   const handleDisable2FA = (userProfile: UserProfile) => {
     // Only allow for users and moderators, not admins
     if (userProfile.role === 'admin') {
       toast({
         title: t('error'),
-        description: 'Cannot disable 2FA for admin users',
+        description: t('cannotDisable2FAForAdmin'),
         variant: 'destructive'
       });
       return;
@@ -624,6 +687,14 @@ const UserManagement = () => {
                           <Button
                             size="sm"
                             variant="secondary"
+                            onClick={() => handleAssignTenantApartments(userProfile)}
+                            title={t('assignTenantApartments')}
+                          >
+                            <Home className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="secondary"
                             onClick={() => handleAssignOwner(userProfile)}
                             title={t('assignAsOwner')}
                           >
@@ -685,12 +756,53 @@ const UserManagement = () => {
                 />
               </div>
               <div>
+                <Label htmlFor="edit-email">{t('email')}</Label>
+                <Input
+                  id="edit-email"
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  dir="ltr"
+                />
+              </div>
+              <div>
                 <Label htmlFor="phone">{t('phoneLabel')}</Label>
                 <Input
                   id="phone"
                   value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                 />
+              </div>
+              <div>
+                <Label htmlFor="id-number">{t('idNumber')}</Label>
+                <Input
+                  id="id-number"
+                  value={formData.idNumber}
+                  onChange={(e) => setFormData({ ...formData, idNumber: e.target.value })}
+                  dir="ltr"
+                  maxLength={50}
+                />
+              </div>
+              <div>
+                <Label htmlFor="birth-date">{t('birthDate')}</Label>
+                <Input
+                  id="birth-date"
+                  type="date"
+                  value={formData.birthDate}
+                  onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })}
+                  dir="ltr"
+                />
+              </div>
+              <div>
+                <Label htmlFor="admin-notes">{t('adminNotes')}</Label>
+                <Textarea
+                  id="admin-notes"
+                  value={formData.adminNotes}
+                  onChange={(e) => setFormData({ ...formData, adminNotes: e.target.value })}
+                  rows={3}
+                  maxLength={5000}
+                />
+                <p className="text-xs text-muted-foreground mt-1">{t('adminNotesHint')}</p>
               </div>
               <div>
                 <Label htmlFor="role">{t('role')}</Label>
@@ -1036,6 +1148,62 @@ const UserManagement = () => {
                     setIsBeneficiaryDialogOpen(false);
                     setAssigningBeneficiaryUser(null);
                     setSelectedBeneficiaryApartments([]);
+                  }}
+                >
+                  {t('cancel')}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Assign Tenant Apartments Dialog */}
+        <Dialog open={isTenantAptDialogOpen} onOpenChange={setIsTenantAptDialogOpen}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>
+                {t('assignTenantApartments')} - {assigningTenantAptUser?.name}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">{t('selectTenantApartments')}</p>
+              <div className="space-y-2">
+                {apartments.length === 0 ? (
+                  <p className="text-center text-muted-foreground">{t('noApartments')}</p>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2">
+                    {apartments.map((apartment) => {
+                      const isSelected = selectedTenantApartments.includes(apartment.id);
+                      const building = buildings.find((b) => b.id === apartment.buildingId);
+                      return (
+                        <div
+                          key={apartment.id}
+                          onClick={() => toggleTenantApartmentSelection(apartment.id)}
+                          className={`
+                            p-3 rounded border text-sm text-center transition-colors cursor-pointer
+                            ${isSelected
+                              ? 'bg-primary text-primary-foreground border-primary'
+                              : 'bg-background hover:bg-accent border-border'
+                            }
+                          `}
+                        >
+                          <div className="font-medium">{building?.name} — {apartment.apartmentNumber}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <Button onClick={handleSaveTenantAptAssignments} className="flex-1">
+                  {t('saveAssignments')}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setIsTenantAptDialogOpen(false);
+                    setAssigningTenantAptUser(null);
+                    setSelectedTenantApartments([]);
                   }}
                 >
                   {t('cancel')}

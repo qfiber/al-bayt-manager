@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useCurrency } from '@/contexts/PublicSettingsContext';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,8 +27,9 @@ interface MonthlyData {
 }
 
 const Reports = () => {
-  const { user, loading } = useAuth();
+  const { user, isAdmin, isModerator, loading } = useAuth();
   const { t } = useLanguage();
+  const { currencySymbol, formatCurrency } = useCurrency();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -42,8 +44,10 @@ const Reports = () => {
   useEffect(() => {
     if (!loading && !user) {
       navigate('/auth');
+    } else if (!loading && !isAdmin && !isModerator) {
+      navigate('/dashboard');
     }
-  }, [user, loading, navigate]);
+  }, [user, isAdmin, isModerator, loading, navigate]);
 
   useEffect(() => {
     if (user) {
@@ -92,7 +96,7 @@ const Reports = () => {
           .map(([month, data]) => ({ month, payments: data.payments, expenses: data.expenses })),
       );
     } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      toast({ title: t('error'), description: error.message, variant: 'destructive' });
     }
   };
 
@@ -105,7 +109,7 @@ const Reports = () => {
     return <div className="min-h-screen flex items-center justify-center">{t('loading')}</div>;
   }
 
-  if (!user) return null;
+  if (!user || (!isAdmin && !isModerator)) return null;
 
   const netIncome = totalRevenue - totalExpenses;
 
@@ -152,7 +156,7 @@ const Reports = () => {
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">₪{totalRevenue.toFixed(2)}</div>
+              <div className="text-2xl font-bold">{formatCurrency(totalRevenue)}</div>
               <p className="text-xs text-muted-foreground">{t('fromAllPayments')}</p>
             </CardContent>
           </Card>
@@ -163,7 +167,7 @@ const Reports = () => {
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">₪{totalExpenses.toFixed(2)}</div>
+              <div className="text-2xl font-bold">{formatCurrency(totalExpenses)}</div>
               <p className="text-xs text-muted-foreground">{t('allCategories')}</p>
             </CardContent>
           </Card>
@@ -175,7 +179,7 @@ const Reports = () => {
             </CardHeader>
             <CardContent>
               <div className={`text-2xl font-bold ${netIncome >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                ₪{netIncome.toFixed(2)}
+                {formatCurrency(netIncome)}
               </div>
               <p className="text-xs text-muted-foreground">{t('revenueMinusExpenses')}</p>
             </CardContent>
@@ -201,16 +205,16 @@ const Reports = () => {
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-muted-foreground">{t('totalOverpayment')}</span>
-                      <span className="font-medium text-green-600">₪{credit.toFixed(2)}</span>
+                      <span className="font-medium text-green-600">{formatCurrency(credit)}</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-muted-foreground">{t('outstandingDebt')}</span>
-                      <span className="font-medium text-red-600">₪{debt.toFixed(2)}</span>
+                      <span className="font-medium text-red-600">{formatCurrency(debt)}</span>
                     </div>
                     <div className="pt-2 border-t flex justify-between items-center">
                       <span className="text-sm font-semibold">{t('netBalance')}</span>
                       <span className={`font-bold ${credit - debt >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        ₪{(credit - debt).toFixed(2)}
+                        {formatCurrency(credit - debt)}
                       </span>
                     </div>
                   </CardContent>
@@ -233,7 +237,7 @@ const Reports = () => {
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="category" />
                     <YAxis />
-                    <Tooltip formatter={(value: number) => `₪${value.toFixed(2)}`} />
+                    <Tooltip formatter={(value: number) => formatCurrency(value)} />
                     <Bar dataKey="amount" fill="hsl(var(--primary))" />
                   </BarChart>
                 </ResponsiveContainer>
@@ -287,7 +291,7 @@ const Reports = () => {
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="month" />
                   <YAxis />
-                  <Tooltip formatter={(value: number) => `₪${value.toFixed(2)}`} />
+                  <Tooltip formatter={(value: number) => formatCurrency(value)} />
                   <Legend />
                   <Line type="monotone" dataKey="payments" stroke="hsl(var(--primary))" name={t('revenue')} strokeWidth={2} />
                   <Line type="monotone" dataKey="expenses" stroke="hsl(var(--destructive))" name={t('expenses')} strokeWidth={2} />

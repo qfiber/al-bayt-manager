@@ -1,8 +1,9 @@
 import { db } from '../config/database.js';
-import { expenses, apartmentExpenses, apartments, buildings, apartmentLedger } from '../db/schema/index.js';
+import { expenses, apartmentExpenses, apartments, buildings, apartmentLedger, paymentAllocations } from '../db/schema/index.js';
 import { eq, and, inArray, sql, gte, isNull } from 'drizzle-orm';
 import { AppError } from '../middleware/error-handler.js';
 import * as ledgerService from './ledger.service.js';
+import * as occupancyPeriodService from './occupancy-period.service.js';
 import { generateChildExpenses } from './subscription.service.js';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
@@ -96,6 +97,7 @@ export async function createExpense(data: {
         })
         .returning();
 
+      const periodId = await occupancyPeriodService.getActivePeriodId(data.apartmentId, tx);
       await ledgerService.recordExpenseCharge(
         data.apartmentId,
         ae.id,
@@ -103,6 +105,7 @@ export async function createExpense(data: {
         data.description || 'Expense charge',
         userId,
         tx,
+        periodId ?? undefined,
       );
 
       await ledgerService.refreshCachedBalance(data.apartmentId, tx);
@@ -141,6 +144,7 @@ export async function createExpense(data: {
           })
           .returning();
 
+        const periodId = await occupancyPeriodService.getActivePeriodId(apt.id, tx);
         await ledgerService.recordExpenseCharge(
           apt.id,
           ae.id,
@@ -148,6 +152,7 @@ export async function createExpense(data: {
           data.description || 'Expense charge (split)',
           userId,
           tx,
+          periodId ?? undefined,
         );
 
         await ledgerService.refreshCachedBalance(apt.id, tx);
@@ -208,6 +213,8 @@ export async function deleteExpense(id: string, userId: string) {
     const affectedApartmentIds = new Set<string>();
     for (const ae of aeList) {
       if (!ae.isCanceled) {
+        // Use the original entry's period, not the active period
+        const periodId = await ledgerService.findEntryPeriodId(ae.apartmentId, 'expense', ae.id, tx);
         await ledgerService.recordReversal(
           ae.apartmentId,
           ae.id,
@@ -216,6 +223,7 @@ export async function deleteExpense(id: string, userId: string) {
           `Reversal of expense charge ${ae.id} (expense deleted)`,
           userId,
           tx,
+          periodId ?? undefined,
         );
         affectedApartmentIds.add(ae.apartmentId);
       }
@@ -253,25 +261,27 @@ export async function getApartmentExpenses(apartmentId: string) {
     .where(eq(apartmentExpenses.apartmentId, apartmentId));
 
   // Flatten and compute remaining for frontend consumption
-  const expenseItems = rows.map((row) => {
-    const amount = parseFloat(row.apartmentExpense.amount);
-    const amountPaid = parseFloat(row.apartmentExpense.amountPaid);
-    return {
-      id: row.apartmentExpense.id,
-      apartmentId: row.apartmentExpense.apartmentId,
-      expenseId: row.apartmentExpense.expenseId,
-      amount,
-      amountPaid,
-      remaining: Math.max(0, amount - amountPaid),
-      isCanceled: row.apartmentExpense.isCanceled,
-      createdAt: row.apartmentExpense.createdAt,
-      description: row.expenseDescription,
-      category: row.expenseCategory,
-      expenseDate: row.expenseDate,
-      expenseAmount: row.expenseAmount,
-      isSubscription: false,
-    };
-  });
+  const expenseItems = rows
+    .map((row) => {
+      const amount = parseFloat(row.apartmentExpense.amount);
+      const amountPaid = parseFloat(row.apartmentExpense.amountPaid);
+      return {
+        id: row.apartmentExpense.id,
+        apartmentId: row.apartmentExpense.apartmentId,
+        expenseId: row.apartmentExpense.expenseId,
+        amount,
+        amountPaid,
+        remaining: Math.max(0, amount - amountPaid),
+        isCanceled: row.apartmentExpense.isCanceled,
+        createdAt: row.apartmentExpense.createdAt,
+        description: row.expenseDescription,
+        category: row.expenseCategory,
+        expenseDate: row.expenseDate,
+        expenseAmount: row.expenseAmount,
+        isSubscription: false,
+      };
+    })
+    .filter((item) => !item.isCanceled && item.remaining > 0);
 
   // Also fetch subscription ledger entries for this apartment
   const subscriptionEntries = await db
@@ -285,26 +295,51 @@ export async function getApartmentExpenses(apartmentId: string) {
       ),
     );
 
-  const subscriptionItems = subscriptionEntries.map((entry) => {
+  // Compute amountPaid for each subscription entry from payment_allocations
+  const subscriptionItems: typeof expenseItems = [];
+  for (const entry of subscriptionEntries) {
     const amount = parseFloat(entry.amount);
-    return {
-      id: entry.id, // ledger entry ID (not allocatable)
+
+    const [allocSum] = await db
+      .select({
+        total: sql<string>`COALESCE(SUM(${paymentAllocations.amountAllocated}::numeric), 0)`,
+      })
+      .from(paymentAllocations)
+      .where(eq(paymentAllocations.ledgerEntryId, entry.id));
+
+    const amountPaid = parseFloat(allocSum.total);
+    const remaining = Math.max(0, amount - amountPaid);
+
+    if (remaining <= 0) continue; // Skip fully paid subscriptions
+
+    subscriptionItems.push({
+      id: entry.id,
       apartmentId: entry.apartmentId,
-      expenseId: null,
+      expenseId: null as any,
       amount,
-      amountPaid: 0,
-      remaining: amount,
+      amountPaid,
+      remaining,
       isCanceled: false,
       createdAt: entry.createdAt,
       description: entry.description || 'Subscription',
-      category: null,
-      expenseDate: null,
-      expenseAmount: null,
+      category: null as any,
+      expenseDate: null as any,
+      expenseAmount: null as any,
       isSubscription: true,
-    };
-  });
+    });
+  }
 
-  return [...expenseItems, ...subscriptionItems];
+  // Sort: subscriptions first (by date), then expenses (by date)
+  const sorted = [
+    ...subscriptionItems.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()),
+    ...expenseItems.sort((a, b) => {
+      const dateA = a.expenseDate || '';
+      const dateB = b.expenseDate || '';
+      return dateA.localeCompare(dateB);
+    }),
+  ];
+
+  return sorted;
 }
 
 export async function cancelApartmentExpense(id: string, userId: string) {
@@ -315,6 +350,9 @@ export async function cancelApartmentExpense(id: string, userId: string) {
 
     await tx.update(apartmentExpenses).set({ isCanceled: true }).where(eq(apartmentExpenses.id, id));
 
+    // Use the original entry's period, not the active period
+    const periodId = await ledgerService.findEntryPeriodId(ae.apartmentId, 'expense', ae.id, tx);
+
     // Reversal: the original was a debit, so reversal is a credit
     await ledgerService.recordReversal(
       ae.apartmentId,
@@ -324,6 +362,7 @@ export async function cancelApartmentExpense(id: string, userId: string) {
       `Reversal of expense charge ${ae.id}`,
       userId,
       tx,
+      periodId ?? undefined,
     );
 
     await ledgerService.refreshCachedBalance(ae.apartmentId, tx);
@@ -347,6 +386,9 @@ export async function waiveApartmentExpense(id: string, userId: string) {
       .set({ amountPaid: ae.amount })
       .where(eq(apartmentExpenses.id, id));
 
+    // Use the original expense entry's period, not the active period
+    const periodId = await ledgerService.findEntryPeriodId(ae.apartmentId, 'expense', ae.id, tx);
+
     // Create waiver credit entry
     await ledgerService.recordWaiver(
       ae.apartmentId,
@@ -354,6 +396,7 @@ export async function waiveApartmentExpense(id: string, userId: string) {
       `Waiver for expense ${ae.id}`,
       userId,
       tx,
+      periodId ?? undefined,
     );
 
     await ledgerService.refreshCachedBalance(ae.apartmentId, tx);
@@ -392,12 +435,14 @@ function getOccupiedDays(occupancyStart: Date, expenseDate: string): { days: num
 
 /**
  * Retroactively charge an apartment for building-wide expenses that occurred
- * since its occupancy start date. Redistributes existing expense splits so
- * the total collected equals the original expense amount.
+ * since its occupancy start date.
  *
- * Uses day-weighted splitting: each apartment's share is proportional to
- * how many days it was occupied in the expense's month. This means
- * mid-month apartments pay a prorated share.
+ * The new tenant pays their prorated equal share:
+ *   perTenantShare = totalExpense / numberOfTenants
+ *   newTenantCharge = perTenantShare × (occupiedDays / daysInMonth)
+ *
+ * Existing tenants' shares are NOT changed — they already paid their
+ * full-month share when the expense was originally created.
  */
 export async function backfillExpensesForApartment(
   apartmentId: string,
@@ -409,6 +454,9 @@ export async function backfillExpensesForApartment(
   // Only regular apartments participate in expense splitting
   const [apt] = await tx.select().from(apartments).where(eq(apartments.id, apartmentId)).limit(1);
   if (apt && apt.apartmentType !== 'regular') return;
+
+  // Look up active period ID to tag ledger entries
+  const activePeriodId = await occupancyPeriodService.getActivePeriodId(apartmentId, tx);
 
   const occupancyDateStr = occupancyStart.toISOString().split('T')[0]; // YYYY-MM-DD
   // Also include expenses in the same month as occupancy start (even if expense date is before occupancy day)
@@ -424,8 +472,6 @@ export async function backfillExpensesForApartment(
         gte(expenses.expenseDate, occupancyMonthStr),
       ),
     );
-
-  const affectedApartmentIds = new Set<string>();
 
   for (const expense of buildingExpenses) {
     // Skip recurring template parents — they don't have apartment_expenses
@@ -445,14 +491,10 @@ export async function backfillExpensesForApartment(
 
     if (existing) continue; // Already charged — idempotent skip
 
-    // Get ALL existing non-canceled apartment_expense splits for this expense (with apartment details)
+    // Count existing non-canceled splits to determine per-tenant share
     const existingSplits = await tx
-      .select({
-        ae: apartmentExpenses,
-        occupancyStart: apartments.occupancyStart,
-      })
+      .select({ id: apartmentExpenses.id, amount: apartmentExpenses.amount })
       .from(apartmentExpenses)
-      .innerJoin(apartments, eq(apartmentExpenses.apartmentId, apartments.id))
       .where(
         and(
           eq(apartmentExpenses.expenseId, expense.id),
@@ -460,134 +502,50 @@ export async function backfillExpensesForApartment(
         ),
       );
 
-    // If no existing splits, this was likely a single-apartment expense — skip
+    // If no existing splits, skip
     if (existingSplits.length === 0) continue;
+
+    // If there's exactly 1 split whose amount matches the total expense amount,
+    // this was a single-apartment expense — not a building-wide split. Skip it.
+    const totalAmount = parseFloat(expense.amount);
+    if (existingSplits.length === 1) {
+      const splitAmount = parseFloat(existingSplits[0].amount);
+      if (Math.abs(splitAmount - totalAmount) < 0.01) continue;
+    }
 
     // Check if the new apartment was occupied during this expense's month
     const newAptOccupied = getOccupiedDays(occupancyStart, expense.expenseDate);
     if (newAptOccupied.days <= 0) continue;
 
-    const totalAmount = parseFloat(expense.amount);
+    // Per-tenant share = total / number of tenants (including the new one)
+    const tenantCount = existingSplits.length + 1;
+    const perTenantShare = totalAmount / tenantCount;
 
-    // Calculate day-weights for all apartments (existing + new)
-    const weights: { apartmentId: string; aeId: string | null; days: number }[] = [];
+    // Prorate for occupied days in the month
+    const proratedAmount = Math.round(perTenantShare * newAptOccupied.days / newAptOccupied.daysInMonth * 100) / 100;
 
-    for (const split of existingSplits) {
-      const aptOccStart = split.occupancyStart ? new Date(split.occupancyStart) : null;
-      // If no occupancy start, assume full month (they were split in originally)
-      const occupied = aptOccStart
-        ? getOccupiedDays(aptOccStart, expense.expenseDate)
-        : { days: newAptOccupied.daysInMonth, daysInMonth: newAptOccupied.daysInMonth };
-      weights.push({
-        apartmentId: split.ae.apartmentId,
-        aeId: split.ae.id,
-        days: Math.max(occupied.days, 1), // at least 1 day since they have an existing split
-      });
-    }
+    if (proratedAmount <= 0) continue;
 
-    // Add the new apartment
-    weights.push({
+    const [ae] = await tx
+      .insert(apartmentExpenses)
+      .values({
+        apartmentId,
+        expenseId: expense.id,
+        amount: proratedAmount.toFixed(2),
+      })
+      .returning();
+
+    await ledgerService.recordExpenseCharge(
       apartmentId,
-      aeId: null, // will be created
-      days: newAptOccupied.days,
-    });
-
-    const totalDays = weights.reduce((sum, w) => sum + w.days, 0);
-
-    // Distribute using floor-based penny distribution for exact total
-    const totalCents = Math.round(totalAmount * 100);
-    const shares: { apartmentId: string; aeId: string | null; cents: number }[] = [];
-
-    // Calculate base cents per weight unit
-    let allocatedCents = 0;
-    for (const w of weights) {
-      const rawCents = (totalCents * w.days) / totalDays;
-      const baseCents = Math.floor(rawCents);
-      shares.push({ ...w, cents: baseCents });
-      allocatedCents += baseCents;
-    }
-
-    // Distribute remaining pennies to apartments with largest fractional parts
-    let remainingCents = totalCents - allocatedCents;
-    if (remainingCents > 0) {
-      const fractionals = weights.map((w, i) => ({
-        index: i,
-        frac: ((totalCents * w.days) / totalDays) - Math.floor((totalCents * w.days) / totalDays),
-      }));
-      fractionals.sort((a, b) => b.frac - a.frac);
-      for (let i = 0; i < remainingCents && i < fractionals.length; i++) {
-        shares[fractionals[i].index].cents += 1;
-      }
-    }
-
-    // Update existing apartment_expense amounts and adjust ledger
-    for (const share of shares) {
-      if (share.aeId) {
-        // Existing split — update amount and adjust ledger
-        const existingSplit = existingSplits.find(s => s.ae.id === share.aeId)!;
-        const oldAmount = parseFloat(existingSplit.ae.amount);
-        const newAmount = share.cents / 100;
-
-        if (Math.abs(oldAmount - newAmount) > 0.001) {
-          // Update apartment_expense amount
-          await tx
-            .update(apartmentExpenses)
-            .set({ amount: newAmount.toFixed(2) })
-            .where(eq(apartmentExpenses.id, share.aeId));
-
-          // Reverse old ledger entry and record new one
-          await ledgerService.recordReversal(
-            share.apartmentId,
-            share.aeId,
-            oldAmount,
-            'debit',
-            `Expense redistribution: reversed old share ₪${oldAmount.toFixed(2)}`,
-            userId,
-            tx,
-          );
-
-          await ledgerService.recordExpenseCharge(
-            share.apartmentId,
-            share.aeId,
-            newAmount,
-            expense.description || 'Expense charge (redistributed)',
-            userId,
-            tx,
-          );
-
-          affectedApartmentIds.add(share.apartmentId);
-        }
-      } else {
-        // New apartment — create apartment_expense and ledger entry
-        const newAmount = share.cents / 100;
-        if (newAmount <= 0) continue;
-
-        const [ae] = await tx
-          .insert(apartmentExpenses)
-          .values({
-            apartmentId,
-            expenseId: expense.id,
-            amount: newAmount.toFixed(2),
-          })
-          .returning();
-
-        await ledgerService.recordExpenseCharge(
-          apartmentId,
-          ae.id,
-          newAmount,
-          expense.description || 'Retroactive expense charge',
-          userId,
-          tx,
-        );
-      }
-    }
+      ae.id,
+      proratedAmount,
+      expense.description || 'Retroactive expense charge (prorated)',
+      userId,
+      tx,
+      activePeriodId ?? undefined,
+    );
   }
 
   // Refresh cached balance for the new apartment
   await ledgerService.refreshCachedBalance(apartmentId, tx);
-
-  // Refresh cached balance for all existing apartments whose shares changed
-  for (const aptId of affectedApartmentIds) {
-    await ledgerService.refreshCachedBalance(aptId, tx);
-  }
 }

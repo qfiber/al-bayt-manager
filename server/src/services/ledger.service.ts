@@ -8,8 +8,14 @@ type TxOrDb = NodePgDatabase<any> | typeof db;
 /**
  * Get the balance of an apartment from the ledger.
  * Balance = SUM(credits) - SUM(debits). Positive = overpayment, negative = debt.
+ * If periodId is provided, only sums entries for that period.
  */
-export async function getBalance(apartmentId: string, txOrDb: TxOrDb = db): Promise<number> {
+export async function getBalance(apartmentId: string, txOrDb: TxOrDb = db, periodId?: string): Promise<number> {
+  const conditions = [eq(apartmentLedger.apartmentId, apartmentId)];
+  if (periodId) {
+    conditions.push(eq(apartmentLedger.occupancyPeriodId, periodId));
+  }
+
   const [result] = await txOrDb
     .select({
       balance: sql<string>`COALESCE(SUM(
@@ -19,13 +25,14 @@ export async function getBalance(apartmentId: string, txOrDb: TxOrDb = db): Prom
       ), 0)`,
     })
     .from(apartmentLedger)
-    .where(eq(apartmentLedger.apartmentId, apartmentId));
+    .where(and(...conditions));
 
   return parseFloat(result.balance);
 }
 
 /**
  * Refresh the cached_balance column on the apartments table.
+ * Always uses all-time balance (no period filter) for the cached value.
  */
 export async function refreshCachedBalance(apartmentId: string, txOrDb: TxOrDb = db): Promise<number> {
   const balance = await getBalance(apartmentId, txOrDb);
@@ -33,6 +40,22 @@ export async function refreshCachedBalance(apartmentId: string, txOrDb: TxOrDb =
     .update(apartments)
     .set({ cachedBalance: balance.toFixed(2), updatedAt: new Date() })
     .where(eq(apartments.id, apartmentId));
+
+  // Debt tracking for collection workflow
+  if (balance < 0) {
+    // Set debt_since if not already set
+    await txOrDb
+      .update(apartments)
+      .set({ debtSince: sql`COALESCE(${apartments.debtSince}, NOW())` })
+      .where(eq(apartments.id, apartmentId));
+  } else {
+    // Clear debt tracking
+    await txOrDb
+      .update(apartments)
+      .set({ debtSince: null, collectionStageId: null })
+      .where(eq(apartments.id, apartmentId));
+  }
+
   return balance;
 }
 
@@ -45,6 +68,7 @@ export async function recordPayment(
   amount: number,
   userId: string,
   txOrDb: TxOrDb = db,
+  occupancyPeriodId?: string,
 ) {
   await txOrDb.insert(apartmentLedger).values({
     apartmentId,
@@ -53,6 +77,7 @@ export async function recordPayment(
     referenceType: 'payment',
     referenceId: paymentId,
     description: `Payment of ${amount}`,
+    occupancyPeriodId: occupancyPeriodId ?? null,
     createdBy: userId,
   });
 }
@@ -67,6 +92,7 @@ export async function recordExpenseCharge(
   description: string,
   userId: string,
   txOrDb: TxOrDb = db,
+  occupancyPeriodId?: string,
 ) {
   await txOrDb.insert(apartmentLedger).values({
     apartmentId,
@@ -75,6 +101,7 @@ export async function recordExpenseCharge(
     referenceType: 'expense',
     referenceId: apartmentExpenseId,
     description,
+    occupancyPeriodId: occupancyPeriodId ?? null,
     createdBy: userId,
   });
 }
@@ -89,6 +116,7 @@ export async function recordSubscriptionCharge(
   userId: string | null,
   txOrDb: TxOrDb = db,
   description?: string,
+  occupancyPeriodId?: string,
 ) {
   await txOrDb.insert(apartmentLedger).values({
     apartmentId,
@@ -97,6 +125,7 @@ export async function recordSubscriptionCharge(
     referenceType: 'subscription',
     referenceId: null,
     description: description || `Monthly subscription ${month}`,
+    occupancyPeriodId: occupancyPeriodId ?? null,
     createdBy: userId,
   });
 }
@@ -110,6 +139,7 @@ export async function recordWaiver(
   description: string,
   userId: string,
   txOrDb: TxOrDb = db,
+  occupancyPeriodId?: string,
 ) {
   await txOrDb.insert(apartmentLedger).values({
     apartmentId,
@@ -118,6 +148,7 @@ export async function recordWaiver(
     referenceType: 'waiver',
     referenceId: null,
     description,
+    occupancyPeriodId: occupancyPeriodId ?? null,
     createdBy: userId,
   });
 }
@@ -131,6 +162,7 @@ export async function recordDebitAdjustment(
   description: string,
   userId: string,
   txOrDb: TxOrDb = db,
+  occupancyPeriodId?: string,
 ) {
   await txOrDb.insert(apartmentLedger).values({
     apartmentId,
@@ -139,6 +171,7 @@ export async function recordDebitAdjustment(
     referenceType: 'waiver',
     referenceId: null,
     description,
+    occupancyPeriodId: occupancyPeriodId ?? null,
     createdBy: userId,
   });
 }
@@ -151,6 +184,7 @@ export async function recordOccupancyCredit(
   amount: number,
   userId: string,
   txOrDb: TxOrDb = db,
+  occupancyPeriodId?: string,
 ) {
   await txOrDb.insert(apartmentLedger).values({
     apartmentId,
@@ -159,6 +193,7 @@ export async function recordOccupancyCredit(
     referenceType: 'occupancy_credit',
     referenceId: null,
     description: `Occupancy termination credit`,
+    occupancyPeriodId: occupancyPeriodId ?? null,
     createdBy: userId,
   });
 }
@@ -174,6 +209,7 @@ export async function recordReversal(
   description: string,
   userId: string,
   txOrDb: TxOrDb = db,
+  occupancyPeriodId?: string,
 ) {
   // Reversal is the opposite of the original: if original was credit, reversal is debit and vice versa.
   const reversalType = originalEntryType === 'credit' ? 'debit' : 'credit';
@@ -184,25 +220,57 @@ export async function recordReversal(
     referenceType: 'reversal',
     referenceId: originalReferenceId,
     description,
+    occupancyPeriodId: occupancyPeriodId ?? null,
     createdBy: userId,
   });
 }
 
 /**
  * Get ledger entries for an apartment, paginated.
+ * If periodId is provided, filters to that period.
  */
 export async function getLedger(
   apartmentId: string,
-  options: { limit?: number; offset?: number } = {},
+  options: { limit?: number; offset?: number; periodId?: string } = {},
 ) {
-  const { limit = 50, offset = 0 } = options;
+  const { limit = 50, offset = 0, periodId } = options;
+
+  const conditions = [eq(apartmentLedger.apartmentId, apartmentId)];
+  if (periodId) {
+    conditions.push(eq(apartmentLedger.occupancyPeriodId, periodId));
+  }
+
   return db
     .select()
     .from(apartmentLedger)
-    .where(eq(apartmentLedger.apartmentId, apartmentId))
+    .where(and(...conditions))
     .orderBy(desc(apartmentLedger.createdAt))
     .limit(limit)
     .offset(offset);
+}
+
+/**
+ * Find the occupancy period ID of a ledger entry by reference.
+ * Used to tag reversals with the same period as the original entry.
+ */
+export async function findEntryPeriodId(
+  apartmentId: string,
+  referenceType: 'payment' | 'expense' | 'subscription' | 'waiver' | 'occupancy_credit' | 'reversal',
+  referenceId: string,
+  txOrDb: TxOrDb = db,
+): Promise<string | null> {
+  const [entry] = await txOrDb
+    .select({ occupancyPeriodId: apartmentLedger.occupancyPeriodId })
+    .from(apartmentLedger)
+    .where(
+      and(
+        eq(apartmentLedger.apartmentId, apartmentId),
+        eq(apartmentLedger.referenceType, referenceType),
+        eq(apartmentLedger.referenceId, referenceId),
+      ),
+    )
+    .limit(1);
+  return entry?.occupancyPeriodId ?? null;
 }
 
 /**

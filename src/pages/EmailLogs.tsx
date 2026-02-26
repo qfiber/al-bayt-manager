@@ -180,6 +180,8 @@ const EmailLogs = () => {
     );
   }
 
+  if (!user || !isAdmin) return null;
+
   return (
     <div className="container mx-auto px-3 py-4 sm:p-6 max-w-7xl" dir={isRTL ? 'rtl' : 'ltr'}>
       <div className="mb-6">

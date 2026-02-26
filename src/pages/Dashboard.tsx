@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useCurrency } from '@/contexts/PublicSettingsContext';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,6 +19,13 @@ import {
   Users,
   Clock,
   Info,
+  AlertTriangle,
+  Wrench,
+  User,
+  Layers,
+  FolderOpen,
+  BarChart3,
+  CalendarDays,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -77,8 +85,7 @@ interface AuditEntry {
   createdAt: string;
 }
 
-const formatCurrency = (val: number) =>
-  `₪${val.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+// formatCurrencyShort is defined inside component to use currencySymbol from context
 
 const actionIcons: Record<string, React.ElementType> = {
   create: Plus,
@@ -117,13 +124,18 @@ function relativeTime(dateStr: string, language: string): string {
 const Dashboard = () => {
   const { user, isAdmin, isModerator, loading } = useAuth();
   const { t, language } = useLanguage();
+  const { currencySymbol, formatCurrency } = useCurrency();
   const navigate = useNavigate();
+
+  const formatCurrencyShort = (val: number) =>
+    `${currencySymbol}${val.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 
   const [summary, setSummary] = useState<Summary | null>(null);
   const [trends, setTrends] = useState<MonthlyTrends | null>(null);
   const [buildingsReport, setBuildingsReport] = useState<BuildingReport[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditEntry[]>([]);
   const [generalInfo, setGeneralInfo] = useState<any[]>([]);
+  const [openIssueCount, setOpenIssueCount] = useState(0);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedInfoId, setSelectedInfoId] = useState<string | undefined>();
   const [dataLoading, setDataLoading] = useState(true);
@@ -142,7 +154,10 @@ const Dashboard = () => {
     const fetchAll = async () => {
       setDataLoading(true);
       try {
-        const promises: Promise<any>[] = [api.get('/general-info')];
+        const promises: Promise<any>[] = [
+          api.get('/general-info'),
+          api.get('/issues/count/open'),
+        ];
 
         if (canViewFinancials) {
           promises.push(
@@ -158,12 +173,14 @@ const Dashboard = () => {
           r.status === 'fulfilled' ? r.value : null;
 
         setGeneralInfo(getValue(results[0]) || []);
+        const issueCountData = getValue(results[1]);
+        setOpenIssueCount(issueCountData?.count || 0);
 
         if (canViewFinancials) {
-          setSummary(getValue(results[1]));
-          setTrends(getValue(results[2]));
-          setBuildingsReport(getValue(results[3]) || []);
-          setAuditLogs(getValue(results[4]) || []);
+          setSummary(getValue(results[2]));
+          setTrends(getValue(results[3]));
+          setBuildingsReport(getValue(results[4]) || []);
+          setAuditLogs(getValue(results[5]) || []);
         }
       } finally {
         setDataLoading(false);
@@ -250,22 +267,63 @@ const Dashboard = () => {
           <h1 className="text-2xl font-bold">{t('welcomeBack')}, {user.name || user.email}</h1>
         </div>
 
-        <Card
-          className="cursor-pointer hover:shadow-md transition-shadow"
-          onClick={() => navigate('/my-apartments')}
-        >
-          <CardHeader>
-            <CardTitle className="flex items-center gap-3">
-              <div className="p-3 rounded-lg bg-primary/10 text-primary">
-                <Home className="w-6 h-6" />
-              </div>
-              {t('myApartments')}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">{t('clickToManage')}</p>
-          </CardContent>
-        </Card>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card
+            className="cursor-pointer hover:shadow-md transition-shadow"
+            onClick={() => navigate('/my-apartments')}
+          >
+            <CardHeader>
+              <CardTitle className="flex items-center gap-3">
+                <div className="p-3 rounded-lg bg-primary/10 text-primary">
+                  <Home className="w-6 h-6" />
+                </div>
+                {t('myApartments')}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">{t('clickToManage')}</p>
+            </CardContent>
+          </Card>
+
+          <Card
+            className="cursor-pointer hover:shadow-md transition-shadow"
+            onClick={() => navigate('/issues')}
+          >
+            <CardHeader>
+              <CardTitle className="flex items-center gap-3">
+                <div className="p-3 rounded-lg bg-orange-50 text-orange-600">
+                  <AlertTriangle className="w-6 h-6" />
+                </div>
+                <span className="flex items-center gap-2">
+                  {t('issues')}
+                  {openIssueCount > 0 && (
+                    <Badge variant="destructive" className="text-xs">{openIssueCount}</Badge>
+                  )}
+                </span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">{t('reportIssue')}</p>
+            </CardContent>
+          </Card>
+
+          <Card
+            className="cursor-pointer hover:shadow-md transition-shadow"
+            onClick={() => navigate('/profile')}
+          >
+            <CardHeader>
+              <CardTitle className="flex items-center gap-3">
+                <div className="p-3 rounded-lg bg-violet-50 text-violet-600">
+                  <User className="w-6 h-6" />
+                </div>
+                {t('profile')}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">{t('manageProfile')}</p>
+            </CardContent>
+          </Card>
+        </div>
 
         {/* General Information */}
         {generalInfo.length > 0 && (
@@ -417,7 +475,7 @@ const Dashboard = () => {
                       return `${m}/${y.slice(2)}`;
                     }}
                   />
-                  <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `₪${v}`} />
+                  <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `${currencySymbol}${v}`} />
                   <Tooltip
                     formatter={(value: number, name: string) => [
                       formatCurrency(value),
@@ -496,6 +554,103 @@ const Dashboard = () => {
             )}
           </CardContent>
         </Card>
+      </div>
+
+      {/* Issues & Maintenance Quick Nav */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Card
+          className="cursor-pointer hover:shadow-md transition-shadow"
+          onClick={() => navigate('/issues')}
+        >
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-lg bg-orange-50 text-orange-600 shrink-0">
+                <AlertTriangle className="h-5 w-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium">{t('issues')}</p>
+                <p className="text-xs text-muted-foreground">{t('issueReports')}</p>
+              </div>
+              {openIssueCount > 0 && (
+                <Badge variant="destructive" className="tabular-nums shrink-0">{openIssueCount}</Badge>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+        <Card
+          className="cursor-pointer hover:shadow-md transition-shadow"
+          onClick={() => navigate('/maintenance')}
+        >
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-lg bg-indigo-50 text-indigo-600 shrink-0">
+                <Wrench className="h-5 w-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-medium">{t('maintenanceJobs')}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* New Features Quick Nav */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+<Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate('/bulk-operations')}>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-lg bg-cyan-50 text-cyan-600 shrink-0"><Layers className="h-5 w-5" /></div>
+              <div className="min-w-0">
+                <p className="text-sm font-medium">{t('bulkOperations')}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate('/documents')}>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-lg bg-amber-50 text-amber-600 shrink-0"><FolderOpen className="h-5 w-5" /></div>
+              <div className="min-w-0">
+                <p className="text-sm font-medium">{t('documents')}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate('/portfolio')}>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-lg bg-purple-50 text-purple-600 shrink-0"><BarChart3 className="h-5 w-5" /></div>
+              <div className="min-w-0">
+                <p className="text-sm font-medium">{t('portfolio')}</p>
+                <p className="text-xs text-muted-foreground">{t('portfolioOverview')}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate('/meetings')}>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-lg bg-rose-50 text-rose-600 shrink-0"><CalendarDays className="h-5 w-5" /></div>
+              <div className="min-w-0">
+                <p className="text-sm font-medium">{t('meetings')}</p>
+                <p className="text-xs text-muted-foreground">{t('vaadBayit')}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        {isAdmin && (
+          <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate('/debt-collection')}>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-lg bg-red-50 text-red-600 shrink-0"><AlertCircle className="h-5 w-5" /></div>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium">{t('debtCollection')}</p>
+                  <p className="text-xs text-muted-foreground">{t('collectionWorkflow')}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Recent Activity */}

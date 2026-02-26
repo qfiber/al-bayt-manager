@@ -16,6 +16,8 @@ import {
   Mail,
   MailOpen,
   Receipt,
+  AlertTriangle,
+  Wrench,
 } from 'lucide-react';
 import {
   Sheet,
@@ -47,11 +49,13 @@ export const MobileBottomNav = () => {
     { label: t('payments'), icon: CreditCard, path: '/payments' },
     { label: t('expenses'), icon: Receipt, path: '/expenses' },
     { label: t('reports'), icon: FileText, path: '/reports' },
+    { label: t('issues'), icon: AlertTriangle, path: '/issues' },
+    { label: t('maintenanceJobs'), icon: Wrench, path: '/maintenance' },
     { label: t('users'), icon: Users, path: '/users' },
     { label: t('settings'), icon: Settings, path: '/settings' },
     { label: t('apiKeys'), icon: Key, path: '/api-keys' },
     { label: t('auditLogs'), icon: Shield, path: '/audit-logs' },
-    { label: t('emailTemplates'), icon: Mail, path: '/email-templates' },
+    { label: t('notificationTemplates'), icon: Mail, path: '/email-templates' },
     { label: t('emailLogs'), icon: MailOpen, path: '/email-logs' },
   ];
 
@@ -60,12 +64,15 @@ export const MobileBottomNav = () => {
     { label: t('payments'), icon: CreditCard, path: '/payments' },
     { label: t('expenses'), icon: Receipt, path: '/expenses' },
     { label: t('reports'), icon: FileText, path: '/reports' },
+    { label: t('issues'), icon: AlertTriangle, path: '/issues' },
+    { label: t('maintenanceJobs'), icon: Wrench, path: '/maintenance' },
     { label: t('auditLogs'), icon: Shield, path: '/audit-logs' },
   ];
 
   const userItems: NavItem[] = [
     { label: t('dashboard'), icon: LayoutDashboard, path: '/dashboard' },
     { label: t('myApartments'), icon: Home, path: '/my-apartments' },
+    { label: t('issues'), icon: AlertTriangle, path: '/issues' },
   ];
 
   const allItems = isAdmin ? allAdminItems : isModerator ? allModeratorItems : userItems;

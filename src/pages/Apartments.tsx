@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useCurrency } from '@/contexts/PublicSettingsContext';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -58,6 +59,7 @@ interface User {
 const Apartments = () => {
   const { user, isAdmin, isModerator, loading } = useAuth();
   const { t, language } = useLanguage();
+  const { currencySymbol, formatCurrency } = useCurrency();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [apartmentItems, setApartmentItems] = useState<ApartmentListItem[]>([]);
@@ -132,7 +134,7 @@ const Apartments = () => {
       const data = await api.get<Building[]>('/buildings');
       setBuildings(data);
     } catch (err: any) {
-      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      toast({ title: t('error'), description: err.message, variant: 'destructive' });
     }
   };
 
@@ -141,7 +143,7 @@ const Apartments = () => {
       const data = await api.get<ApartmentListItem[]>('/apartments');
       setApartmentItems(data);
     } catch (err: any) {
-      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      toast({ title: t('error'), description: err.message, variant: 'destructive' });
     }
   };
 
@@ -150,7 +152,7 @@ const Apartments = () => {
       const data = await api.get<User[]>('/users');
       setProfiles(data.map(u => ({ id: u.id, name: u.name })));
     } catch (err: any) {
-      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      toast({ title: t('error'), description: err.message, variant: 'destructive' });
     }
   };
 
@@ -176,20 +178,20 @@ const Apartments = () => {
     if (editingApartment) {
       try {
         await api.put(`/apartments/${editingApartment.id}`, apartmentData);
-        toast({ title: 'Success', description: 'Apartment updated successfully' });
+        toast({ title: t('success'), description: t('apartmentUpdatedSuccess') });
         fetchApartments();
         resetForm();
       } catch (err: any) {
-        toast({ title: 'Error', description: err.message, variant: 'destructive' });
+        toast({ title: t('error'), description: err.message, variant: 'destructive' });
       }
     } else {
       try {
         await api.post('/apartments', apartmentData);
-        toast({ title: 'Success', description: 'Apartment created successfully' });
+        toast({ title: t('success'), description: t('apartmentCreatedSuccess') });
         fetchApartments();
         resetForm();
       } catch (err: any) {
-        toast({ title: 'Error', description: err.message, variant: 'destructive' });
+        toast({ title: t('error'), description: err.message, variant: 'destructive' });
       }
     }
   };
@@ -199,10 +201,10 @@ const Apartments = () => {
 
     try {
       await api.delete(`/apartments/${id}`);
-      toast({ title: 'Success', description: 'Apartment deleted successfully' });
+      toast({ title: t('success'), description: t('apartmentDeletedSuccess') });
       fetchApartments();
     } catch (err: any) {
-      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      toast({ title: t('error'), description: err.message, variant: 'destructive' });
     }
   };
 
@@ -351,6 +353,8 @@ const Apartments = () => {
   const [debtDetails, setDebtDetails] = useState<any[]>([]);
   const [apartmentExpenses, setApartmentExpenses] = useState<any[]>([]);
   const [apartmentPayments, setApartmentPayments] = useState<any[]>([]);
+  const [occupancyPeriods, setOccupancyPeriods] = useState<any[]>([]);
+  const [selectedPeriodId, setSelectedPeriodId] = useState<string>('current');
 
   const calculateTerminationCredit = (apartment: Apartment): number => {
     if (!apartment.occupancyStart) return 0;
@@ -372,13 +376,13 @@ const Apartments = () => {
       await api.post(`/apartments/${apartmentToTerminate.id}/terminate`);
       toast({
         title: t('success'),
-        description: t('occupancyTerminated').replace('{credit}', `₪${calculatedTerminationCredit.toFixed(2)}`)
+        description: t('occupancyTerminated').replace('{credit}', formatCurrency(calculatedTerminationCredit))
       });
       fetchApartments();
       setTerminateDialogOpen(false);
       setApartmentToTerminate(null);
     } catch (err: any) {
-      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      toast({ title: t('error'), description: err.message, variant: 'destructive' });
     }
   };
 
@@ -389,53 +393,96 @@ const Apartments = () => {
     setTerminateDialogOpen(true);
   };
 
-  const showDebtDetails = async (apartment: Apartment) => {
+  const showDebtDetails = async (apartment: Apartment, periodId: string = 'current') => {
     setSelectedApartment(apartment);
 
     try {
+      // Fetch periods for admin period selector
+      try {
+        const periods = await api.get<any[]>(`/apartments/${apartment.id}/periods`);
+        setOccupancyPeriods(periods || []);
+      } catch {
+        setOccupancyPeriods([]);
+      }
+
+      const periodParam = periodId === 'current' ? '' : `?periodId=${periodId}`;
       const data = await api.get<{
         apartment: Apartment;
         balance: number;
         expenses: any[];
         payments: any[];
         ledger: any[];
-      }>(`/apartments/${apartment.id}/debt-details`);
+        periodId: string | null;
+        subscriptionAllocations: Record<string, number>;
+      }>(`/apartments/${apartment.id}/debt-details${periodParam}`);
 
       setApartmentExpenses(data.expenses || []);
       setApartmentPayments(data.payments || []);
+      setSelectedPeriodId(periodId);
 
-      if (!apartment.occupancyStart) {
-        setDebtDetails([]);
-        setDebtDialogOpen(true);
-        return;
+      const subAllocations = data.subscriptionAllocations || {};
+
+      // Build debt rows from subscription ledger entries, one per source per month
+      // Description format: "Monthly subscription YYYY-MM" or "Storage S-1 subscription YYYY-MM"
+      const subscriptionEntries = (data.ledger || []).filter(
+        (e: any) => e.referenceType === 'subscription' && e.entryType === 'debit'
+      );
+
+      // Group by source+month so apartment and storage subscriptions are separate rows
+      const rowMap = new Map<string, { month: string; label: string; amountDue: number; amountPaid: number; sortKey: string }>();
+      for (const entry of subscriptionEntries) {
+        const desc = entry.description || '';
+        const match = desc.match(/(\d{4})-(\d{2})$/);
+        if (!match) continue;
+
+        const monthStr = `${match[2]}/${match[1]}`; // MM/YYYY
+        const sortKey = `${match[1]}-${match[2]}`; // YYYY-MM for sorting
+
+        // Extract source label from the part before "subscription YYYY-MM"
+        const prefixMatch = desc.match(/^(.+?)\s+subscription\s+/i);
+        const sourceLabel = prefixMatch ? prefixMatch[1].trim() : t('monthlySubscription').replace(/ \(.*?\)/, '');
+
+        const key = `${monthStr}|${sourceLabel}`;
+        const existing = rowMap.get(key);
+        const allocated = subAllocations[entry.id] || 0;
+
+        if (existing) {
+          existing.amountDue += parseFloat(entry.amount);
+          existing.amountPaid += allocated;
+        } else {
+          rowMap.set(key, {
+            month: monthStr,
+            label: sourceLabel,
+            amountDue: parseFloat(entry.amount),
+            amountPaid: allocated,
+            sortKey,
+          });
+        }
       }
 
-      const startDate = new Date(apartment.occupancyStart);
-      const monthsOccupied = calculateMonthsOccupied(apartment.occupancyStart);
-
-      const details = [];
-      for (let i = 0; i < monthsOccupied; i++) {
-        const monthDate = new Date(startDate.getFullYear(), startDate.getMonth() + i, 1);
-        const monthStr = `${String(monthDate.getMonth() + 1).padStart(2, '0')}/${monthDate.getFullYear()}`;
-
-        // Find payment for this month
-        const payment = data.payments?.find((p: any) => p.month === monthStr);
-        const subscriptionAmount = parseFloat(apartment.subscriptionAmount);
-
-        details.push({
-          month: monthStr,
-          amount_due: subscriptionAmount,
-          amount_paid: payment && !payment.isCanceled ? parseFloat(payment.amount) : 0,
-          balance: subscriptionAmount - (payment && !payment.isCanceled ? parseFloat(payment.amount) : 0),
-          payment_id: payment?.id || null,
-          is_payment_canceled: payment?.isCanceled || false
-        });
-      }
+      // Sort: chronologically by month, then by label
+      const details = [...rowMap.values()]
+        .sort((a, b) => a.sortKey.localeCompare(b.sortKey) || a.label.localeCompare(b.label))
+        .map(row => ({
+          month: row.month,
+          label: row.label,
+          amount_due: row.amountDue,
+          amount_paid: row.amountPaid,
+          balance: Math.round((row.amountDue - row.amountPaid) * 100) / 100,
+          payment_id: null as string | null,
+          is_payment_canceled: false,
+        }));
 
       setDebtDetails(details);
       setDebtDialogOpen(true);
     } catch (err: any) {
-      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      toast({ title: t('error'), description: err.message, variant: 'destructive' });
+    }
+  };
+
+  const handlePeriodChange = (periodId: string) => {
+    if (selectedApartment) {
+      showDebtDetails(selectedApartment, periodId);
     }
   };
 
@@ -461,7 +508,7 @@ const Apartments = () => {
         await showDebtDetails(updatedItem.apartment);
       }
     } catch (err: any) {
-      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      toast({ title: t('error'), description: err.message, variant: 'destructive' });
     }
   };
 
@@ -482,7 +529,7 @@ const Apartments = () => {
         }
       }
     } catch (err: any) {
-      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      toast({ title: t('error'), description: err.message, variant: 'destructive' });
     }
   };
 
@@ -503,7 +550,7 @@ const Apartments = () => {
         }
       }
     } catch (err: any) {
-      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      toast({ title: t('error'), description: err.message, variant: 'destructive' });
     }
   };
 
@@ -522,7 +569,7 @@ const Apartments = () => {
       setWriteOffDialogOpen(false);
       setApartmentToWriteOff(null);
     } catch (err: any) {
-      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      toast({ title: t('error'), description: err.message, variant: 'destructive' });
     }
   };
 
@@ -537,8 +584,15 @@ const Apartments = () => {
     : buildings.filter(b => b.id === selectedBuildingFilter);
 
   const getApartmentsForBuilding = (buildingId: string) => {
+    // Return only regular apartments + orphan storage/parking (no parent set)
     return apartmentItems
-      .filter(a => a.apartment.buildingId === buildingId)
+      .filter(a => a.apartment.buildingId === buildingId && !a.apartment.parentApartmentId)
+      .map(a => a.apartment);
+  };
+
+  const getChildApartments = (parentId: string) => {
+    return apartmentItems
+      .filter(a => a.apartment.parentApartmentId === parentId)
       .map(a => a.apartment);
   };
 
@@ -697,7 +751,7 @@ const Apartments = () => {
                     </Popover>
                   </div>
                   <div className={formData.status !== 'occupied' ? 'opacity-50' : ''}>
-                    <Label htmlFor="subscription_amount">{t('monthlySubscription')}</Label>
+                    <Label htmlFor="subscription_amount">{t('monthlySubscription').replace('{currency}', currencySymbol)}</Label>
                     <Input
                       id="subscription_amount"
                       type="number"
@@ -708,7 +762,7 @@ const Apartments = () => {
                       disabled={formData.status !== 'occupied'}
                     />
                     <p className="text-xs text-muted-foreground mt-1">
-                      {t('autoCalculated').replace('{fee}', String(monthlyFee))}
+                      {t('autoCalculated').replace('{currency}', currencySymbol).replace('{fee}', String(monthlyFee))}
                     </p>
                   </div>
                   <div className={formData.status !== 'occupied' ? 'opacity-50' : ''}>
@@ -768,10 +822,10 @@ const Apartments = () => {
                             <TableHead className="text-start">{t('floor')}</TableHead>
                             <TableHead className="text-start">{t('status')}</TableHead>
                             <TableHead className="text-start">{t('owner')} / {t('beneficiary')}</TableHead>
-                            <TableHead className="text-start">{t('monthlySubscription')}</TableHead>
+                            <TableHead className="text-start">{t('monthlySubscription').replace('{currency}', currencySymbol)}</TableHead>
                             <TableHead className="text-start">{t('monthsOccupied')}</TableHead>
                             <TableHead className="text-start">{t('totalDebt')}</TableHead>
-                            <TableHead className="text-start">{t('credit')}</TableHead>
+                            <TableHead className="text-start">{t('credit').replace('{currency}', currencySymbol)}</TableHead>
                             <TableHead className="text-start">{t('actions')}</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -779,8 +833,10 @@ const Apartments = () => {
                           {buildingApartments.map((apartment) => {
                             const balance = parseFloat(apartment.cachedBalance);
                             const subscriptionAmount = parseFloat(apartment.subscriptionAmount);
+                            const children = getChildApartments(apartment.id);
                             return (
-                              <TableRow key={apartment.id}>
+                              <React.Fragment key={apartment.id}>
+                              <TableRow>
                                 <TableCell className="font-medium text-start">
                                   <div className="flex items-center gap-2">
                                     {apartment.apartmentNumber}
@@ -797,11 +853,6 @@ const Apartments = () => {
                                       </Badge>
                                     )}
                                   </div>
-                                  {apartment.parentApartmentId && (
-                                    <div className="text-xs text-muted-foreground mt-0.5">
-                                      {t('linkedTo')}: {t('apt')} {getParentApartmentNumber(apartment.parentApartmentId)}
-                                    </div>
-                                  )}
                                 </TableCell>
                                 <TableCell className="text-start">
                                   {apartment.floor != null ? getFloorDisplayName(apartment.floor === 0 ? 'Ground' : apartment.floor.toString()) : '-'}
@@ -818,16 +869,16 @@ const Apartments = () => {
                                   </div>
                                 </TableCell>
                                 <TableCell className={`text-start ${apartment.status !== 'occupied' ? 'text-muted-foreground/50' : ''}`}>
-                                  {apartment.status === 'occupied' ? `₪${subscriptionAmount.toFixed(2)}` : '-'}
+                                  {apartment.status === 'occupied' ? formatCurrency(subscriptionAmount) : '-'}
                                 </TableCell>
                                 <TableCell className={`text-start ${apartment.status !== 'occupied' ? 'text-muted-foreground/50' : ''}`}>
                                   {apartment.status === 'occupied' ? calculateMonthsOccupied(apartment.occupancyStart) : '-'}
                                 </TableCell>
                                 <TableCell className={`text-start font-semibold ${calculateTotalDebt(apartment) > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                                  ₪{Math.abs(calculateTotalDebt(apartment)).toFixed(2)}
+                                  {formatCurrency(Math.abs(calculateTotalDebt(apartment)))}
                                 </TableCell>
                                 <TableCell className={`text-start ${balance > 0 ? 'text-green-600 font-semibold' : balance < 0 ? 'text-red-600 font-semibold' : ''}`}>
-                                  ₪{balance.toFixed(2)}
+                                  {formatCurrency(balance)}
                                 </TableCell>
                                 <TableCell className="text-start">
                                   <div className="flex justify-end gap-2">
@@ -864,6 +915,54 @@ const Apartments = () => {
                                   </div>
                                 </TableCell>
                               </TableRow>
+                              {/* Child sub-rows (storage rooms / parking lots) */}
+                              {children.map((child) => {
+                                const childSub = parseFloat(child.subscriptionAmount);
+                                return (
+                                  <TableRow key={child.id} className="bg-muted/30">
+                                    <TableCell className="text-start ps-8">
+                                      <div className="flex items-center gap-2 text-muted-foreground">
+                                        <span className="text-xs opacity-60">└</span>
+                                        {child.apartmentType === 'storage' ? (
+                                          <Package className="w-3.5 h-3.5 text-muted-foreground" />
+                                        ) : (
+                                          <Car className="w-3.5 h-3.5 text-muted-foreground" />
+                                        )}
+                                        <span className="text-sm font-medium text-foreground">{child.apartmentNumber}</span>
+                                        <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                                          {child.apartmentType === 'storage' ? t('storageRoom') : t('parkingSpot')}
+                                        </Badge>
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="text-start text-sm text-muted-foreground">
+                                      {child.floor != null ? getFloorDisplayName(child.floor === 0 ? 'Ground' : child.floor.toString()) : '-'}
+                                    </TableCell>
+                                    <TableCell className="text-start">
+                                      <span className={`px-2 py-1 rounded text-xs ${child.status === 'vacant' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                                        {t(child.status as 'vacant' | 'occupied')}
+                                      </span>
+                                    </TableCell>
+                                    <TableCell className="text-start text-sm text-muted-foreground">-</TableCell>
+                                    <TableCell className={`text-start text-sm ${child.status !== 'occupied' ? 'text-muted-foreground/50' : 'text-muted-foreground'}`}>
+                                      {child.status === 'occupied' ? formatCurrency(childSub) : '-'}
+                                    </TableCell>
+                                    <TableCell className="text-start text-sm text-muted-foreground">-</TableCell>
+                                    <TableCell className="text-start text-sm text-muted-foreground">-</TableCell>
+                                    <TableCell className="text-start text-sm text-muted-foreground">-</TableCell>
+                                    <TableCell className="text-start">
+                                      <div className="flex justify-end gap-2">
+                                        <Button size="sm" variant="outline" onClick={() => handleEdit(child)}>
+                                          <Pencil className="w-4 h-4" />
+                                        </Button>
+                                        <Button size="sm" variant="destructive" onClick={() => handleDelete(child.id)}>
+                                          <Trash2 className="w-4 h-4" />
+                                        </Button>
+                                      </div>
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                              </React.Fragment>
                             );
                           })}
                         </TableBody>
@@ -883,6 +982,31 @@ const Apartments = () => {
                 {t('debtDetails')} - {selectedApartment ? `${t('apt')} ${selectedApartment.apartmentNumber}` : ''}
               </AlertDialogTitle>
             </AlertDialogHeader>
+
+            {/* Period Selector */}
+            {occupancyPeriods.length > 0 && (
+              <div className="flex items-center gap-3 pb-2 border-b">
+                <span className="text-sm font-medium text-muted-foreground">{t('occupancyPeriods')}:</span>
+                <Select value={selectedPeriodId} onValueChange={handlePeriodChange}>
+                  <SelectTrigger className="w-[280px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="current">{t('currentPeriod')}</SelectItem>
+                    <SelectItem value="all">{t('allTime')}</SelectItem>
+                    {occupancyPeriods
+                      .filter((p: any) => p.status === 'closed')
+                      .map((period: any) => (
+                        <SelectItem key={period.id} value={period.id}>
+                          {period.tenantName || t('periodTenant')} ({new Date(period.startDate).toLocaleDateString()} - {period.endDate ? new Date(period.endDate).toLocaleDateString() : '...'})
+                          {period.closingBalance != null && ` — ${formatCurrency(parseFloat(period.closingBalance))}`}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             <div className="max-h-96 overflow-y-auto space-y-6">
               {/* Payments Section */}
               <div>
@@ -907,7 +1031,7 @@ const Apartments = () => {
                       apartmentPayments.map((payment) => (
                         <TableRow key={payment.id} className={payment.isCanceled ? 'opacity-50' : ''}>
                           <TableCell className="text-start font-medium">{payment.month}</TableCell>
-                          <TableCell className="text-start text-green-600">₪{parseFloat(payment.amount).toFixed(2)}</TableCell>
+                          <TableCell className="text-start text-green-600">{formatCurrency(parseFloat(payment.amount))}</TableCell>
                           <TableCell className="text-start">
                             <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
                               payment.isCanceled
@@ -962,11 +1086,16 @@ const Apartments = () => {
                     ) : (
                       debtDetails.map((detail, index) => (
                         <TableRow key={index}>
-                          <TableCell className="text-start font-medium">{detail.month}</TableCell>
-                          <TableCell className="text-start">₪{detail.amount_due.toFixed(2)}</TableCell>
-                          <TableCell className="text-start">₪{detail.amount_paid.toFixed(2)}</TableCell>
+                          <TableCell className="text-start">
+                            <div className="font-medium">{detail.month}</div>
+                            {detail.label && (
+                              <div className="text-xs text-muted-foreground">{detail.label}</div>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-start">{formatCurrency(detail.amount_due)}</TableCell>
+                          <TableCell className="text-start">{formatCurrency(detail.amount_paid)}</TableCell>
                           <TableCell className={`text-start font-semibold ${detail.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                            ₪{Math.abs(detail.balance).toFixed(2)}
+                            {formatCurrency(Math.abs(detail.balance))}
                           </TableCell>
                           {(isAdmin || isModerator) && (
                             <TableCell className="text-start">
@@ -1019,7 +1148,7 @@ const Apartments = () => {
                         <TableRow key={expense.id}>
                           <TableCell className="text-start">{expense.description || '-'}</TableCell>
                           <TableCell className="text-start">{expense.expenseDate || (expense.createdAt ? new Date(expense.createdAt).toLocaleDateString() : '-')}</TableCell>
-                          <TableCell className="text-start text-red-600 font-medium">₪{parseFloat(expense.amount).toFixed(2)}</TableCell>
+                          <TableCell className="text-start text-red-600 font-medium">{formatCurrency(parseFloat(expense.amount))}</TableCell>
                           <TableCell className="text-start">
                             <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
                               expense.isCanceled
@@ -1064,7 +1193,9 @@ const Apartments = () => {
               <AlertDialogDescription>
                 {t('terminateOccupancyConfirm')
                   .replace('{apartment}', apartmentToTerminate?.apartmentNumber || '')
-                  .replace('{credit}', `₪${calculatedTerminationCredit.toFixed(2)}`)}
+                  .replace('{credit}', formatCurrency(calculatedTerminationCredit))}
+                {' '}
+                {t('periodClosedNote')}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -1087,6 +1218,7 @@ const Apartments = () => {
               <AlertDialogTitle>{t('writeOffBalance')}</AlertDialogTitle>
               <AlertDialogDescription>
                 {t('writeOffBalanceConfirm')
+                  .replace('{currency}', currencySymbol)
                   .replace('{apartment}', apartmentToWriteOff?.apartmentNumber || '')
                   .replace('{balance}', Math.abs(parseFloat(apartmentToWriteOff?.cachedBalance || '0')).toFixed(2))}
               </AlertDialogDescription>

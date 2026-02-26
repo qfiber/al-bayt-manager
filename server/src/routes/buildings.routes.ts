@@ -19,6 +19,7 @@ const createBuildingSchema = z.object({
     z.number().min(0),
   ]).transform((v) => String(v)).optional(),
   logoUrl: z.string().max(500).optional(),
+  ntfyTopicUrl: z.string().max(500).nullable().optional(),
 });
 
 const updateBuildingSchema = createBuildingSchema.partial();

@@ -4,6 +4,7 @@ import { logger } from '../config/logger.js';
 import { apartments, expenses, apartmentExpenses } from '../db/schema/index.js';
 import { eq, and, gt, isNull } from 'drizzle-orm';
 import * as ledgerService from './ledger.service.js';
+import * as occupancyPeriodService from './occupancy-period.service.js';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 type TxOrDb = NodePgDatabase<any> | typeof db;
@@ -50,6 +51,10 @@ export async function backfillSubscriptions(apartmentId: string, tx: TxOrDb) {
   // Build description prefix for child apartments (e.g. "Storage S-1 subscription 2026-02")
   const typeLabel = apt.apartmentType === 'storage' ? 'Storage' : apt.apartmentType === 'parking' ? 'Parking' : '';
 
+  // Look up active period ID to tag ledger entries
+  const period = await occupancyPeriodService.getActivePeriod(targetApartmentId, tx);
+  const periodId = period?.id;
+
   const occupancyStart = new Date(apt.occupancyStart);
   const now = new Date();
   const months = generateMonthRange(occupancyStart, now);
@@ -92,7 +97,7 @@ export async function backfillSubscriptions(apartmentId: string, tx: TxOrDb) {
       const description = isChild
         ? `${typeLabel} ${apt.apartmentNumber} subscription ${month}`
         : undefined;
-      await ledgerService.recordSubscriptionCharge(targetApartmentId, chargeAmount, month, null, tx, description);
+      await ledgerService.recordSubscriptionCharge(targetApartmentId, chargeAmount, month, null, tx, description, periodId);
     }
   }
 
@@ -227,6 +232,7 @@ export async function generateChildExpenses(
           })
           .returning();
 
+        const aptPeriodId = await occupancyPeriodService.getActivePeriodId(apt.id, tx);
         await ledgerService.recordExpenseCharge(
           apt.id,
           ae.id,
@@ -234,6 +240,7 @@ export async function generateChildExpenses(
           expense.description || 'Recurring expense charge',
           userId as any,
           tx,
+          aptPeriodId ?? undefined,
         );
 
         await ledgerService.refreshCachedBalance(apt.id, tx);

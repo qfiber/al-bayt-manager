@@ -9,6 +9,9 @@ const pool = new pg.Pool({
   max: 20,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 2000,
+  ssl: env.DB_SSL === 'true' ? true
+     : env.DB_SSL === 'no-verify' ? { rejectUnauthorized: false }
+     : false,
 });
 
 pool.on('error', (err) => {

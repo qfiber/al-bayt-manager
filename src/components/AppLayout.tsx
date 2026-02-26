@@ -2,6 +2,7 @@ import { ReactNode } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { usePublicSettings } from '@/contexts/PublicSettingsContext';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { MobileBottomNav } from './MobileBottomNav';
 import {
@@ -20,6 +21,9 @@ import {
   Shield,
   Mail,
   MailOpen,
+  AlertTriangle,
+  Wrench,
+  User,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -44,6 +48,7 @@ interface NavLink {
 export const AppLayout = ({ children }: AppLayoutProps) => {
   const { user, isAdmin, isModerator, loading, signOut } = useAuth();
   const { t, language, setLanguage, dir } = useLanguage();
+  const { logoUrl, companyName } = usePublicSettings();
   const navigate = useNavigate();
   const location = useLocation();
   const isMobile = useIsMobile();
@@ -71,6 +76,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
         { label: t('payments'), path: '/payments', icon: CreditCard },
         { label: t('expenses'), path: '/expenses', icon: Receipt },
         { label: t('reports'), path: '/reports', icon: FileText },
+        { label: t('issues'), path: '/issues', icon: AlertTriangle },
       ]
     : isModerator
     ? [
@@ -78,20 +84,24 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
         { label: t('payments'), path: '/payments', icon: CreditCard },
         { label: t('expenses'), path: '/expenses', icon: Receipt },
         { label: t('reports'), path: '/reports', icon: FileText },
+        { label: t('issues'), path: '/issues', icon: AlertTriangle },
+        { label: t('maintenanceJobs'), path: '/maintenance', icon: Wrench },
         { label: t('auditLogs'), path: '/audit-logs', icon: Shield },
       ]
     : [
         { label: t('dashboard'), path: '/dashboard', icon: LayoutDashboard },
         { label: t('myApartments'), path: '/my-apartments', icon: Home },
+        { label: t('issues'), path: '/issues', icon: AlertTriangle },
       ];
 
   // Admin-only dropdown items
   const adminDropdownLinks: NavLink[] = [
+    { label: t('maintenanceJobs'), path: '/maintenance', icon: Wrench },
     { label: t('users'), path: '/users', icon: Users },
     { label: t('settings'), path: '/settings', icon: Settings },
     { label: t('apiKeys'), path: '/api-keys', icon: Key },
     { label: t('auditLogs'), path: '/audit-logs', icon: Shield },
-    { label: t('emailTemplates'), path: '/email-templates', icon: Mail },
+    { label: t('notificationTemplates'), path: '/email-templates', icon: Mail },
     { label: t('emailLogs'), path: '/email-logs', icon: MailOpen },
   ];
 
@@ -114,8 +124,14 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
               onClick={() => navigate('/dashboard')}
               className="flex items-center gap-2 font-semibold text-foreground shrink-0"
             >
-              <Building2 className="h-5 w-5 text-primary" />
-              <span className="hidden lg:inline">{t('buildingManagementSystem')}</span>
+              {logoUrl ? (
+                <img src={logoUrl} alt="" className="h-7 max-w-[120px] object-contain" />
+              ) : (
+                <Building2 className="h-5 w-5 text-primary" />
+              )}
+              <span className="hidden lg:inline">
+                {companyName || t('buildingManagementSystem')}
+              </span>
             </button>
 
             {/* Nav links — center */}
@@ -207,6 +223,10 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
                     <div className="text-xs text-muted-foreground truncate">{user.email}</div>
                   </div>
                   <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => navigate('/profile')}>
+                    <User className="h-4 w-4 me-2" />
+                    {t('profile')}
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={signOut} className="text-destructive focus:text-destructive">
                     <LogOut className="h-4 w-4 me-2" />
                     {t('logout')}
@@ -226,8 +246,14 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
               onClick={() => navigate('/dashboard')}
               className="flex items-center gap-2 font-semibold text-foreground"
             >
-              <Building2 className="h-5 w-5 text-primary" />
-              <span className="text-sm">{t('buildingManagementSystem')}</span>
+              {logoUrl ? (
+                <img src={logoUrl} alt="" className="h-6 max-w-[100px] object-contain" />
+              ) : (
+                <Building2 className="h-5 w-5 text-primary" />
+              )}
+              <span className="text-sm truncate max-w-[140px]">
+                {companyName || t('buildingManagementSystem')}
+              </span>
             </button>
 
             <div className="flex items-center gap-1">
@@ -266,6 +292,10 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
                     <div className="text-xs text-muted-foreground truncate">{user.email}</div>
                   </div>
                   <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => navigate('/profile')}>
+                    <User className="h-4 w-4 me-2" />
+                    {t('profile')}
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={signOut} className="text-destructive focus:text-destructive">
                     <LogOut className="h-4 w-4 me-2" />
                     {t('logout')}

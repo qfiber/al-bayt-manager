@@ -1,8 +1,10 @@
 import { db } from '../config/database.js';
-import { payments, paymentAllocations, apartmentExpenses } from '../db/schema/index.js';
+import { payments, paymentAllocations, apartmentExpenses, apartmentLedger } from '../db/schema/index.js';
 import { eq, and, inArray, sql } from 'drizzle-orm';
 import { AppError } from '../middleware/error-handler.js';
 import * as ledgerService from './ledger.service.js';
+import * as occupancyPeriodService from './occupancy-period.service.js';
+import * as receiptService from './receipt.service.js';
 import { apartments, buildings } from '../db/schema/index.js';
 
 export async function listPayments(filters?: {
@@ -46,10 +48,11 @@ export async function createPayment(data: {
   month: string;
   amount: number;
   allocations?: { apartmentExpenseId: string; amountAllocated: number }[];
+  subscriptionAllocations?: { ledgerEntryId: string; amountAllocated: number }[];
 }, userId: string) {
   return await db.transaction(async (tx) => {
     // Verify apartment exists
-    const [apt] = await tx.select({ id: apartments.id }).from(apartments).where(eq(apartments.id, data.apartmentId)).limit(1);
+    const [apt] = await tx.select({ id: apartments.id, buildingId: apartments.buildingId }).from(apartments).where(eq(apartments.id, data.apartmentId)).limit(1);
     if (!apt) throw new AppError(404, 'Apartment not found');
 
     // Insert payment
@@ -63,18 +66,20 @@ export async function createPayment(data: {
       .returning();
 
     // Create credit ledger entry
-    await ledgerService.recordPayment(data.apartmentId, payment.id, data.amount, userId, tx);
+    const periodId = await occupancyPeriodService.getActivePeriodId(data.apartmentId, tx);
+    await ledgerService.recordPayment(data.apartmentId, payment.id, data.amount, userId, tx, periodId ?? undefined);
 
-    // Handle allocations
+    // Validate total allocations (expense + subscription) do not exceed payment amount
+    const expenseAllocTotal = (data.allocations || []).reduce((sum, a) => sum + a.amountAllocated, 0);
+    const subAllocTotal = (data.subscriptionAllocations || []).reduce((sum, a) => sum + a.amountAllocated, 0);
+    const totalAllocated = expenseAllocTotal + subAllocTotal;
+    if (totalAllocated > data.amount + 0.01) {
+      throw new AppError(400, 'Total allocations exceed payment amount');
+    }
+
+    // Handle expense allocations
     if (data.allocations?.length) {
-      // Validate total allocations do not exceed payment amount
-      const totalAllocated = data.allocations.reduce((sum, a) => sum + a.amountAllocated, 0);
-      if (totalAllocated > data.amount + 0.01) { // small epsilon for floating point
-        throw new AppError(400, 'Total allocations exceed payment amount');
-      }
-
       for (const alloc of data.allocations) {
-        // Validate each allocation does not exceed expense's remaining balance
         const [ae] = await tx.select().from(apartmentExpenses).where(eq(apartmentExpenses.id, alloc.apartmentExpenseId)).limit(1);
         if (!ae) throw new AppError(400, `Apartment expense ${alloc.apartmentExpenseId} not found`);
         if (ae.apartmentId !== data.apartmentId) throw new AppError(400, `Allocation expense does not belong to the payment apartment`);
@@ -100,7 +105,44 @@ export async function createPayment(data: {
       }
     }
 
+    // Handle subscription allocations
+    if (data.subscriptionAllocations?.length) {
+      for (const alloc of data.subscriptionAllocations) {
+        // Validate: ledger entry exists, is a subscription debit for the correct apartment
+        const [entry] = await tx.select().from(apartmentLedger).where(eq(apartmentLedger.id, alloc.ledgerEntryId)).limit(1);
+        if (!entry) throw new AppError(400, `Ledger entry ${alloc.ledgerEntryId} not found`);
+        if (entry.apartmentId !== data.apartmentId) throw new AppError(400, `Subscription entry does not belong to the payment apartment`);
+        if (entry.referenceType !== 'subscription' || entry.entryType !== 'debit') {
+          throw new AppError(400, `Ledger entry ${alloc.ledgerEntryId} is not a subscription debit`);
+        }
+
+        // Check allocation doesn't exceed remaining
+        const [allocSum] = await tx
+          .select({
+            total: sql<string>`COALESCE(SUM(${paymentAllocations.amountAllocated}::numeric), 0)`,
+          })
+          .from(paymentAllocations)
+          .where(eq(paymentAllocations.ledgerEntryId, alloc.ledgerEntryId));
+
+        const alreadyPaid = parseFloat(allocSum.total);
+        const entryAmount = parseFloat(entry.amount);
+        const remaining = entryAmount - alreadyPaid;
+        if (alloc.amountAllocated > remaining + 0.01) {
+          throw new AppError(400, `Allocation exceeds remaining balance for subscription entry ${alloc.ledgerEntryId}`);
+        }
+
+        await tx.insert(paymentAllocations).values({
+          paymentId: payment.id,
+          ledgerEntryId: alloc.ledgerEntryId,
+          amountAllocated: alloc.amountAllocated.toFixed(2),
+        });
+      }
+    }
+
     await ledgerService.refreshCachedBalance(data.apartmentId, tx);
+
+    // Auto-create receipt
+    await receiptService.createReceipt(payment.id, data.apartmentId, apt.buildingId, data.amount, tx);
 
     return payment;
   });
@@ -143,6 +185,8 @@ export async function updatePayment(id: string, data: { month?: string; amount?:
 
     // If amount changed, reverse old ledger entry and create new one
     if (data.amount !== undefined && data.amount !== oldAmount) {
+      // Use the original payment entry's period, not the active period
+      const periodId = await ledgerService.findEntryPeriodId(existing.apartmentId, 'payment', existing.id, tx);
       // Reverse old credit
       await ledgerService.recordReversal(
         existing.apartmentId,
@@ -152,15 +196,17 @@ export async function updatePayment(id: string, data: { month?: string; amount?:
         `Reversal of payment ${existing.id} (amount update)`,
         userId,
         tx,
+        periodId ?? undefined,
       );
 
-      // Record new credit
+      // Record new credit in the same period as the original
       await ledgerService.recordPayment(
         existing.apartmentId,
         existing.id,
         newAmount,
         userId,
         tx,
+        periodId ?? undefined,
       );
 
       await ledgerService.refreshCachedBalance(existing.apartmentId, tx);
@@ -180,21 +226,30 @@ export async function cancelPayment(id: string, userId: string) {
     await tx.update(payments).set({ isCanceled: true, updatedAt: new Date() }).where(eq(payments.id, id));
 
     // Reverse allocations
-    const allocations = await tx
+    const allocs = await tx
       .select()
       .from(paymentAllocations)
       .where(eq(paymentAllocations.paymentId, id));
 
-    for (const alloc of allocations) {
-      await tx
-        .update(apartmentExpenses)
-        .set({
-          amountPaid: sql`GREATEST(${apartmentExpenses.amountPaid}::numeric - ${parseFloat(alloc.amountAllocated)}, 0)`,
-        })
-        .where(eq(apartmentExpenses.id, alloc.apartmentExpenseId));
+    for (const alloc of allocs) {
+      if (alloc.apartmentExpenseId) {
+        // Expense allocation — reverse amountPaid on apartment_expense
+        await tx
+          .update(apartmentExpenses)
+          .set({
+            amountPaid: sql`GREATEST(${apartmentExpenses.amountPaid}::numeric - ${parseFloat(alloc.amountAllocated)}, 0)`,
+          })
+          .where(eq(apartmentExpenses.id, alloc.apartmentExpenseId));
+      }
+      // Subscription allocations: no amountPaid column to reverse — just delete the allocation row
     }
 
+    // Delete all allocation rows for this payment (both expense and subscription)
+    await tx.delete(paymentAllocations).where(eq(paymentAllocations.paymentId, id));
+
     // Create reversal ledger entry (debit to reverse the credit)
+    // Use the original payment entry's period, not the active period
+    const periodId = await ledgerService.findEntryPeriodId(payment.apartmentId, 'payment', payment.id, tx);
     await ledgerService.recordReversal(
       payment.apartmentId,
       payment.id,
@@ -203,6 +258,7 @@ export async function cancelPayment(id: string, userId: string) {
       `Reversal of payment ${payment.id}`,
       userId,
       tx,
+      periodId ?? undefined,
     );
 
     await ledgerService.refreshCachedBalance(payment.apartmentId, tx);

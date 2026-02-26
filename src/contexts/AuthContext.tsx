@@ -8,6 +8,7 @@ interface UserData {
   name?: string;
   phone?: string;
   preferredLanguage?: string;
+  avatarUrl?: string;
   role: string;
   totpFactors?: { id: string; status: string; friendlyName?: string }[];
 }

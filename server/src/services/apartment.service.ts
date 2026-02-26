@@ -1,13 +1,23 @@
 import { db } from '../config/database.js';
 import {
   apartments, buildings, profiles, apartmentExpenses, payments,
-  apartmentLedger, userApartments, expenses,
+  apartmentLedger, userApartments, expenses, paymentAllocations,
 } from '../db/schema/index.js';
-import { eq, and, inArray, sql, desc } from 'drizzle-orm';
+import { eq, and, inArray, sql, desc, gte, lte } from 'drizzle-orm';
 import { AppError } from '../middleware/error-handler.js';
 import * as ledgerService from './ledger.service.js';
+import * as occupancyPeriodService from './occupancy-period.service.js';
 import { backfillSubscriptions } from './subscription.service.js';
 import { backfillExpensesForApartment } from './expense.service.js';
+
+/**
+ * Helper: look up a profile name by ID.
+ */
+async function getProfileName(profileId: string | null, txOrDb: any = db): Promise<string | null> {
+  if (!profileId) return null;
+  const [profile] = await txOrDb.select({ name: profiles.name }).from(profiles).where(eq(profiles.id, profileId)).limit(1);
+  return profile?.name ?? null;
+}
 
 export async function listApartments(buildingId?: string, allowedBuildingIds?: string[]) {
   let query = db
@@ -87,6 +97,18 @@ export async function createApartment(data: {
       cachedBalance: '0',
     }).returning();
 
+    // Create occupancy period if apartment is occupied
+    if (apt.status === 'occupied' && apt.occupancyStart) {
+      const tenantName = await getProfileName(apt.ownerId, tx);
+      await occupancyPeriodService.createPeriod(
+        apt.id,
+        apt.ownerId,
+        tenantName,
+        new Date(apt.occupancyStart),
+        tx,
+      );
+    }
+
     // Backfill subscriptions and expenses if apartment is occupied with a past date
     if (apt.status === 'occupied' && apt.occupancyStart) {
       await backfillSubscriptions(apt.id, tx);
@@ -144,6 +166,16 @@ export async function updateApartment(id: string, data: Partial<{
     const isNowOccupied = apt.status === 'occupied';
 
     if (!wasOccupied && isNowOccupied && apt.occupancyStart) {
+      // Create a new occupancy period
+      const tenantName = await getProfileName(apt.ownerId, tx);
+      await occupancyPeriodService.createPeriod(
+        apt.id,
+        apt.ownerId,
+        tenantName,
+        new Date(apt.occupancyStart),
+        tx,
+      );
+
       await backfillSubscriptions(apt.id, tx);
       // Only backfill expenses for regular apartments
       if (apt.apartmentType === 'regular') {
@@ -164,7 +196,8 @@ export async function deleteApartment(id: string) {
     throw new AppError(400, 'Cannot delete an occupied apartment. Terminate occupancy first.');
   }
 
-  const balance = parseFloat(apt.cachedBalance);
+  // Use real-time balance, not cached, to ensure accuracy
+  const balance = await ledgerService.getBalance(id);
   if (balance !== 0) {
     throw new AppError(400, `Cannot delete apartment with non-zero balance (₪${balance.toFixed(2)}). Settle outstanding balance first.`);
   }
@@ -190,10 +223,13 @@ export async function terminateOccupancy(id: string, userId: string) {
     const isChild = apt.apartmentType !== 'regular' && !!apt.parentApartmentId;
     const creditTargetId = isChild ? apt.parentApartmentId! : id;
 
+    // Get the active period ID for tagging the occupancy credit
+    const activePeriodId = await occupancyPeriodService.getActivePeriodId(creditTargetId, tx);
+
     // Calculate prorated credit for remaining days of the month
     const now = new Date();
     const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-    const remainingDays = daysInMonth - now.getDate();
+    const remainingDays = daysInMonth - now.getDate() + 1;
     const subscriptionAmount = parseFloat(apt.subscriptionAmount || '0');
 
     if (subscriptionAmount > 0 && remainingDays > 0) {
@@ -201,9 +237,44 @@ export async function terminateOccupancy(id: string, userId: string) {
       const proratedCredit = Math.round(dailyRate * remainingDays * 100) / 100;
 
       if (proratedCredit > 0) {
-        await ledgerService.recordOccupancyCredit(creditTargetId, proratedCredit, userId, tx);
+        await ledgerService.recordOccupancyCredit(creditTargetId, proratedCredit, userId, tx, activePeriodId ?? undefined);
       }
     }
+
+    // Process child apartments BEFORE closing parent period so child credits
+    // are included in the parent's closing balance snapshot
+    if (apt.apartmentType === 'regular') {
+      const children = await tx.select().from(apartments)
+        .where(and(eq(apartments.parentApartmentId, id), eq(apartments.status, 'occupied')));
+
+      for (const child of children) {
+        const childSubAmount = parseFloat(child.subscriptionAmount || '0');
+        if (childSubAmount > 0 && remainingDays > 0) {
+          const childDailyRate = childSubAmount / daysInMonth;
+          const childCredit = Math.round(childDailyRate * remainingDays * 100) / 100;
+          if (childCredit > 0) {
+            // Child's prorated credit goes to parent's ledger, tagged with parent's period
+            await ledgerService.recordOccupancyCredit(id, childCredit, userId, tx, activePeriodId ?? undefined);
+          }
+        }
+
+        // Close the child's active occupancy period
+        await occupancyPeriodService.closePeriod(child.id, tx);
+
+        await tx.update(apartments).set({
+          status: 'vacant',
+          ownerId: null,
+          beneficiaryId: null,
+          occupancyStart: null,
+          updatedAt: new Date(),
+        }).where(eq(apartments.id, child.id));
+
+        await tx.delete(userApartments).where(eq(userApartments.apartmentId, child.id));
+      }
+    }
+
+    // Close the parent's period AFTER all child credits are recorded
+    await occupancyPeriodService.closePeriod(id, tx);
 
     // Update apartment status
     const [updated] = await tx
@@ -221,34 +292,6 @@ export async function terminateOccupancy(id: string, userId: string) {
     // Remove user-apartment assignments
     await tx.delete(userApartments).where(eq(userApartments.apartmentId, id));
 
-    // Cascade: terminate occupied child apartments (storage/parking)
-    if (apt.apartmentType === 'regular') {
-      const children = await tx.select().from(apartments)
-        .where(and(eq(apartments.parentApartmentId, id), eq(apartments.status, 'occupied')));
-
-      for (const child of children) {
-        const childSubAmount = parseFloat(child.subscriptionAmount || '0');
-        if (childSubAmount > 0 && remainingDays > 0) {
-          const childDailyRate = childSubAmount / daysInMonth;
-          const childCredit = Math.round(childDailyRate * remainingDays * 100) / 100;
-          if (childCredit > 0) {
-            // Child's prorated credit goes to parent's ledger
-            await ledgerService.recordOccupancyCredit(id, childCredit, userId, tx);
-          }
-        }
-
-        await tx.update(apartments).set({
-          status: 'vacant',
-          ownerId: null,
-          beneficiaryId: null,
-          occupancyStart: null,
-          updatedAt: new Date(),
-        }).where(eq(apartments.id, child.id));
-
-        await tx.delete(userApartments).where(eq(userApartments.apartmentId, child.id));
-      }
-    }
-
     await ledgerService.refreshCachedBalance(creditTargetId, tx);
     // Also refresh the child's own balance if it's a child
     if (isChild) {
@@ -259,9 +302,44 @@ export async function terminateOccupancy(id: string, userId: string) {
   });
 }
 
-export async function getDebtDetails(apartmentId: string) {
+export async function getDebtDetails(apartmentId: string, periodId?: string) {
   const [apt] = await db.select().from(apartments).where(eq(apartments.id, apartmentId)).limit(1);
   if (!apt) throw new AppError(404, 'Apartment not found');
+
+  // Resolve period and its date range
+  let resolvedPeriodId: string | undefined;
+  let periodStartDate: Date | undefined;
+  let periodEndDate: Date | undefined;
+
+  if (periodId === 'current' || !periodId) {
+    const activePeriod = await occupancyPeriodService.getActivePeriod(apartmentId);
+    resolvedPeriodId = activePeriod?.id;
+    periodStartDate = activePeriod?.startDate ? new Date(activePeriod.startDate) : undefined;
+    periodEndDate = activePeriod?.endDate ? new Date(activePeriod.endDate) : undefined;
+  } else if (periodId === 'all') {
+    resolvedPeriodId = undefined;
+  } else {
+    // Specific period UUID — validate it belongs to this apartment
+    const periods = await occupancyPeriodService.getPeriodsForApartment(apartmentId);
+    const period = periods.find(p => p.id === periodId);
+    if (!period) throw new AppError(404, 'Period not found for this apartment');
+    resolvedPeriodId = period.id;
+    periodStartDate = new Date(period.startDate);
+    periodEndDate = period.endDate ? new Date(period.endDate) : undefined;
+  }
+
+  // Build conditions for expenses and payments, scoped by period date range
+  const expenseConditions: any[] = [eq(apartmentExpenses.apartmentId, apartmentId), eq(apartmentExpenses.isCanceled, false)];
+  const paymentConditions: any[] = [eq(payments.apartmentId, apartmentId), eq(payments.isCanceled, false)];
+
+  if (periodStartDate) {
+    expenseConditions.push(gte(apartmentExpenses.createdAt, periodStartDate));
+    paymentConditions.push(gte(payments.createdAt, periodStartDate));
+  }
+  if (periodEndDate) {
+    expenseConditions.push(lte(apartmentExpenses.createdAt, periodEndDate));
+    paymentConditions.push(lte(payments.createdAt, periodEndDate));
+  }
 
   const expenseRows = await db
     .select({
@@ -278,20 +356,48 @@ export async function getDebtDetails(apartmentId: string) {
     })
     .from(apartmentExpenses)
     .innerJoin(expenses, eq(apartmentExpenses.expenseId, expenses.id))
-    .where(and(eq(apartmentExpenses.apartmentId, apartmentId), eq(apartmentExpenses.isCanceled, false)));
+    .where(and(...expenseConditions));
 
   const aptPayments = await db
     .select()
     .from(payments)
-    .where(and(eq(payments.apartmentId, apartmentId), eq(payments.isCanceled, false)));
+    .where(and(...paymentConditions));
+
+  // Ledger: filter by period ID
+  const ledgerConditions: any[] = [eq(apartmentLedger.apartmentId, apartmentId)];
+  if (resolvedPeriodId) {
+    ledgerConditions.push(eq(apartmentLedger.occupancyPeriodId, resolvedPeriodId));
+  }
 
   const ledger = await db
     .select()
     .from(apartmentLedger)
-    .where(eq(apartmentLedger.apartmentId, apartmentId))
+    .where(and(...ledgerConditions))
     .orderBy(desc(apartmentLedger.createdAt));
 
-  const balance = await ledgerService.getBalance(apartmentId);
+  const balance = resolvedPeriodId
+    ? await ledgerService.getBalance(apartmentId, db, resolvedPeriodId)
+    : await ledgerService.getBalance(apartmentId);
+
+  // Compute subscription allocation totals per ledger entry
+  const subscriptionDebits = ledger.filter(e => e.referenceType === 'subscription' && e.entryType === 'debit');
+  const subscriptionAllocations: Record<string, number> = {};
+  if (subscriptionDebits.length > 0) {
+    const allocRows = await db
+      .select({
+        ledgerEntryId: paymentAllocations.ledgerEntryId,
+        total: sql<string>`COALESCE(SUM(${paymentAllocations.amountAllocated}::numeric), 0)`,
+      })
+      .from(paymentAllocations)
+      .where(inArray(paymentAllocations.ledgerEntryId, subscriptionDebits.map(e => e.id)))
+      .groupBy(paymentAllocations.ledgerEntryId);
+
+    for (const row of allocRows) {
+      if (row.ledgerEntryId) {
+        subscriptionAllocations[row.ledgerEntryId] = parseFloat(row.total);
+      }
+    }
+  }
 
   return {
     apartment: apt,
@@ -299,11 +405,20 @@ export async function getDebtDetails(apartmentId: string) {
     expenses: expenseRows,
     payments: aptPayments,
     ledger,
+    periodId: resolvedPeriodId || null,
+    subscriptionAllocations,
   };
 }
 
-export async function getApartmentLedger(apartmentId: string, limit: number = 50, offset: number = 0) {
-  return ledgerService.getLedger(apartmentId, { limit, offset });
+export async function getApartmentLedger(apartmentId: string, limit: number = 50, offset: number = 0, periodId?: string) {
+  return ledgerService.getLedger(apartmentId, { limit, offset, periodId });
+}
+
+/**
+ * Get all occupancy periods for an apartment.
+ */
+export async function getApartmentPeriods(apartmentId: string) {
+  return occupancyPeriodService.getPeriodsForApartment(apartmentId);
 }
 
 /**
@@ -319,6 +434,8 @@ export async function writeOffBalance(id: string, userId: string) {
     const balance = await ledgerService.getBalance(id, tx);
     if (balance === 0) throw new AppError(400, 'Balance is already zero');
 
+    const periodId = await occupancyPeriodService.getActivePeriodId(id, tx);
+
     if (balance < 0) {
       // Debt: create a credit waiver to zero it out
       await ledgerService.recordWaiver(
@@ -327,6 +444,7 @@ export async function writeOffBalance(id: string, userId: string) {
         'Balance write-off (debt cleared)',
         userId,
         tx,
+        periodId ?? undefined,
       );
     } else {
       // Overpayment: create a debit adjustment to zero it out
@@ -336,12 +454,25 @@ export async function writeOffBalance(id: string, userId: string) {
         'Balance write-off (overpayment cleared)',
         userId,
         tx,
+        periodId ?? undefined,
       );
     }
 
     await ledgerService.refreshCachedBalance(id, tx);
     return { success: true, previousBalance: balance };
   });
+}
+
+/**
+ * Check if a user is assigned to an apartment (via user_apartments).
+ */
+export async function userOwnsApartment(userId: string, apartmentId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ id: userApartments.id })
+    .from(userApartments)
+    .where(and(eq(userApartments.userId, userId), eq(userApartments.apartmentId, apartmentId)))
+    .limit(1);
+  return !!row;
 }
 
 /**
@@ -358,4 +489,63 @@ export async function getMyApartments(userId: string) {
     .innerJoin(apartments, eq(userApartments.apartmentId, apartments.id))
     .innerJoin(buildings, eq(apartments.buildingId, buildings.id))
     .where(eq(userApartments.userId, userId));
+}
+
+export async function getPaymentHistory(apartmentId: string, limit: number = 50, offset: number = 0) {
+  const { receipts } = await import('../db/schema/index.js');
+
+  const result = await db
+    .select({
+      payment: payments,
+      receiptId: receipts.id,
+      receiptNumber: receipts.receiptNumber,
+    })
+    .from(payments)
+    .leftJoin(receipts, eq(payments.id, receipts.paymentId))
+    .where(eq(payments.apartmentId, apartmentId))
+    .orderBy(desc(payments.createdAt))
+    .limit(limit)
+    .offset(offset);
+
+  return result;
+}
+
+export async function getUpcomingCharges(apartmentId: string) {
+  const [apt] = await db.select().from(apartments).where(eq(apartments.id, apartmentId)).limit(1);
+  if (!apt) throw new AppError(404, 'Apartment not found');
+
+  const subscriptionAmount = parseFloat(apt.subscriptionAmount || '0');
+
+  // Find pending unpaid expenses
+  const pendingExpenses = await db
+    .select({
+      id: apartmentExpenses.id,
+      amount: apartmentExpenses.amount,
+      amountPaid: apartmentExpenses.amountPaid,
+      description: expenses.description,
+    })
+    .from(apartmentExpenses)
+    .innerJoin(expenses, eq(apartmentExpenses.expenseId, expenses.id))
+    .where(
+      and(
+        eq(apartmentExpenses.apartmentId, apartmentId),
+        eq(apartmentExpenses.isCanceled, false),
+        sql`${apartmentExpenses.amount}::numeric > ${apartmentExpenses.amountPaid}::numeric`,
+      ),
+    );
+
+  const pendingTotal = pendingExpenses.reduce(
+    (sum, e) => sum + (parseFloat(e.amount) - parseFloat(e.amountPaid)),
+    0,
+  );
+
+  return {
+    subscriptionAmount,
+    pendingExpenses: pendingExpenses.map(e => ({
+      id: e.id,
+      description: e.description || 'Building expense',
+      remaining: Math.round((parseFloat(e.amount) - parseFloat(e.amountPaid)) * 100) / 100,
+    })),
+    totalUpcoming: Math.round((subscriptionAmount + pendingTotal) * 100) / 100,
+  };
 }

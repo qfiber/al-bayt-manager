@@ -13,7 +13,7 @@ const idParams = z.object({ id: z.string().uuid() });
 
 const createUserSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(8).max(72),
+  password: z.string().min(16).max(72),
   name: z.string().min(1).max(255),
   phone: z.string().max(50).optional(),
   role: z.enum(['admin', 'moderator', 'user']).default('user'),
@@ -24,10 +24,14 @@ const updateUserSchema = z.object({
   phone: z.string().max(50).optional(),
   preferredLanguage: z.enum(['ar', 'he', 'en']).optional(),
   role: z.enum(['admin', 'moderator', 'user']).optional(),
+  idNumber: z.string().max(50).nullable().optional(),
+  birthDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+  adminNotes: z.string().max(5000).nullable().optional(),
+  email: z.string().email().optional(),
 });
 
 const changePasswordSchema = z.object({
-  newPassword: z.string().min(8).max(72),
+  newPassword: z.string().min(16).max(72),
 });
 
 const assignmentSchema = z.object({
@@ -112,6 +116,13 @@ userRoutes.put('/:id/beneficiary-assignments', requireAuth, requireRole('admin')
 userRoutes.put('/:id/building-assignments', requireAuth, requireRole('admin'), validate({ params: idParams, body: assignmentSchema }), auditLog('role_change', 'moderator_buildings'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await userService.updateBuildingAssignments(req.params.id as string, req.body.ids);
+    res.json(result);
+  } catch (err) { next(err); }
+});
+
+userRoutes.put('/:id/apartment-assignments', requireAuth, requireRole('admin'), validate({ params: idParams, body: assignmentSchema }), auditLog('update', 'user_apartments'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const result = await userService.updateUserApartmentAssignments(req.params.id as string, req.body.ids);
     res.json(result);
   } catch (err) { next(err); }
 });

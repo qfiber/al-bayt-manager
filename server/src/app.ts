@@ -9,6 +9,7 @@ import path from 'path';
 import { env } from './config/env.js';
 import { logger } from './config/logger.js';
 import { errorHandler } from './middleware/error-handler.js';
+import { requireAuth } from './middleware/auth.js';
 import { authRoutes } from './routes/auth.routes.js';
 import { buildingRoutes } from './routes/buildings.routes.js';
 import { apartmentRoutes } from './routes/apartments.routes.js';
@@ -17,7 +18,6 @@ import { expenseRoutes } from './routes/expenses.routes.js';
 import { apartmentExpenseRoutes } from './routes/apartment-expenses.routes.js';
 import { userRoutes } from './routes/users.routes.js';
 import { settingsRoutes } from './routes/settings.routes.js';
-import { brandingRoutes } from './routes/branding.routes.js';
 import { auditLogRoutes } from './routes/audit-logs.routes.js';
 import { apiKeyRoutes } from './routes/api-keys.routes.js';
 import { generalInfoRoutes } from './routes/general-info.routes.js';
@@ -26,6 +26,13 @@ import { uploadRoutes } from './routes/upload.routes.js';
 import { captchaRoutes } from './routes/captcha.routes.js';
 import { reportRoutes } from './routes/reports.routes.js';
 import { myApartmentRoutes } from './routes/my-apartments.routes.js';
+import { issueRoutes } from './routes/issues.routes.js';
+import { maintenanceRoutes } from './routes/maintenance.routes.js';
+import { receiptRoutes } from './routes/receipts.routes.js';
+import { bulkRoutes } from './routes/bulk.routes.js';
+import { documentRoutes } from './routes/documents.routes.js';
+import { meetingRoutes } from './routes/meetings.routes.js';
+import { debtCollectionRoutes } from './routes/debt-collection.routes.js';
 import { v1Routes } from './routes/v1/index.js';
 import { apiRateLimit, v1RateLimit } from './middleware/rate-limit.js';
 
@@ -47,8 +54,15 @@ export function createApp() {
   app.use(express.json());
   app.use(cookieParser());
 
-  // Static uploads — with security headers to prevent XSS via uploaded files
-  app.use('/api/uploads', (_req, res, next) => {
+  // Public uploads (logos) — no auth, served by Express in dev, nginx in prod
+  app.use('/public-uploads', (_req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Cache-Control', 'public, max-age=604800');
+    next();
+  }, express.static(path.resolve(env.PUBLIC_UPLOAD_DIR)));
+
+  // Private uploads — require auth + security headers
+  app.use('/api/uploads', requireAuth, (_req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self'; style-src 'none'; script-src 'none'");
     next();
@@ -68,7 +82,6 @@ export function createApp() {
   app.use('/api/my-apartments', myApartmentRoutes);
   app.use('/api/users', userRoutes);
   app.use('/api/settings', settingsRoutes);
-  app.use('/api/branding', brandingRoutes);
   app.use('/api/audit-logs', auditLogRoutes);
   app.use('/api/api-keys', apiKeyRoutes);
   app.use('/api/general-info', generalInfoRoutes);
@@ -76,6 +89,13 @@ export function createApp() {
   app.use('/api/upload', uploadRoutes);
   app.use('/api/captcha', captchaRoutes);
   app.use('/api/reports', reportRoutes);
+  app.use('/api/issues', issueRoutes);
+  app.use('/api/maintenance', maintenanceRoutes);
+  app.use('/api', receiptRoutes);
+  app.use('/api/bulk', bulkRoutes);
+  app.use('/api/documents', documentRoutes);
+  app.use('/api/meetings', meetingRoutes);
+  app.use('/api/debt-collection', debtCollectionRoutes);
   app.use('/api/v1', v1Routes);
 
   // Health check

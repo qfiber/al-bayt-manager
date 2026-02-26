@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { usePublicSettings } from '@/contexts/PublicSettingsContext';
 import { api, auth } from '@/lib/api';
 import { type PowProgress } from '@/lib/pow';
 import { Button } from '@/components/ui/button';
@@ -9,7 +10,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Building, Shield } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Building, Globe, Shield } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Turnstile } from '@marsidev/react-turnstile';
 
 
@@ -17,47 +20,25 @@ const Auth = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [require2FA, setRequire2FA] = useState(false);
   const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [verificationCode, setVerificationCode] = useState('');
-  const [turnstileEnabled, setTurnstileEnabled] = useState(false);
-  const [turnstileSiteKey, setTurnstileSiteKey] = useState<string | null>(null);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [powActive, setPowActive] = useState(false);
   const [powHash, setPowHash] = useState('');
-  const [powNonce, setPowNonce] = useState('');
   const [powDone, setPowDone] = useState(false);
   const hashContainerRef = useRef<HTMLDivElement>(null);
   const { user, loading, refreshUser } = useAuth();
-  const { t, language } = useLanguage();
+  const { t, language, setLanguage } = useLanguage();
+
+  const languages = [
+    { code: 'ar' as const, label: 'العربية' },
+    { code: 'he' as const, label: 'עברית' },
+    { code: 'en' as const, label: 'English' },
+  ];
+  const { logoUrl, companyName, turnstileEnabled, turnstileSiteKey } = usePublicSettings();
   const navigate = useNavigate();
   const { toast } = useToast();
-
-  useEffect(() => {
-    const fetchBranding = async () => {
-      try {
-        const data = await api.get<{
-          logoUrl?: string;
-          turnstileEnabled?: boolean;
-          turnstileSiteKey?: string;
-        }>('/branding');
-
-        if (data?.logoUrl) {
-          setLogoUrl(data.logoUrl);
-        }
-
-        if (data?.turnstileEnabled && data?.turnstileSiteKey) {
-          setTurnstileEnabled(true);
-          setTurnstileSiteKey(data.turnstileSiteKey);
-        }
-      } catch (error) {
-        console.log('Branding fetch error:', error);
-      }
-    };
-
-    fetchBranding();
-  }, []);
 
   useEffect(() => {
     // Only auto-navigate if not currently checking for 2FA
@@ -75,7 +56,6 @@ const Auth = () => {
 
   const handlePowProgress = (p: PowProgress) => {
     setPowHash(p.hash);
-    setPowNonce(p.nonce);
     if (p.done) setPowDone(true);
   };
 
@@ -85,7 +65,6 @@ const Auth = () => {
     setPowActive(false);
     setPowDone(false);
     setPowHash('');
-    setPowNonce('');
 
     try {
       // Verify CAPTCHA if enabled
@@ -197,15 +176,34 @@ const Auth = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-secondary/10 p-4">
-      <Card className="w-full max-w-md relative overflow-hidden">
+      <div className="w-full max-w-md">
+        <div className="flex justify-end mb-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="gap-1.5">
+                <Globe className="h-4 w-4" />
+                <span className="text-xs uppercase">{language}</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {languages.map((lang) => (
+                <DropdownMenuItem
+                  key={lang.code}
+                  onClick={() => setLanguage(lang.code)}
+                  className={language === lang.code ? 'bg-primary/10 text-primary' : ''}
+                >
+                  {lang.label}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      <Card className="w-full relative overflow-hidden">
         {/* PoW Overlay */}
         {powActive && (
           <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/95 backdrop-blur-sm p-6 animate-in fade-in duration-300">
             <Shield className="w-10 h-10 text-primary mb-4 animate-pulse" />
-            <h3 className="text-lg font-semibold mb-1">{t('securingConnection')}</h3>
-            <p className="text-sm text-muted-foreground mb-4" dir="ltr">
-              nonce: {powNonce}
-            </p>
+            <h3 className="text-lg font-semibold mb-4">{t('securingConnection')}</h3>
             <div
               ref={hashContainerRef}
               className="w-full h-32 overflow-hidden rounded-lg bg-muted/50 border p-3 font-mono text-xs leading-relaxed"
@@ -232,7 +230,7 @@ const Auth = () => {
               </div>
             )}
           </div>
-          <CardTitle className="text-2xl font-bold">{t('buildingManagementSystem')}</CardTitle>
+          <CardTitle className="text-2xl font-bold">{companyName || t('buildingManagementSystem')}</CardTitle>
           <CardDescription>
             {t('signInToAccount')}
           </CardDescription>
@@ -341,9 +339,9 @@ const Auth = () => {
           <div className="mt-6 text-center text-sm">
             <p className="text-muted-foreground">
               {t('dontHaveAccount')}{' '}
-              <a href="/register" className="text-primary hover:underline">
+              <Link to="/register" className="text-primary hover:underline">
                 {t('register')}
-              </a>
+              </Link>
             </p>
           </div>
 
@@ -362,6 +360,7 @@ const Auth = () => {
           </div>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 };

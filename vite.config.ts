@@ -14,6 +14,10 @@ export default defineConfig(({ mode }) => ({
         target: "http://localhost:4010",
         changeOrigin: true,
       },
+      "/public-uploads": {
+        target: "http://localhost:4010",
+        changeOrigin: true,
+      },
     },
   },
   plugins: [

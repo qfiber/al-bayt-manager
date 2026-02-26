@@ -16,6 +16,8 @@ export const apartments = pgTable('apartments', {
   apartmentType: varchar('apartment_type', { length: 20 }).notNull().default('regular'),
   parentApartmentId: uuid('parent_apartment_id'),
   occupancyStart: timestamp('occupancy_start', { withTimezone: true }),
+  collectionStageId: uuid('collection_stage_id'),
+  debtSince: timestamp('debt_since', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [

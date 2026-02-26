@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useCurrency } from '@/contexts/PublicSettingsContext';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -55,10 +56,10 @@ interface Building {
 
 interface UnpaidExpense {
   id: string;
-  expenseId: string;
+  expenseId: string | null;
   description: string;
   category: string | null;
-  expenseDate: string;
+  expenseDate: string | null;
   amount: number;
   amountPaid: number;
   remaining: number;
@@ -74,6 +75,7 @@ interface ExpenseAllocation {
 const Payments = () => {
   const { user, isAdmin, isModerator, loading } = useAuth();
   const { t } = useLanguage();
+  const { currencySymbol, formatCurrency } = useCurrency();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [paymentRows, setPaymentRows] = useState<PaymentRow[]>([]);
@@ -125,7 +127,7 @@ const Payments = () => {
       const expenses = await api.get<UnpaidExpense[]>(`/apartment-expenses/${apartmentId}`);
       setUnpaidExpenses(expenses);
     } catch (err: any) {
-      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      toast({ title: t('error'), description: err.message, variant: 'destructive' });
       setUnpaidExpenses([]);
     }
     setAllocations({});
@@ -137,7 +139,7 @@ const Payments = () => {
       const data = await api.get<Building[]>('/buildings');
       setBuildings(data || []);
     } catch (err: any) {
-      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      toast({ title: t('error'), description: err.message, variant: 'destructive' });
     }
   };
 
@@ -146,7 +148,7 @@ const Payments = () => {
       const data = await api.get<ApartmentRow[]>('/apartments');
       setApartmentRows(data || []);
     } catch (err: any) {
-      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      toast({ title: t('error'), description: err.message, variant: 'destructive' });
     }
   };
 
@@ -155,7 +157,7 @@ const Payments = () => {
       const data = await api.get<PaymentRow[]>('/payments');
       setPaymentRows(data || []);
     } catch (err: any) {
-      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      toast({ title: t('error'), description: err.message, variant: 'destructive' });
     }
   };
 
@@ -201,19 +203,29 @@ const Payments = () => {
 
     const apartmentRow = apartmentRows.find(a => a.apartment.id === formData.apartment_id);
     if (!apartmentRow) {
-      toast({ title: 'Error', description: 'Apartment not found', variant: 'destructive' });
+      toast({ title: t('error'), description: t('apartmentNotFound'), variant: 'destructive' });
       return;
     }
 
     const paymentAmount = parseFloat(formData.amount);
     const totalAllocated = getTotalAllocated();
 
-    // Build allocations list if any
-    const allocationsList: ExpenseAllocation[] | undefined = totalAllocated > 0
-      ? Object.entries(allocations)
-          .filter(([_, amount]) => amount > 0)
-          .map(([apartmentExpenseId, amount]) => ({ apartmentExpenseId, amountAllocated: amount }))
-      : undefined;
+    // Split allocations by type: expense vs subscription
+    const expenseAllocations: ExpenseAllocation[] = [];
+    const subAllocations: { ledgerEntryId: string; amountAllocated: number }[] = [];
+
+    if (totalAllocated > 0) {
+      for (const [id, amount] of Object.entries(allocations)) {
+        if (amount <= 0) continue;
+        const expense = unpaidExpenses.find(e => e.id === id);
+        if (!expense) continue;
+        if (expense.isSubscription) {
+          subAllocations.push({ ledgerEntryId: id, amountAllocated: amount });
+        } else {
+          expenseAllocations.push({ apartmentExpenseId: id, amountAllocated: amount });
+        }
+      }
+    }
 
     const now = new Date();
     const monthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -223,20 +235,21 @@ const Payments = () => {
         apartmentId: formData.apartment_id,
         month: monthStr,
         amount: paymentAmount,
-        allocations: allocationsList,
+        allocations: expenseAllocations.length > 0 ? expenseAllocations : undefined,
+        subscriptionAllocations: subAllocations.length > 0 ? subAllocations : undefined,
       });
 
       if (totalAllocated > 0) {
         toast({ title: t('success'), description: t('paymentAllocated') });
       } else {
-        toast({ title: t('success'), description: `Payment of ₪${paymentAmount.toFixed(2)} recorded` });
+        toast({ title: t('success'), description: t('paymentRecorded').replace('{amount}', formatCurrency(paymentAmount)) });
       }
 
       fetchPayments();
       fetchApartments();
       resetForm();
     } catch (err: any) {
-      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      toast({ title: t('error'), description: err.message, variant: 'destructive' });
     }
   };
 
@@ -253,7 +266,7 @@ const Payments = () => {
       fetchPayments();
       fetchApartments();
     } catch (err: any) {
-      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      toast({ title: t('error'), description: err.message, variant: 'destructive' });
     }
   };
 
@@ -370,7 +383,7 @@ const Payments = () => {
                     </Select>
                   </div>
                   <div>
-                    <Label htmlFor="amount">{t('amountLabel')}</Label>
+                    <Label htmlFor="amount">{t('amountLabel').replace('{currency}', currencySymbol)}</Label>
                     <Input
                       id="amount"
                       type="number"
@@ -386,7 +399,7 @@ const Payments = () => {
                     <div className="border-t pt-4">
                       <Label className="text-base font-semibold">{t('selectExpenses')}</Label>
                       <p className="text-sm text-muted-foreground mb-3">
-                        {t('remainingAmount')}: ₪{getRemainingToAllocate().toFixed(2)}
+                        {t('remainingAmount')}: {formatCurrency(getRemainingToAllocate())}
                       </p>
 
                       {loadingExpenses ? (
@@ -402,7 +415,7 @@ const Payments = () => {
                                 <div className="flex-1">
                                   <div className="flex items-center gap-2">
                                     <span className="font-medium">
-                                      {expense.isSubscription ? t('monthlySubscription').replace(' (₪)', '') : expense.description}
+                                      {expense.isSubscription ? t('monthlySubscription').replace(/ \(.*?\)/, '') : expense.description}
                                     </span>
                                     {expense.isSubscription ? (
                                       <Badge variant="default" className="text-xs">{t('subscriptionStatus')}</Badge>
@@ -414,31 +427,29 @@ const Payments = () => {
                                     )}
                                   </div>
                                   <p className="text-sm text-muted-foreground">
-                                    {expense.isSubscription ? t('due') : formatDate(expense.expenseDate)} • {t('remainingAmount')}: ₪{expense.remaining.toFixed(2)}
+                                    {expense.isSubscription ? t('due') : formatDate(expense.expenseDate)} • {t('remainingAmount')}: {formatCurrency(expense.remaining)}
                                   </p>
                                 </div>
-                                {!expense.isSubscription && (
-                                  <div className="flex items-center gap-2">
-                                    <Input
-                                      type="number"
-                                      step="0.01"
-                                      min="0"
-                                      max={expense.remaining}
-                                      value={allocations[expense.id] || ''}
-                                      onChange={(e) => handleAllocationChange(expense.id, e.target.value)}
-                                      className="w-24"
-                                      placeholder="₪0"
-                                    />
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => handlePayFullAmount(expense.id)}
-                                    >
-                                      {t('paid')}
-                                    </Button>
-                                  </div>
-                                )}
+                                <div className="flex items-center gap-2">
+                                  <Input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    max={expense.remaining}
+                                    value={allocations[expense.id] || ''}
+                                    onChange={(e) => handleAllocationChange(expense.id, e.target.value)}
+                                    className="w-24"
+                                    placeholder={`${currencySymbol}0`}
+                                  />
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handlePayFullAmount(expense.id)}
+                                  >
+                                    {t('paid')}
+                                  </Button>
+                                </div>
                               </div>
                             );
                           })}
@@ -447,7 +458,7 @@ const Payments = () => {
 
                       {getRemainingToAllocate() > 0 && unpaidExpenses.length > 0 && (
                         <p className="text-sm text-muted-foreground mt-3">
-                          {t('creditFromPayment')}: ₪{getRemainingToAllocate().toFixed(2)}
+                          {t('creditFromPayment')}: {formatCurrency(getRemainingToAllocate())}
                         </p>
                       )}
                     </div>
@@ -476,7 +487,7 @@ const Payments = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead className="text-start">{t('apartment')}</TableHead>
-                  <TableHead className="text-start">{t('amountLabel')}</TableHead>
+                  <TableHead className="text-start">{t('amountLabel').replace('{currency}', currencySymbol)}</TableHead>
                   <TableHead className="text-start">{t('month')}</TableHead>
                   <TableHead className="text-start">{t('actions')}</TableHead>
                 </TableRow>
@@ -498,7 +509,7 @@ const Payments = () => {
                       <TableCell className="font-medium text-start">
                         {row.buildingName} - {t('apt')} {row.apartmentNumber}
                       </TableCell>
-                      <TableCell className="text-start">₪{row.payment.amount.toFixed(2)}</TableCell>
+                      <TableCell className="text-start">{formatCurrency(row.payment.amount)}</TableCell>
                       <TableCell className="text-start">
                         {row.payment.month}
                         {row.payment.isCanceled && <Badge variant="destructive" className="me-2">{t('canceled')}</Badge>}

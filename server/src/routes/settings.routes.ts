@@ -9,6 +9,7 @@ import * as settingsService from '../services/settings.service.js';
 export const settingsRoutes = Router();
 
 const updateSettingsSchema = z.object({
+  companyName: z.string().max(255).nullable().optional(),
   systemLanguage: z.enum(['ar', 'he', 'en']).optional(),
   logoUrl: z.string().max(500).nullable().optional(),
   smtpEnabled: z.boolean().optional(),
@@ -18,6 +19,18 @@ const updateSettingsSchema = z.object({
   turnstileEnabled: z.boolean().optional(),
   turnstileSiteKey: z.string().max(255).nullable().optional(),
   turnstileSecretKey: z.string().max(255).nullable().optional(),
+  ntfyEnabled: z.boolean().optional(),
+  ntfyServerUrl: z.string().url().max(500).nullable().optional(),
+  currencyCode: z.string().min(3).max(3).optional(),
+  currencySymbol: z.string().min(1).max(5).optional(),
+});
+
+// Public endpoint (no auth required) — must be before authenticated routes
+settingsRoutes.get('/public', async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const result = await settingsService.getPublicSettings();
+    res.json(result);
+  } catch (err) { next(err); }
 });
 
 settingsRoutes.get('/', requireAuth, requireRole('admin'), async (_req: Request, res: Response, next: NextFunction) => {

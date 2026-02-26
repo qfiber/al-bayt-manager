@@ -20,8 +20,8 @@ COPY --from=build /app/dist ./dist
 # Drizzle migration files (SQL, not TS)
 COPY --from=build /app/src/db/migrations ./dist/db/migrations
 
-# Ensure uploads directory exists
-RUN mkdir -p uploads/logos
+# Ensure upload directories exist
+RUN mkdir -p uploads/logos public-uploads/logos
 
 EXPOSE 4010
 CMD ["node", "dist/index.js"]

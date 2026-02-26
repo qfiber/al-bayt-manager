@@ -18,6 +18,10 @@ const createPaymentSchema = z.object({
     apartmentExpenseId: z.string().uuid(),
     amountAllocated: z.number().positive().max(9999999999),
   })).optional(),
+  subscriptionAllocations: z.array(z.object({
+    ledgerEntryId: z.string().uuid(),
+    amountAllocated: z.number().positive().max(9999999999),
+  })).optional(),
 });
 
 const updatePaymentSchema = z.object({

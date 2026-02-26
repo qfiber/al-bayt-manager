@@ -6,28 +6,21 @@
       "idx": 0,
       "version": "7",
       "when": 1771608387869,
-      "tag": "0000_smiling_agent_zero",
+      "tag": "0000_seed",
       "breakpoints": true
     },
     {
       "idx": 1,
       "version": "7",
-      "when": 1771671000000,
-      "tag": "0001_add_monthly_fee_to_buildings",
+      "when": 1771694787869,
+      "tag": "0001_payment_allocation_ledger",
       "breakpoints": true
     },
     {
       "idx": 2,
       "version": "7",
-      "when": 1771718400000,
-      "tag": "0002_add_turnstile_secret_key",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1771804800000,
-      "tag": "0003_add_apartment_types",
+      "when": 1771781187869,
+      "tag": "0002_seed_email_templates",
       "breakpoints": true
     }
   ]

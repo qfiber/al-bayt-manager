@@ -35,8 +35,10 @@ export default function ApiKeys() {
   const [showKeyDialog, setShowKeyDialog] = useState(false);
 
   useEffect(() => {
-    if (!loading && (!user || !isAdmin)) {
-      navigate('/');
+    if (!loading && !user) {
+      navigate('/auth');
+    } else if (!loading && !isAdmin) {
+      navigate('/dashboard');
     }
   }, [user, isAdmin, loading, navigate]);
 

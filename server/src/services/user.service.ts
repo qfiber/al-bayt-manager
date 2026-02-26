@@ -14,6 +14,7 @@ export async function listUsers() {
       name: profiles.name,
       phone: profiles.phone,
       preferredLanguage: profiles.preferredLanguage,
+      idNumber: profiles.idNumber,
       createdAt: users.createdAt,
     })
     .from(users)
@@ -40,6 +41,9 @@ export async function getUser(id: string) {
       name: profiles.name,
       phone: profiles.phone,
       preferredLanguage: profiles.preferredLanguage,
+      idNumber: profiles.idNumber,
+      birthDate: profiles.birthDate,
+      adminNotes: profiles.adminNotes,
       createdAt: users.createdAt,
     })
     .from(users)
@@ -100,17 +104,35 @@ export async function updateUser(id: string, data: {
   phone?: string;
   preferredLanguage?: string;
   role?: string;
+  idNumber?: string | null;
+  birthDate?: string | null;
+  adminNotes?: string | null;
+  email?: string;
 }) {
   return await db.transaction(async (tx) => {
-    // Update profile
-    if (data.name !== undefined || data.phone !== undefined || data.preferredLanguage !== undefined) {
+    // Update profile fields
+    const profileFields = ['name', 'phone', 'preferredLanguage', 'idNumber', 'birthDate', 'adminNotes'] as const;
+    const hasProfileUpdate = profileFields.some((f) => data[f] !== undefined);
+    if (hasProfileUpdate) {
       const profileData: any = {};
       if (data.name !== undefined) profileData.name = data.name;
       if (data.phone !== undefined) profileData.phone = data.phone;
       if (data.preferredLanguage !== undefined) profileData.preferredLanguage = data.preferredLanguage;
+      if (data.idNumber !== undefined) profileData.idNumber = data.idNumber;
+      if (data.birthDate !== undefined) profileData.birthDate = data.birthDate;
+      if (data.adminNotes !== undefined) profileData.adminNotes = data.adminNotes;
       profileData.updatedAt = new Date();
 
       await tx.update(profiles).set(profileData).where(eq(profiles.id, id));
+    }
+
+    // Update email on users table (admin direct change)
+    if (data.email) {
+      const [existing] = await tx.select({ id: users.id }).from(users).where(eq(users.email, data.email)).limit(1);
+      if (existing && existing.id !== id) {
+        throw new AppError(409, 'Email already in use');
+      }
+      await tx.update(users).set({ email: data.email, updatedAt: new Date() }).where(eq(users.id, id));
     }
 
     // Update role (delete + insert pattern)
@@ -121,6 +143,20 @@ export async function updateUser(id: string, data: {
 
     return getUser(id);
   });
+}
+
+export async function updateUserApartmentAssignments(userId: string, apartmentIds: string[]) {
+  // Clear existing tenant assignments
+  await db.delete(userApartments).where(eq(userApartments.userId, userId));
+
+  // Insert new
+  if (apartmentIds.length > 0) {
+    await db.insert(userApartments).values(
+      apartmentIds.map((apartmentId) => ({ userId, apartmentId })),
+    );
+  }
+
+  return { success: true };
 }
 
 export async function deleteUser(id: string) {

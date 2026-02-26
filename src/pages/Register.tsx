@@ -2,12 +2,14 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { usePublicSettings } from '@/contexts/PublicSettingsContext';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
+import { Link } from 'react-router-dom';
 import { Building } from 'lucide-react';
 import { Turnstile } from '@marsidev/react-turnstile';
 
@@ -18,35 +20,12 @@ const Register = () => {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [logoUrl, setLogoUrl] = useState<string | null>(null);
-  const [turnstileEnabled, setTurnstileEnabled] = useState(false);
-  const [turnstileSiteKey, setTurnstileSiteKey] = useState<string | null>(null);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const { signUp, user, loading } = useAuth();
   const { t, language } = useLanguage();
+  const { logoUrl, companyName, turnstileEnabled, turnstileSiteKey } = usePublicSettings();
   const navigate = useNavigate();
   const { toast } = useToast();
-
-  useEffect(() => {
-    const fetchBranding = async () => {
-      try {
-        const data = await api.get('/branding');
-
-        if (data?.logoUrl) {
-          setLogoUrl(data.logoUrl);
-        }
-
-        if (data?.turnstileEnabled && data?.turnstileSiteKey) {
-          setTurnstileEnabled(true);
-          setTurnstileSiteKey(data.turnstileSiteKey);
-        }
-      } catch (error) {
-        console.log('Branding fetch error:', error);
-      }
-    };
-
-    fetchBranding();
-  }, []);
 
   useEffect(() => {
     if (!loading && user) {
@@ -66,7 +45,7 @@ const Register = () => {
       return;
     }
 
-    if (password.length < 8) {
+    if (password.length < 16) {
       toast({
         title: t('error'),
         description: t('passwordMinLengthError'),
@@ -115,7 +94,7 @@ const Register = () => {
           title: t('success'),
           description: t('accountCreatedSuccess'),
         });
-        navigate('/auth');
+        // AuthContext.signUp auto-logs in and navigates to /dashboard
       }
     } catch (error) {
       console.error('Sign up error:', error);
@@ -152,7 +131,7 @@ const Register = () => {
               </div>
             )}
           </div>
-          <CardTitle className="text-2xl font-bold">{t('buildingManagementSystem')}</CardTitle>
+          <CardTitle className="text-2xl font-bold">{companyName || t('buildingManagementSystem')}</CardTitle>
           <CardDescription>
             {t('createNewAccount')}
           </CardDescription>
@@ -208,7 +187,7 @@ const Register = () => {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 disabled={isLoading}
-                minLength={8}
+                minLength={16}
               />
               <p className="text-xs text-muted-foreground">
                 {t('passwordMinLength')}
@@ -248,9 +227,9 @@ const Register = () => {
           <div className="mt-6 text-center text-sm">
             <p className="text-muted-foreground">
               {t('alreadyHaveAccount')}{' '}
-              <a href="/auth" className="text-primary hover:underline">
+              <Link to="/auth" className="text-primary hover:underline">
                 {t('signIn')}
-              </a>
+              </Link>
             </p>
           </div>
 

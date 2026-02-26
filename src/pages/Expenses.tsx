@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useCurrency } from '@/contexts/PublicSettingsContext';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -52,6 +53,7 @@ interface ApartmentOption {
 const Expenses = () => {
   const { user, isAdmin, isModerator, loading } = useAuth();
   const { t } = useLanguage();
+  const { formatCurrency } = useCurrency();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [expenseRows, setExpenseRows] = useState<ExpenseRow[]>([]);
@@ -96,7 +98,7 @@ const Expenses = () => {
       const data = await api.get<Building[]>('/buildings');
       setBuildings(data || []);
     } catch (err: any) {
-      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      toast({ title: t('error'), description: err.message, variant: 'destructive' });
     }
   };
 
@@ -105,7 +107,7 @@ const Expenses = () => {
       const data = await api.get<{ apartment: ApartmentOption }[]>('/apartments');
       setApartments((data || []).map(row => row.apartment));
     } catch (err: any) {
-      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      toast({ title: t('error'), description: err.message, variant: 'destructive' });
     }
   };
 
@@ -114,7 +116,7 @@ const Expenses = () => {
       const data = await api.get<ExpenseRow[]>('/expenses');
       setExpenseRows(data || []);
     } catch (err: any) {
-      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      toast({ title: t('error'), description: err.message, variant: 'destructive' });
     }
   };
 
@@ -133,11 +135,11 @@ const Expenses = () => {
           expenseDate: dbDate,
           category: formData.category || null,
         });
-        toast({ title: 'Success', description: 'Expense updated successfully' });
+        toast({ title: t('success'), description: t('expenseUpdatedSuccess') });
         fetchExpenses();
         resetForm();
       } catch (err: any) {
-        toast({ title: 'Error', description: err.message, variant: 'destructive' });
+        toast({ title: t('error'), description: err.message, variant: 'destructive' });
       }
     } else {
       try {
@@ -175,7 +177,7 @@ const Expenses = () => {
         fetchExpenses();
         resetForm();
       } catch (err: any) {
-        toast({ title: 'Error', description: err.message, variant: 'destructive' });
+        toast({ title: t('error'), description: err.message, variant: 'destructive' });
       }
     }
   };
@@ -185,10 +187,10 @@ const Expenses = () => {
 
     try {
       await api.delete(`/expenses/${id}`);
-      toast({ title: 'Success', description: t('expenseDeletedAndRestored') });
+      toast({ title: t('success'), description: t('expenseDeletedAndRestored') });
       fetchExpenses();
     } catch (err: any) {
-      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      toast({ title: t('error'), description: err.message, variant: 'destructive' });
     }
   };
 
@@ -568,7 +570,7 @@ const Expenses = () => {
                       <TableCell className="font-medium text-start">{row.buildingName || getBuildingName(row.expense.buildingId)}</TableCell>
                       <TableCell className="text-start">{row.expense.description}</TableCell>
                       <TableCell className="text-start">{row.expense.category || '-'}</TableCell>
-                      <TableCell className="text-start">₪{Number(row.expense.amount).toFixed(2)}</TableCell>
+                      <TableCell className="text-start">{formatCurrency(Number(row.expense.amount))}</TableCell>
                       <TableCell className="text-start">{formatDate(row.expense.expenseDate)}</TableCell>
                       <TableCell className="text-start">
                         {row.expense.isRecurring ? (

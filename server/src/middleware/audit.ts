@@ -8,7 +8,8 @@ type AuditAction = 'create' | 'update' | 'delete' | 'role_change' | 'password_ch
 // Fields that should never appear in audit logs
 const SENSITIVE_FIELDS = [
   'password', 'newPassword', 'adminPassword', 'confirmPassword',
-  'resendApiKey', 'token', 'refreshToken', 'code', 'secret',
+  'resendApiKey', 'turnstileSecretKey',
+  'token', 'refreshToken', 'code', 'secret',
   'keyHash', 'key', 'htmlBody',
 ];
 

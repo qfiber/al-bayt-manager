@@ -1,6 +1,7 @@
 import { pgTable, uuid, numeric, varchar, text, timestamp, index } from 'drizzle-orm/pg-core';
 import { apartments } from './apartments.js';
 import { users } from './users.js';
+import { occupancyPeriods } from './occupancy-periods.js';
 import { ledgerEntryTypeEnum, ledgerReferenceTypeEnum } from './enums.js';
 
 export const apartmentLedger = pgTable('apartment_ledger', {
@@ -11,6 +12,7 @@ export const apartmentLedger = pgTable('apartment_ledger', {
   referenceType: ledgerReferenceTypeEnum('reference_type').notNull(),
   referenceId: uuid('reference_id'),
   description: text('description'),
+  occupancyPeriodId: uuid('occupancy_period_id').references(() => occupancyPeriods.id, { onDelete: 'set null' }),
   createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [

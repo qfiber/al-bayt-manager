@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useCurrency } from '@/contexts/PublicSettingsContext';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -27,10 +28,11 @@ const Buildings = () => {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { currencySymbol, formatCurrency } = useCurrency();
   const [buildings, setBuildings] = useState<BuildingData[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingBuilding, setEditingBuilding] = useState<BuildingData | null>(null);
-  const [formData, setFormData] = useState({ name: '', address: '', numberOfFloors: '', undergroundFloors: '', monthlyFee: '' });
+  const [formData, setFormData] = useState({ name: '', address: '', numberOfFloors: '', undergroundFloors: '', monthlyFee: '', ntfyTopicUrl: '' });
 
   useEffect(() => {
     if (!loading && !user) {
@@ -51,7 +53,7 @@ const Buildings = () => {
       const data = await api.get('/buildings');
       setBuildings(data || []);
     } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      toast({ title: t('error'), description: error.message, variant: 'destructive' });
     }
   };
 
@@ -65,20 +67,21 @@ const Buildings = () => {
         numberOfFloors: formData.numberOfFloors ? parseInt(formData.numberOfFloors) : undefined,
         undergroundFloors: formData.undergroundFloors ? parseInt(formData.undergroundFloors) : 0,
         monthlyFee: formData.monthlyFee || '0',
+        ntfyTopicUrl: formData.ntfyTopicUrl || null,
       };
 
       if (editingBuilding) {
         await api.put(`/buildings/${editingBuilding.id}`, payload);
-        toast({ title: 'Success', description: 'Building updated successfully' });
+        toast({ title: t('success'), description: t('buildingUpdatedSuccess') });
       } else {
         await api.post('/buildings', payload);
-        toast({ title: 'Success', description: 'Building created successfully' });
+        toast({ title: t('success'), description: t('buildingCreatedSuccess') });
       }
 
       fetchBuildings();
       resetForm();
     } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      toast({ title: t('error'), description: error.message, variant: 'destructive' });
     }
   };
 
@@ -87,10 +90,10 @@ const Buildings = () => {
 
     try {
       await api.delete(`/buildings/${id}`);
-      toast({ title: 'Success', description: 'Building deleted successfully' });
+      toast({ title: t('success'), description: t('buildingDeletedSuccess') });
       fetchBuildings();
     } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      toast({ title: t('error'), description: error.message, variant: 'destructive' });
     }
   };
 
@@ -102,12 +105,13 @@ const Buildings = () => {
       numberOfFloors: building.numberOfFloors?.toString() || '',
       undergroundFloors: building.undergroundFloors?.toString() || '',
       monthlyFee: building.monthlyFee || '',
+      ntfyTopicUrl: (building as any).ntfyTopicUrl || '',
     });
     setIsDialogOpen(true);
   };
 
   const resetForm = () => {
-    setFormData({ name: '', address: '', numberOfFloors: '', undergroundFloors: '', monthlyFee: '' });
+    setFormData({ name: '', address: '', numberOfFloors: '', undergroundFloors: '', monthlyFee: '', ntfyTopicUrl: '' });
     setEditingBuilding(null);
     setIsDialogOpen(false);
   };
@@ -183,7 +187,7 @@ const Buildings = () => {
                   <div>
                     <Label htmlFor="monthlyFee">{t('buildingMonthlyFee')}</Label>
                     <div className="relative">
-                      <span className="absolute start-3 top-1/2 -translate-y-1/2 text-muted-foreground">₪</span>
+                      <span className="absolute start-3 top-1/2 -translate-y-1/2 text-muted-foreground">{currencySymbol}</span>
                       <Input
                         id="monthlyFee"
                         type="number"
@@ -195,6 +199,15 @@ const Buildings = () => {
                         placeholder="0.00"
                       />
                     </div>
+                  </div>
+                  <div>
+                    <Label htmlFor="ntfyTopicUrl">{t('ntfyTopicUrl')}</Label>
+                    <Input
+                      id="ntfyTopicUrl"
+                      value={formData.ntfyTopicUrl}
+                      onChange={(e) => setFormData({ ...formData, ntfyTopicUrl: e.target.value })}
+                      placeholder="building-topic-name"
+                    />
                   </div>
                   <div className="flex gap-2">
                     <Button type="submit" className="flex-1">
@@ -241,7 +254,7 @@ const Buildings = () => {
                         {building.numberOfFloors || '-'}
                       </TableCell>
                       <TableCell className="text-start">
-                        ₪{parseFloat(building.monthlyFee || '0').toFixed(2)}
+                        {formatCurrency(parseFloat(building.monthlyFee || '0'))}
                       </TableCell>
                       <TableCell className="text-start">
                         <div className="flex justify-end gap-2">

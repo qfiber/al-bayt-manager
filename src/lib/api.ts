@@ -44,8 +44,8 @@ async function request<T = any>(
     credentials: 'include',
   });
 
-  // Auto-refresh on 401
-  if (res.status === 401) {
+  // Auto-refresh on 401 (skip for auth endpoints — let the actual error through)
+  if (res.status === 401 && !path.startsWith('/auth/login')) {
     const refreshed = await refreshTokens();
     if (refreshed) {
       res = await fetch(`${API_URL}${path}`, {
@@ -54,7 +54,10 @@ async function request<T = any>(
         credentials: 'include',
       });
     } else {
-      window.location.href = '/auth';
+      // Only redirect if not already on /auth (prevents infinite reload loop)
+      if (window.location.pathname !== '/auth') {
+        window.location.href = '/auth';
+      }
       throw new Error('Session expired');
     }
   }

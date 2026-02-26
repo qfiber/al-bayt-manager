@@ -2,11 +2,14 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useCurrency } from '@/contexts/PublicSettingsContext';
 import { api } from '@/lib/api';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Home } from 'lucide-react';
+import { Home, Download, Receipt, Clock } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
 
 interface ApartmentData {
@@ -27,6 +30,7 @@ interface ApartmentData {
 const MyApartments = () => {
   const { user, loading } = useAuth();
   const { t } = useLanguage();
+  const { currencySymbol, formatCurrency } = useCurrency();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [apartments, setApartments] = useState<any[]>([]);
@@ -55,10 +59,11 @@ const MyApartments = () => {
         return;
       }
 
-      // For each apartment, fetch debt details (includes payments, expenses, ledger)
+      // For each apartment, fetch debt details scoped to active period
       const withDetails = await Promise.all(
         data.map(async (item) => {
           try {
+            // Fetch with current period scoping (default behavior)
             const details = await api.get(`/apartments/${item.apartment.id}/debt-details`);
             return {
               ...item.apartment,
@@ -85,7 +90,7 @@ const MyApartments = () => {
 
       setApartments(withDetails);
     } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      toast({ title: t('error'), description: error.message, variant: 'destructive' });
     } finally {
       setIsLoading(false);
     }
@@ -146,7 +151,7 @@ const MyApartments = () => {
                       </div>
                       <div className="space-y-1">
                         <p className="text-sm text-muted-foreground">Monthly Subscription</p>
-                        <p className="font-medium">₪{subscriptionAmount.toFixed(2)}</p>
+                        <p className="font-medium">{formatCurrency(subscriptionAmount)}</p>
                       </div>
                       <div className="space-y-1">
                         <p className="text-sm text-muted-foreground">Subscription Status</p>
@@ -160,24 +165,24 @@ const MyApartments = () => {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4 border-t">
                       <Card>
                         <CardHeader className="pb-3">
                           <CardTitle className="text-sm font-medium text-muted-foreground">
-                            Total Paid
+                            {t('accountStatus')}
                           </CardTitle>
                         </CardHeader>
                         <CardContent>
-                          <p className="text-2xl font-bold text-green-600">
-                            ₪{getTotalPaid(apartment.payments).toFixed(2)}
-                          </p>
+                          <Badge variant={balance >= 0 ? 'default' : 'destructive'} className="text-sm">
+                            {balance >= 0 ? t('inGoodStanding') : t('overdue')}
+                          </Badge>
                         </CardContent>
                       </Card>
 
                       <Card>
                         <CardHeader className="pb-3">
                           <CardTitle className="text-sm font-medium text-muted-foreground">
-                            Credit Balance
+                            {t('credit')}
                           </CardTitle>
                         </CardHeader>
                         <CardContent>
@@ -186,7 +191,7 @@ const MyApartments = () => {
                             balance < 0 ? 'text-red-600' :
                             'text-gray-600'
                           }`}>
-                            ₪{balance.toFixed(2)}
+                            {formatCurrency(balance)}
                           </p>
                         </CardContent>
                       </Card>
@@ -194,7 +199,20 @@ const MyApartments = () => {
                       <Card>
                         <CardHeader className="pb-3">
                           <CardTitle className="text-sm font-medium text-muted-foreground">
-                            Total Payments
+                            {t('totalAmount')}
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <p className="text-2xl font-bold text-green-600">
+                            {formatCurrency(getTotalPaid(apartment.payments))}
+                          </p>
+                        </CardContent>
+                      </Card>
+
+                      <Card>
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-sm font-medium text-muted-foreground">
+                            {t('payments')}
                           </CardTitle>
                         </CardHeader>
                         <CardContent>
@@ -205,14 +223,15 @@ const MyApartments = () => {
 
                     {(apartment.payments.length > 0 || apartment.expenses.length > 0) && (
                       <div className="pt-4 border-t">
-                        <h3 className="text-lg font-semibold mb-3">Transaction History</h3>
+                        <h3 className="text-lg font-semibold mb-3">{t('paymentHistory')}</h3>
                         <Table>
                           <TableHeader>
                             <TableRow>
-                              <TableHead>Date</TableHead>
-                              <TableHead>Description</TableHead>
-                              <TableHead>Type</TableHead>
-                              <TableHead className="text-start">Amount (₪)</TableHead>
+                              <TableHead>{t('date')}</TableHead>
+                              <TableHead>{t('description')}</TableHead>
+                              <TableHead>{t('status')}</TableHead>
+                              <TableHead className="text-start">{t('amount')} ({currencySymbol})</TableHead>
+                              <TableHead></TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -220,7 +239,7 @@ const MyApartments = () => {
                               ...apartment.payments.map((p: any) => ({
                                 id: p.id,
                                 date: p.createdAt,
-                                description: `Payment for ${p.month}`,
+                                description: t('paymentForMonth').replace('{month}', p.month),
                                 type: 'payment',
                                 amount: parseFloat(p.amount),
                                 isCanceled: p.isCanceled,
@@ -258,7 +277,19 @@ const MyApartments = () => {
                                 <TableCell className={`text-start font-medium ${
                                   transaction.type === 'payment' ? 'text-green-600' : transaction.isCanceled ? 'text-gray-600' : 'text-red-600'
                                 }`}>
-                                  {transaction.type === 'payment' ? '+' : '-'}₪{transaction.amount.toFixed(2)}
+                                  {transaction.type === 'payment' ? '+' : '-'}{formatCurrency(transaction.amount)}
+                                </TableCell>
+                                <TableCell>
+                                  {transaction.type === 'payment' && !transaction.isCanceled && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => window.open(`/api/my-apartments/${apartment.id}/receipts/${transaction.id}/download`)}
+                                      title={t('downloadReceipt')}
+                                    >
+                                      <Download className="h-4 w-4" />
+                                    </Button>
+                                  )}
                                 </TableCell>
                               </TableRow>
                             ))}

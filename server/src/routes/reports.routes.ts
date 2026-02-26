@@ -55,3 +55,17 @@ reportRoutes.get('/reconciliation', requireAuth, requireRole('admin'), async (re
     res.json(result);
   } catch (err) { next(err); }
 });
+
+reportRoutes.get('/portfolio', requireAuth, requireRole('admin', 'moderator'), scopeToModeratorBuildings, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const result = await reportService.getPortfolioOverview(req.allowedBuildingIds);
+    res.json(result);
+  } catch (err) { next(err); }
+});
+
+reportRoutes.get('/portfolio/expenses', requireAuth, requireRole('admin', 'moderator'), scopeToModeratorBuildings, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const result = await reportService.getExpenseBreakdownByBuilding(req.allowedBuildingIds);
+    res.json(result);
+  } catch (err) { next(err); }
+});

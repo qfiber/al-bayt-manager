@@ -8,6 +8,7 @@ import { generateTotpSecret, verifyTotpCode, getTotpUri, generateQrCode } from '
 import { AppError } from '../middleware/error-handler.js';
 import { env } from '../config/env.js';
 import { createTwoFASession, consumeTwoFASession, invalidateTwoFASession } from './twofa-session.service.js';
+import { deleteFile, getAvatarPath } from './storage.service.js';
 
 function hashToken(token: string): string {
   return crypto.createHash('sha256').update(token).digest('hex');
@@ -183,6 +184,7 @@ export async function getMe(userId: string) {
     name: profile?.name,
     phone: profile?.phone,
     preferredLanguage: profile?.preferredLanguage,
+    avatarUrl: profile?.avatarUrl,
     role,
     totpFactors: factors,
   };
@@ -248,6 +250,59 @@ export async function getFactors(userId: string) {
     })
     .from(totpFactors)
     .where(eq(totpFactors.userId, userId));
+}
+
+/**
+ * Self-service: update profile (phone, preferredLanguage, avatarUrl)
+ */
+export async function updateProfile(userId: string, data: { phone?: string; preferredLanguage?: string; avatarUrl?: string }) {
+  const [profile] = await db.select().from(profiles).where(eq(profiles.id, userId)).limit(1);
+
+  // If replacing avatar, delete old file
+  if (data.avatarUrl && profile?.avatarUrl) {
+    const oldFilename = profile.avatarUrl.split('/').pop();
+    if (oldFilename) {
+      deleteFile(getAvatarPath(oldFilename));
+    }
+  }
+
+  await db.update(profiles).set({
+    ...data,
+    updatedAt: new Date(),
+  }).where(eq(profiles.id, userId));
+
+  return getMe(userId);
+}
+
+/**
+ * Self-service: change own password
+ */
+export async function selfChangePassword(userId: string, currentPassword: string, newPassword: string) {
+  const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  if (!user) throw new AppError(404, 'User not found');
+
+  const valid = await comparePassword(currentPassword, user.passwordHash);
+  if (!valid) throw new AppError(401, 'Wrong password');
+
+  const passwordHash = await hashPassword(newPassword);
+  await db.update(users).set({ passwordHash, updatedAt: new Date() }).where(eq(users.id, userId));
+
+  // Revoke all refresh tokens
+  await db.update(refreshTokens).set({ revoked: true }).where(eq(refreshTokens.userId, userId));
+}
+
+/**
+ * Reissue access + refresh tokens (used after password/email change to keep current session alive)
+ */
+export async function reissueTokens(userId: string) {
+  const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  if (!user) throw new AppError(404, 'User not found');
+
+  const role = await getUserRole(userId);
+  const accessToken = signAccessToken({ userId: user.id, email: user.email, role });
+  const refreshToken = await createRefreshToken(user.id);
+
+  return { accessToken, refreshToken };
 }
 
 /**

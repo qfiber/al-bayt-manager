@@ -27,3 +27,26 @@ export const ledgerReferenceTypeEnum = pgEnum('ledger_reference_type', [
   'occupancy_credit',
   'reversal',
 ]);
+
+export const issueStatusEnum = pgEnum('issue_status', ['open', 'in_progress', 'resolved']);
+
+export const issueCategoryEnum = pgEnum('issue_category', [
+  'plumbing',
+  'electrical',
+  'elevator',
+  'water_leak',
+  'cleaning',
+  'structural',
+  'safety',
+  'other',
+]);
+
+export const maintenanceStatusEnum = pgEnum('maintenance_status', ['pending', 'in_progress', 'completed']);
+
+export const occupancyPeriodStatusEnum = pgEnum('occupancy_period_status', ['active', 'closed']);
+
+export const documentScopeEnum = pgEnum('document_scope', ['building', 'apartment', 'user']);
+
+export const meetingDecisionStatusEnum = pgEnum('meeting_decision_status', ['pending', 'in_progress', 'completed', 'canceled']);
+
+export const collectionActionTypeEnum = pgEnum('collection_action_type', ['email_reminder', 'formal_notice', 'final_warning', 'custom']);
