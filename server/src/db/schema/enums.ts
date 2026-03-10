@@ -13,6 +13,10 @@ export const auditActionTypeEnum = pgEnum('audit_action_type', [
   'password_change',
   'api_key_created',
   'api_key_deleted',
+  'failed_login',
+  'account_locked',
+  'rate_limited',
+  'unauthorized_access',
 ]);
 
 export const totpStatusEnum = pgEnum('totp_status', ['unverified', 'verified']);

@@ -5,11 +5,11 @@ import { db } from '../../config/database.js';
 import {
   apartments, buildings, expenses, payments, users, userApartments, profiles,
 } from '../../db/schema/index.js';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 
 export const v1Routes = Router();
 
-// All v1 routes require API key
+// All v1 routes require API key (which also attaches user identity + building scope)
 v1Routes.use(requireApiKey);
 
 // Shared pagination schema
@@ -23,7 +23,7 @@ const uuidParams = z.object({ id: z.string().uuid() });
 v1Routes.get('/apartments', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { limit, offset } = paginationSchema.parse(req.query);
-    const result = await db
+    let query = db
       .select({
         id: apartments.id,
         apartmentNumber: apartments.apartmentNumber,
@@ -33,9 +33,13 @@ v1Routes.get('/apartments', async (req: Request, res: Response, next: NextFuncti
         cachedBalance: apartments.cachedBalance,
         subscriptionAmount: apartments.subscriptionAmount,
       })
-      .from(apartments)
-      .limit(limit)
-      .offset(offset);
+      .from(apartments);
+
+    if (req.allowedBuildingIds) {
+      query = query.where(inArray(apartments.buildingId, req.allowedBuildingIds)) as any;
+    }
+
+    const result = await query.limit(limit).offset(offset);
     res.json(result);
   } catch (err) { next(err); }
 });
@@ -61,6 +65,13 @@ v1Routes.get('/apartments/:id', async (req: Request, res: Response, next: NextFu
       .where(eq(apartments.id, id))
       .limit(1);
     if (!result) { res.status(404).json({ error: 'Not found' }); return; }
+
+    // Enforce building scope for moderators
+    if (req.allowedBuildingIds && !req.allowedBuildingIds.includes(result.buildingId)) {
+      res.status(403).json({ error: 'Not authorized for this building' });
+      return;
+    }
+
     res.json(result);
   } catch (err) { next(err); }
 });
@@ -68,7 +79,13 @@ v1Routes.get('/apartments/:id', async (req: Request, res: Response, next: NextFu
 v1Routes.get('/buildings', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { limit, offset } = paginationSchema.parse(req.query);
-    const result = await db.select().from(buildings).limit(limit).offset(offset);
+    let query = db.select().from(buildings);
+
+    if (req.allowedBuildingIds) {
+      query = query.where(inArray(buildings.id, req.allowedBuildingIds)) as any;
+    }
+
+    const result = await query.limit(limit).offset(offset);
     res.json(result);
   } catch (err) { next(err); }
 });
@@ -76,7 +93,13 @@ v1Routes.get('/buildings', async (req: Request, res: Response, next: NextFunctio
 v1Routes.get('/expenses', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { limit, offset } = paginationSchema.parse(req.query);
-    const result = await db.select().from(expenses).limit(limit).offset(offset);
+    let query = db.select().from(expenses);
+
+    if (req.allowedBuildingIds) {
+      query = query.where(inArray(expenses.buildingId, req.allowedBuildingIds)) as any;
+    }
+
+    const result = await query.limit(limit).offset(offset);
     res.json(result);
   } catch (err) { next(err); }
 });
@@ -84,8 +107,28 @@ v1Routes.get('/expenses', async (req: Request, res: Response, next: NextFunction
 v1Routes.get('/payments', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { limit, offset } = paginationSchema.parse(req.query);
-    const result = await db.select().from(payments).limit(limit).offset(offset);
-    res.json(result);
+
+    if (req.allowedBuildingIds) {
+      // Payments are per-apartment, so join through apartments to filter by building
+      const result = await db
+        .select({
+          id: payments.id,
+          apartmentId: payments.apartmentId,
+          month: payments.month,
+          amount: payments.amount,
+          isCanceled: payments.isCanceled,
+          createdAt: payments.createdAt,
+        })
+        .from(payments)
+        .innerJoin(apartments, eq(payments.apartmentId, apartments.id))
+        .where(inArray(apartments.buildingId, req.allowedBuildingIds))
+        .limit(limit)
+        .offset(offset);
+      res.json(result);
+    } else {
+      const result = await db.select().from(payments).limit(limit).offset(offset);
+      res.json(result);
+    }
   } catch (err) { next(err); }
 });
 
@@ -108,7 +151,23 @@ v1Routes.get('/users', async (req: Request, res: Response, next: NextFunction) =
 v1Routes.get('/user-apartments', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { limit, offset } = paginationSchema.parse(req.query);
-    const result = await db.select().from(userApartments).limit(limit).offset(offset);
-    res.json(result);
+
+    if (req.allowedBuildingIds) {
+      const result = await db
+        .select({
+          id: userApartments.id,
+          userId: userApartments.userId,
+          apartmentId: userApartments.apartmentId,
+        })
+        .from(userApartments)
+        .innerJoin(apartments, eq(userApartments.apartmentId, apartments.id))
+        .where(inArray(apartments.buildingId, req.allowedBuildingIds))
+        .limit(limit)
+        .offset(offset);
+      res.json(result);
+    } else {
+      const result = await db.select().from(userApartments).limit(limit).offset(offset);
+      res.json(result);
+    }
   } catch (err) { next(err); }
 });

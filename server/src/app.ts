@@ -34,7 +34,7 @@ import { documentRoutes } from './routes/documents.routes.js';
 import { meetingRoutes } from './routes/meetings.routes.js';
 import { debtCollectionRoutes } from './routes/debt-collection.routes.js';
 import { v1Routes } from './routes/v1/index.js';
-import { apiRateLimit, v1RateLimit } from './middleware/rate-limit.js';
+import { dbRateLimit, cleanupRateLimitEntries } from './middleware/db-rate-limit.js';
 
 export function createApp() {
   const app = express();
@@ -68,9 +68,12 @@ export function createApp() {
     next();
   }, express.static(path.resolve(env.UPLOAD_DIR)));
 
-  // Rate limiting
-  app.use('/api', apiRateLimit);
-  app.use('/api/v1', v1RateLimit);
+  // DB-backed rate limiting (survives restarts, works across instances)
+  app.use('/api', dbRateLimit({ prefix: 'api', windowMs: 60 * 1000, max: 100 }));
+  app.use('/api/v1', dbRateLimit({ prefix: 'v1', windowMs: 60 * 1000, max: 60 }));
+
+  // Cleanup stale rate limit entries every hour
+  setInterval(() => cleanupRateLimitEntries().catch(() => {}), 3600000);
 
   // Routes
   app.use('/api/auth', authRoutes);

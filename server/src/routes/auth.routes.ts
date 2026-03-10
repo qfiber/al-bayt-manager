@@ -3,10 +3,11 @@ import { z } from 'zod';
 import { validate } from '../middleware/validate.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requirePow } from '../middleware/pow.js';
-import { authRateLimit, refreshRateLimit } from '../middleware/rate-limit.js';
+import { dbRateLimit } from '../middleware/db-rate-limit.js';
 import { createChallenge } from '../services/pow.service.js';
 import * as authService from '../services/auth.service.js';
 import { logAuditEvent } from '../services/audit.service.js';
+import { checkAccountLockout, recordFailedLogin, clearFailedAttempts } from '../services/account-lockout.service.js';
 import { setAuthCookies, clearAuthCookies } from '../utils/cookie.js';
 import { generateOtp, createEmailChangeSession, consumeEmailChangeSession } from '../services/email-change.service.js';
 import { sendOtpEmail } from '../services/email.service.js';
@@ -18,9 +19,13 @@ import { eq, and } from 'drizzle-orm';
 
 export const authRoutes = Router();
 
+/** DB-backed rate limiters */
+const authRateLimit = dbRateLimit({ prefix: 'auth', windowMs: 15 * 60 * 1000, max: 5, message: 'Too many attempts, please try again later' });
+const refreshRateLimit = dbRateLimit({ prefix: 'refresh', windowMs: 15 * 60 * 1000, max: 10, message: 'Too many refresh attempts, please try again later' });
+
 const loginSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(1),
+  password: z.string().min(16).max(72),
   challengeId: z.string().uuid(),
   nonce: z.string(),
 });
@@ -79,7 +84,33 @@ authRoutes.get('/challenge', (_req: Request, res: Response) => {
 
 authRoutes.post('/login', authRateLimit, requirePow, validate(loginSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const result = await authService.signIn(req.body.email, req.body.password);
+    const { email, password } = req.body;
+    const ip = req.ip || req.socket.remoteAddress;
+    const ua = req.headers['user-agent']?.slice(0, 500);
+
+    // Check account lockout before attempting authentication
+    const lockout = await checkAccountLockout(email);
+    if (lockout.locked) {
+      res.status(423).json({
+        error: 'Account temporarily locked due to too many failed attempts',
+        lockedUntil: lockout.lockedUntil?.toISOString(),
+      });
+      return;
+    }
+
+    let result;
+    try {
+      result = await authService.signIn(email, password);
+    } catch (err: any) {
+      // Record failed login attempt on authentication failure
+      if (err.statusCode === 401) {
+        await recordFailedLogin(email, ip, ua);
+      }
+      throw err;
+    }
+
+    // Successful login — clear failed attempts
+    await clearFailedAttempts(email);
 
     if (result.requires2FA) {
       res.json({ requires2FA: true, sessionToken: result.sessionToken });
@@ -89,11 +120,11 @@ authRoutes.post('/login', authRateLimit, requirePow, validate(loginSchema), asyn
     setAuthCookies(res, result.accessToken!, result.refreshToken!);
 
     logAuditEvent({
-      userEmail: req.body.email,
+      userEmail: email,
       actionType: 'login',
       actionDetails: { method: 'password' },
-      ipAddress: req.ip || req.socket.remoteAddress,
-      userAgent: req.headers['user-agent']?.slice(0, 500),
+      ipAddress: ip,
+      userAgent: ua,
     }).catch(() => {});
 
     res.json({ success: true });
