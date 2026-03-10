@@ -8,20 +8,6 @@
       "when": 1771608387869,
       "tag": "0000_seed",
       "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1771694787869,
-      "tag": "0001_payment_allocation_ledger",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1771781187869,
-      "tag": "0002_seed_email_templates",
-      "breakpoints": true
     }
   ]
 }

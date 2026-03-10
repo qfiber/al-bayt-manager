@@ -321,7 +321,7 @@ const Meetings = () => {
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8">
             <div className="flex items-center gap-3">
               <Button variant="ghost" size="sm" onClick={() => setViewMode('list')}>
-                <ArrowLeft className="w-4 h-4 me-1" />
+                <ArrowLeft className="w-4 h-4 me-1 rtl:rotate-180" />
                 {t('back')}
               </Button>
               <CalendarDays className="w-8 h-8 text-primary" />
@@ -478,7 +478,7 @@ const Meetings = () => {
         <div className="container mx-auto px-3 py-4 sm:p-6">
           <div className="flex items-center gap-3 mb-8">
             <Button variant="ghost" size="sm" onClick={() => setViewMode('list')}>
-              <ArrowLeft className="w-4 h-4 me-1" />
+              <ArrowLeft className="w-4 h-4 me-1 rtl:rotate-180" />
               {t('back')}
             </Button>
             <CalendarDays className="w-8 h-8 text-primary" />

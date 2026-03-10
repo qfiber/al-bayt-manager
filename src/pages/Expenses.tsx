@@ -300,7 +300,7 @@ const Expenses = () => {
               <form onSubmit={handleSubmit} className="space-y-4">
                 {!editingExpense && (
                   <Button type="button" variant="ghost" size="sm" onClick={() => setExpenseMode(null)} className="gap-1 -mt-2">
-                    <ArrowLeft className="w-4 h-4" />
+                    <ArrowLeft className="w-4 h-4 rtl:rotate-180" />
                     {t('back')}
                   </Button>
                 )}

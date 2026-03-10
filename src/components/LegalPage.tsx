@@ -21,7 +21,7 @@ export const LegalPage = ({ titleKey, lastUpdatedKey, sections }: LegalPageProps
       <div className="mx-auto max-w-2xl">
         <div className="flex items-center justify-between mb-4">
           <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
-            <ArrowLeft className="h-4 w-4 me-1" />
+            <ArrowLeft className="h-4 w-4 me-1 rtl:rotate-180" />
             {t('back')}
           </Button>
           <LanguageSwitcher />

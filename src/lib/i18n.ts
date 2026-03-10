@@ -935,7 +935,7 @@ export const translations = {
     privacySecurityTitle: "7. אבטחת מידע",
     privacySecurityContent: "אנו מיישמים אמצעי אבטחה סטנדרטיים בתעשייה:\n\n• תקשורת מוצפנת HTTPS בכל הדפים\n• סיסמאות מוצפנות בשיטת bcrypt\n• עוגיות HttpOnly ומאובטחות\n• אימות דו-שלבי (2FA) אופציונלי\n• בקרת גישה מבוססת תפקידים (RBAC)\n• יומני ביקורת לכל הפעולות\n• הגנה מפני DDoS באמצעות Cloudflare\n• גיבויים יומיים של בסיס הנתונים",
     privacyContactTitle: "8. יצירת קשר",
-    privacyContactContent: "לשאלות, בקשות או תלונות בנושא פרטיות:\n\nqFiber בע״מ\nאתר: https://qfiber.co.il\nאימייל: privacy@qfiber.co.il",
+    privacyContactContent: "לשאלות, בקשות או תלונות בנושא פרטיות:\n\nqFiber בע״מ\nאתר: https://qfiber.co.il\nאימייל: hello@qfiber.co.il",
     privacyChangesTitle: "9. שינויים במדיניות",
     privacyChangesContent: "אנו עשויים לעדכן מדיניות זו מעת לעת. שינויים משמעותיים יפורסמו באמצעות השירות ותישלח הודעה למשתמשים רשומים. המשך השימוש בשירות לאחר השינויים מהווה הסכמה למדיניות המעודכנת.",
 
@@ -965,7 +965,7 @@ export const translations = {
     termsChangesTitle: "11. שינויים בתנאים",
     termsChangesContent: "אנו שומרים את הזכות לעדכן תנאים אלה בכל עת. שינויים משמעותיים יפורסמו באמצעות השירות ותישלח הודעה למשתמשים רשומים. המשך השימוש לאחר השינויים מהווה הסכמה לתנאים המעודכנים.",
     termsContactTitle: "12. יצירת קשר",
-    termsContactContent: "לשאלות בנושא תנאי שימוש:\n\nqFiber בע״מ\nאתר: https://qfiber.co.il\nאימייל: support@qfiber.co.il",
+    termsContactContent: "לשאלות בנושא תנאי שימוש:\n\nqFiber בע״מ\nאתר: https://qfiber.co.il\nאימייל: hello@qfiber.co.il",
 
     // Accessibility Statement
     accessibilityTitle: "הצהרת נגישות",
@@ -981,7 +981,7 @@ export const translations = {
     a11yThirdPartyTitle: "5. תוכן צד שלישי",
     a11yThirdPartyContent: "השירות משתמש ברכיבי צד שלישי (Cloudflare, Google Analytics) שנגישותם תלויה בספקים עצמם. אנו בוחרים ספקים המחויבים לנגישות ועוקבים אחר עדכוניהם.",
     a11yFeedbackTitle: "6. משוב ויצירת קשר",
-    a11yFeedbackContent: "נשמח לשמוע ממך אם נתקלת בבעיית נגישות. אנא צור קשר עמנו:\n\nqFiber בע״מ\nאתר: https://qfiber.co.il\nאימייל: accessibility@qfiber.co.il\n\nאנו מתחייבים לטפל בפניות נגישות תוך 14 ימי עסקים.",
+    a11yFeedbackContent: "נשמח לשמוע ממך אם נתקלת בבעיית נגישות. אנא צור קשר עמנו:\n\nqFiber בע״מ\nאתר: https://qfiber.co.il\nאימייל: hello@qfiber.co.il\n\nאנו מתחייבים לטפל בפניות נגישות תוך 14 ימי עסקים.",
   },
   ar: {
     // Site
@@ -1919,7 +1919,7 @@ export const translations = {
     privacySecurityTitle: "7. أمن البيانات",
     privacySecurityContent: "نطبق إجراءات أمنية معيارية في الصناعة:\n\n• اتصال مشفر عبر HTTPS في جميع الصفحات\n• تشفير كلمات المرور بتقنية bcrypt\n• ملفات تعريف ارتباط HttpOnly وآمنة\n• مصادقة ثنائية اختيارية (2FA)\n• التحكم في الوصول المبني على الأدوار (RBAC)\n• سجلات تدقيق لجميع العمليات\n• الحماية من هجمات DDoS عبر Cloudflare\n• نسخ احتياطية يومية لقاعدة البيانات",
     privacyContactTitle: "8. الاتصال بنا",
-    privacyContactContent: "للأسئلة أو الطلبات أو الشكاوى المتعلقة بالخصوصية:\n\nشركة qFiber المحدودة\nالموقع: https://qfiber.co.il\nالبريد الإلكتروني: privacy@qfiber.co.il",
+    privacyContactContent: "للأسئلة أو الطلبات أو الشكاوى المتعلقة بالخصوصية:\n\nشركة qFiber المحدودة\nالموقع: https://qfiber.co.il\nالبريد الإلكتروني: hello@qfiber.co.il",
     privacyChangesTitle: "9. تغييرات السياسة",
     privacyChangesContent: "قد نقوم بتحديث هذه السياسة من وقت لآخر. سيتم نشر التغييرات الجوهرية عبر الخدمة وسيتم إخطار المستخدمين المسجلين. استمرارك في استخدام الخدمة بعد التغييرات يعني موافقتك على السياسة المحدثة.",
 
@@ -1949,7 +1949,7 @@ export const translations = {
     termsChangesTitle: "11. تغييرات الشروط",
     termsChangesContent: "نحتفظ بالحق في تحديث هذه الشروط في أي وقت. سيتم نشر التغييرات الجوهرية عبر الخدمة وسيتم إخطار المستخدمين المسجلين. استمرارك في الاستخدام بعد التغييرات يعني موافقتك على الشروط المحدثة.",
     termsContactTitle: "12. الاتصال بنا",
-    termsContactContent: "للأسئلة المتعلقة بشروط الاستخدام:\n\nشركة qFiber المحدودة\nالموقع: https://qfiber.co.il\nالبريد الإلكتروني: support@qfiber.co.il",
+    termsContactContent: "للأسئلة المتعلقة بشروط الاستخدام:\n\nشركة qFiber المحدودة\nالموقع: https://qfiber.co.il\nالبريد الإلكتروني: hello@qfiber.co.il",
 
     // Accessibility Statement
     accessibilityTitle: "بيان إمكانية الوصول",
@@ -1965,7 +1965,7 @@ export const translations = {
     a11yThirdPartyTitle: "5. محتوى الطرف الثالث",
     a11yThirdPartyContent: "تستخدم الخدمة مكونات طرف ثالث (Cloudflare، Google Analytics) تعتمد إمكانية وصولها على المزودين أنفسهم. نختار مزودين ملتزمين بإمكانية الوصول ونتابع تحديثاتهم.",
     a11yFeedbackTitle: "6. الملاحظات والاتصال",
-    a11yFeedbackContent: "يسعدنا سماع ملاحظاتك إذا واجهت مشكلة في إمكانية الوصول. يرجى التواصل معنا:\n\nشركة qFiber المحدودة\nالموقع: https://qfiber.co.il\nالبريد الإلكتروني: accessibility@qfiber.co.il\n\nنلتزم بمعالجة طلبات إمكانية الوصول خلال 14 يوم عمل.",
+    a11yFeedbackContent: "يسعدنا سماع ملاحظاتك إذا واجهت مشكلة في إمكانية الوصول. يرجى التواصل معنا:\n\nشركة qFiber المحدودة\nالموقع: https://qfiber.co.il\nالبريد الإلكتروني: hello@qfiber.co.il\n\nنلتزم بمعالجة طلبات إمكانية الوصول خلال 14 يوم عمل.",
   },
   en: {
     // Site
@@ -2908,7 +2908,7 @@ export const translations = {
     privacySecurityTitle: "7. Data Security",
     privacySecurityContent: "We implement industry-standard security measures:\n\n• HTTPS encrypted communication on all pages\n• Passwords hashed with bcrypt\n• HttpOnly and Secure cookies\n• Optional two-factor authentication (2FA)\n• Role-based access control (RBAC)\n• Audit logs for all operations\n• DDoS protection via Cloudflare\n• Daily database backups",
     privacyContactTitle: "8. Contact Us",
-    privacyContactContent: "For privacy questions, requests, or complaints:\n\nqFiber LTD\nWebsite: https://qfiber.co.il\nEmail: privacy@qfiber.co.il",
+    privacyContactContent: "For privacy questions, requests, or complaints:\n\nqFiber LTD\nWebsite: https://qfiber.co.il\nEmail: hello@qfiber.co.il",
     privacyChangesTitle: "9. Policy Changes",
     privacyChangesContent: "We may update this policy from time to time. Material changes will be communicated through the Service and registered users will be notified. Your continued use of the Service after changes constitutes acceptance of the updated policy.",
 
@@ -2938,7 +2938,7 @@ export const translations = {
     termsChangesTitle: "11. Changes to Terms",
     termsChangesContent: "We reserve the right to update these terms at any time. Material changes will be communicated through the Service and registered users will be notified. Continued use after changes constitutes acceptance of the updated terms.",
     termsContactTitle: "12. Contact Us",
-    termsContactContent: "For questions about these terms of use:\n\nqFiber LTD\nWebsite: https://qfiber.co.il\nEmail: support@qfiber.co.il",
+    termsContactContent: "For questions about these terms of use:\n\nqFiber LTD\nWebsite: https://qfiber.co.il\nEmail: hello@qfiber.co.il",
 
     // Accessibility Statement
     accessibilityTitle: "Accessibility Statement",
@@ -2954,7 +2954,7 @@ export const translations = {
     a11yThirdPartyTitle: "5. Third-Party Content",
     a11yThirdPartyContent: "The Service uses third-party components (Cloudflare, Google Analytics) whose accessibility depends on the providers themselves. We select providers committed to accessibility and monitor their updates.",
     a11yFeedbackTitle: "6. Feedback & Contact",
-    a11yFeedbackContent: "We welcome your feedback if you encounter an accessibility issue. Please contact us:\n\nqFiber LTD\nWebsite: https://qfiber.co.il\nEmail: accessibility@qfiber.co.il\n\nWe commit to addressing accessibility requests within 14 business days.",
+    a11yFeedbackContent: "We welcome your feedback if you encounter an accessibility issue. Please contact us:\n\nqFiber LTD\nWebsite: https://qfiber.co.il\nEmail: hello@qfiber.co.il\n\nWe commit to addressing accessibility requests within 14 business days.",
   },
 };
 
