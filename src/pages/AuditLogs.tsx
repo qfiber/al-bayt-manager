@@ -1,11 +1,13 @@
 import { useEffect, useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useRequireAuth } from '@/hooks/use-require-auth';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { TableEmptyRow } from '@/components/TableEmptyRow';
+import { PaginationControls } from '@/components/PaginationControls';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -43,9 +45,9 @@ const ACTION_TYPES = [
 const PAGE_SIZE = 50;
 
 const AuditLogs = () => {
-  const { user, isAdmin, isModerator, loading } = useAuth();
+  useRequireAuth('admin-or-moderator');
+  const { user, isAdmin, isModerator } = useAuth();
   const { t, language } = useLanguage();
-  const navigate = useNavigate();
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [filteredLogs, setFilteredLogs] = useState<AuditLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -62,12 +64,6 @@ const AuditLogs = () => {
   // Client-side filters
   const [tableFilter, setTableFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
-
-  useEffect(() => {
-    if (!loading && (!user || (!isAdmin && !isModerator))) {
-      navigate('/dashboard');
-    }
-  }, [user, isAdmin, isModerator, loading, navigate]);
 
   const fetchAuditLogs = useCallback(async (currentPage: number) => {
     setIsLoading(true);
@@ -168,15 +164,13 @@ const AuditLogs = () => {
     setEndDate('');
   };
 
-  if (loading || isLoading) {
+  if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-lg">{t('loading')}</div>
       </div>
     );
   }
-
-  if (!user || (!isAdmin && !isModerator)) return null;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/10">
@@ -275,11 +269,7 @@ const AuditLogs = () => {
                 </TableHeader>
                 <TableBody>
                   {filteredLogs.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                        {t('noLogsFound')}
-                      </TableCell>
-                    </TableRow>
+                    <TableEmptyRow colSpan={5} message={t('noLogsFound')} className="py-8" />
                   ) : (
                     filteredLogs.map((log) => (
                       <TableRow key={log.id}>
@@ -319,27 +309,7 @@ const AuditLogs = () => {
             </div>
 
             {/* Pagination */}
-            <div className="flex items-center justify-between mt-4">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page === 0}
-                onClick={() => setPage(p => p - 1)}
-              >
-                {t('previous')}
-              </Button>
-              <span className="text-sm text-muted-foreground">
-                {t('page')} {page + 1}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={!hasMore}
-                onClick={() => setPage(p => p + 1)}
-              >
-                {t('next')}
-              </Button>
-            </div>
+            <PaginationControls page={page + 1} hasPrevious={page > 0} hasNext={hasMore} onPrevious={() => setPage(p => p - 1)} onNext={() => setPage(p => p + 1)} />
           </CardContent>
         </Card>
 

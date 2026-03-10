@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { usePublicSettings } from '@/contexts/PublicSettingsContext';
@@ -10,10 +10,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Link } from 'react-router-dom';
-import { Building, Globe, Shield } from 'lucide-react';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Turnstile } from '@marsidev/react-turnstile';
+import { Building, Shield } from 'lucide-react';
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
+import { LegalFooter } from '@/components/LegalFooter';
+import { CaptchaField } from '@/components/CaptchaField';
 
 
 const Auth = () => {
@@ -29,14 +29,8 @@ const Auth = () => {
   const [powDone, setPowDone] = useState(false);
   const hashContainerRef = useRef<HTMLDivElement>(null);
   const { user, loading, refreshUser } = useAuth();
-  const { t, language, setLanguage } = useLanguage();
-
-  const languages = [
-    { code: 'ar' as const, label: 'العربية' },
-    { code: 'he' as const, label: 'עברית' },
-    { code: 'en' as const, label: 'English' },
-  ];
-  const { logoUrl, companyName, turnstileEnabled, turnstileSiteKey } = usePublicSettings();
+  const { t } = useLanguage();
+  const { logoUrl, companyName, turnstileEnabled, registrationEnabled } = usePublicSettings();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -178,25 +172,7 @@ const Auth = () => {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-secondary/10 p-4">
       <div className="w-full max-w-md">
         <div className="flex justify-end mb-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="gap-1.5">
-                <Globe className="h-4 w-4" />
-                <span className="text-xs uppercase">{language}</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {languages.map((lang) => (
-                <DropdownMenuItem
-                  key={lang.code}
-                  onClick={() => setLanguage(lang.code)}
-                  className={language === lang.code ? 'bg-primary/10 text-primary' : ''}
-                >
-                  {lang.label}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <LanguageSwitcher />
         </div>
       <Card className="w-full relative overflow-hidden">
         {/* PoW Overlay */}
@@ -264,26 +240,7 @@ const Auth = () => {
                 />
               </div>
 
-              {turnstileEnabled && turnstileSiteKey && (
-                <div className="space-y-2">
-                  <Label>{t('captchaVerification')}</Label>
-                  <div
-                    className="flex justify-center items-center p-4 border rounded-lg bg-muted/20"
-                    dir="ltr"
-                  >
-                    <Turnstile
-                      siteKey={turnstileSiteKey}
-                      onSuccess={(token) => setTurnstileToken(token)}
-                      onError={() => setTurnstileToken(null)}
-                      onExpire={() => setTurnstileToken(null)}
-                      options={{
-                        theme: 'light',
-                        size: 'normal',
-                      }}
-                    />
-                  </div>
-                </div>
-              )}
+              <CaptchaField onToken={setTurnstileToken} />
 
               <Button
                 type="submit"
@@ -336,28 +293,18 @@ const Auth = () => {
             </form>
           )}
 
-          <div className="mt-6 text-center text-sm">
-            <p className="text-muted-foreground">
-              {t('dontHaveAccount')}{' '}
-              <Link to="/register" className="text-primary hover:underline">
-                {t('register')}
-              </Link>
-            </p>
-          </div>
+          {registrationEnabled && (
+            <div className="mt-6 text-center text-sm">
+              <p className="text-muted-foreground">
+                {t('dontHaveAccount')}{' '}
+                <Link to="/register" className="text-primary hover:underline">
+                  {t('register')}
+                </Link>
+              </p>
+            </div>
+          )}
 
-          <div className="mt-4 pt-4 border-t text-center text-xs text-muted-foreground">
-            <p>
-              {language === 'ar' ? 'تصميم شركة ' : language === 'he' ? 'מופעל על ידי ' : 'Powered by '}
-              <a
-                href="https://qfiber.co.il"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary hover:underline"
-              >
-                {language === 'ar' ? 'كيوفايبر' : language === 'he' ? 'qFiber בע״מ' : 'qFiber LTD'}
-              </a>
-            </p>
-          </div>
+          <LegalFooter variant="centered" />
         </CardContent>
       </Card>
       </div>

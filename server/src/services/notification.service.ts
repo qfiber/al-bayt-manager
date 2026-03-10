@@ -129,10 +129,12 @@ export async function notifyIssueResolved(reporterId: string, issueDetails: {
 }): Promise<void> {
   try {
     const [profile] = await db
-      .select({ preferredLanguage: profiles.preferredLanguage })
+      .select({ preferredLanguage: profiles.preferredLanguage, emailNotificationsEnabled: profiles.emailNotificationsEnabled })
       .from(profiles)
       .where(eq(profiles.id, reporterId))
       .limit(1);
+
+    if (profile?.emailNotificationsEnabled === false) return;
 
     const [user] = await db
       .select({ email: users.email })
@@ -180,15 +182,17 @@ export async function sendPaymentReminder(apartmentId: string): Promise<void> {
       .where(inArray(users.id, userIds));
 
     const recipientProfiles = await db
-      .select({ id: profiles.id, preferredLanguage: profiles.preferredLanguage })
+      .select({ id: profiles.id, preferredLanguage: profiles.preferredLanguage, emailNotificationsEnabled: profiles.emailNotificationsEnabled })
       .from(profiles)
       .where(inArray(profiles.id, userIds));
 
     const langMap = new Map(recipientProfiles.map(p => [p.id, p.preferredLanguage]));
+    const notifMap = new Map(recipientProfiles.map(p => [p.id, p.emailNotificationsEnabled]));
 
     const [building] = await db.select({ name: buildings.name }).from(buildings).where(eq(buildings.id, apt.buildingId)).limit(1);
 
     for (const user of recipientUsers) {
+      if (notifMap.get(user.id) === false) continue;
       emailService.sendEmail({
         templateIdentifier: 'payment_reminder',
         recipientEmail: user.email,
@@ -209,5 +213,117 @@ export async function sendPaymentReminder(apartmentId: string): Promise<void> {
     }).catch(() => {});
   } catch (err) {
     logger.error(err, 'Failed to send payment reminder');
+  }
+}
+
+/**
+ * Notify tenant(s) that a payment has been recorded on their apartment.
+ */
+export async function notifyPaymentCreated(apartmentId: string, amount: number, month: string): Promise<void> {
+  try {
+    const [apt] = await db.select().from(apartments).where(eq(apartments.id, apartmentId)).limit(1);
+    if (!apt) return;
+
+    const [building] = await db.select({ name: buildings.name }).from(buildings).where(eq(buildings.id, apt.buildingId)).limit(1);
+
+    // Find assigned users for this apartment
+    const assignments = await db
+      .select({ userId: userApartments.userId })
+      .from(userApartments)
+      .where(eq(userApartments.apartmentId, apartmentId));
+
+    if (assignments.length === 0) return;
+
+    const userIds = assignments.map(a => a.userId);
+    const recipientUsers = await db
+      .select({ id: users.id, email: users.email })
+      .from(users)
+      .where(inArray(users.id, userIds));
+
+    const recipientProfiles = await db
+      .select({ id: profiles.id, preferredLanguage: profiles.preferredLanguage, emailNotificationsEnabled: profiles.emailNotificationsEnabled })
+      .from(profiles)
+      .where(inArray(profiles.id, userIds));
+
+    const langMap = new Map(recipientProfiles.map(p => [p.id, p.preferredLanguage]));
+    const notifMap = new Map(recipientProfiles.map(p => [p.id, p.emailNotificationsEnabled]));
+
+    // Fetch currency symbol from settings
+    const [config] = await db.select({ currencySymbol: settings.currencySymbol }).from(settings).limit(1);
+    const currencySymbol = config?.currencySymbol || '₪';
+
+    for (const user of recipientUsers) {
+      if (notifMap.get(user.id) === false) continue;
+      emailService.sendEmail({
+        templateIdentifier: 'payment_confirmation',
+        recipientEmail: user.email,
+        userId: user.id,
+        preferredLanguage: langMap.get(user.id) || 'ar',
+        variables: {
+          amount: amount.toFixed(2),
+          month,
+          apartmentNumber: apt.apartmentNumber,
+          buildingName: building?.name || '',
+          currencySymbol,
+        },
+      }).catch(err => logger.error(err, 'Failed to send payment confirmation email'));
+    }
+  } catch (err) {
+    logger.error(err, 'Failed to notify payment created');
+  }
+}
+
+/**
+ * Notify tenant(s) that a payment on their apartment has been canceled.
+ */
+export async function notifyPaymentCanceled(apartmentId: string, amount: number, month: string): Promise<void> {
+  try {
+    const [apt] = await db.select().from(apartments).where(eq(apartments.id, apartmentId)).limit(1);
+    if (!apt) return;
+
+    const [building] = await db.select({ name: buildings.name }).from(buildings).where(eq(buildings.id, apt.buildingId)).limit(1);
+
+    const assignments = await db
+      .select({ userId: userApartments.userId })
+      .from(userApartments)
+      .where(eq(userApartments.apartmentId, apartmentId));
+
+    if (assignments.length === 0) return;
+
+    const userIds = assignments.map(a => a.userId);
+    const recipientUsers = await db
+      .select({ id: users.id, email: users.email })
+      .from(users)
+      .where(inArray(users.id, userIds));
+
+    const recipientProfiles = await db
+      .select({ id: profiles.id, preferredLanguage: profiles.preferredLanguage, emailNotificationsEnabled: profiles.emailNotificationsEnabled })
+      .from(profiles)
+      .where(inArray(profiles.id, userIds));
+
+    const langMap = new Map(recipientProfiles.map(p => [p.id, p.preferredLanguage]));
+    const notifMap = new Map(recipientProfiles.map(p => [p.id, p.emailNotificationsEnabled]));
+
+    const [config] = await db.select({ currencySymbol: settings.currencySymbol }).from(settings).limit(1);
+    const currencySymbol = config?.currencySymbol || '₪';
+
+    for (const user of recipientUsers) {
+      if (notifMap.get(user.id) === false) continue;
+      emailService.sendEmail({
+        templateIdentifier: 'payment_canceled',
+        recipientEmail: user.email,
+        userId: user.id,
+        preferredLanguage: langMap.get(user.id) || 'ar',
+        variables: {
+          amount: amount.toFixed(2),
+          month,
+          apartmentNumber: apt.apartmentNumber,
+          buildingName: building?.name || '',
+          currencySymbol,
+        },
+      }).catch(err => logger.error(err, 'Failed to send payment canceled email'));
+    }
+  } catch (err) {
+    logger.error(err, 'Failed to notify payment canceled');
   }
 }

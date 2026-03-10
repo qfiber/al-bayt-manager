@@ -5,6 +5,7 @@ import { AppError } from '../middleware/error-handler.js';
 import * as ledgerService from './ledger.service.js';
 import * as occupancyPeriodService from './occupancy-period.service.js';
 import * as receiptService from './receipt.service.js';
+import * as notificationService from './notification.service.js';
 import { apartments, buildings } from '../db/schema/index.js';
 
 export async function listPayments(filters?: {
@@ -145,6 +146,10 @@ export async function createPayment(data: {
     await receiptService.createReceipt(payment.id, data.apartmentId, apt.buildingId, data.amount, tx);
 
     return payment;
+  }).then((payment) => {
+    // Fire-and-forget: send payment confirmation email
+    notificationService.notifyPaymentCreated(data.apartmentId, data.amount, data.month).catch(() => {});
+    return payment;
   });
 }
 
@@ -263,6 +268,10 @@ export async function cancelPayment(id: string, userId: string) {
 
     await ledgerService.refreshCachedBalance(payment.apartmentId, tx);
 
+    return { apartmentId: payment.apartmentId, amount: parseFloat(payment.amount), month: payment.month };
+  }).then((result) => {
+    // Fire-and-forget: send payment canceled email
+    notificationService.notifyPaymentCanceled(result.apartmentId, result.amount, result.month).catch(() => {});
     return { success: true };
   });
 }

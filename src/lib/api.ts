@@ -67,10 +67,11 @@ async function request<T = any>(
     throw new ApiError(res.status, error.error || 'Request failed', error.details);
   }
 
-  // Handle empty responses (204)
+  // Handle empty responses
   if (res.status === 204) return undefined as T;
-
-  return res.json();
+  const text = await res.text();
+  if (!text) return undefined as T;
+  return JSON.parse(text);
 }
 
 export class ApiError extends Error {

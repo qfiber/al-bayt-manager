@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useCurrency } from '@/contexts/PublicSettingsContext';
+import { useRequireAuth } from '@/hooks/use-require-auth';
+import { useBuildings } from '@/hooks/use-buildings';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,6 +16,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { BuildingFilter } from '@/components/BuildingFilter';
+import { TableEmptyRow } from '@/components/TableEmptyRow';
 import { useToast } from '@/hooks/use-toast';
 import { FileText, Plus, Pencil, Trash2, Calendar as CalendarIcon, ArrowLeft, Repeat, Receipt } from 'lucide-react';
 import { formatDate, cn } from '@/lib/utils';
@@ -39,11 +42,6 @@ interface ExpenseRow {
   buildingName: string;
 }
 
-interface Building {
-  id: string;
-  name: string;
-}
-
 interface ApartmentOption {
   id: string;
   apartmentNumber: string;
@@ -51,13 +49,13 @@ interface ApartmentOption {
 }
 
 const Expenses = () => {
-  const { user, isAdmin, isModerator, loading } = useAuth();
+  const { user, isAdmin, isModerator } = useAuth();
   const { t } = useLanguage();
   const { formatCurrency } = useCurrency();
-  const navigate = useNavigate();
   const { toast } = useToast();
+  useRequireAuth('admin-or-moderator');
+  const { buildings } = useBuildings(!!user);
   const [expenseRows, setExpenseRows] = useState<ExpenseRow[]>([]);
-  const [buildings, setBuildings] = useState<Building[]>([]);
   const [apartments, setApartments] = useState<ApartmentOption[]>([]);
   const [selectedBuildingFilter, setSelectedBuildingFilter] = useState<string>('all');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -78,29 +76,11 @@ const Expenses = () => {
   });
 
   useEffect(() => {
-    if (!loading && !user) {
-      navigate('/auth');
-    } else if (!loading && !isAdmin && !isModerator) {
-      navigate('/dashboard');
-    }
-  }, [user, isAdmin, isModerator, loading, navigate]);
-
-  useEffect(() => {
     if (user && (isAdmin || isModerator)) {
-      fetchBuildings();
       fetchApartments();
       fetchExpenses();
     }
   }, [user, isAdmin, isModerator]);
-
-  const fetchBuildings = async () => {
-    try {
-      const data = await api.get<Building[]>('/buildings');
-      setBuildings(data || []);
-    } catch (err: any) {
-      toast({ title: t('error'), description: err.message, variant: 'destructive' });
-    }
-  };
 
   const fetchApartments = async () => {
     try {
@@ -234,10 +214,6 @@ const Expenses = () => {
     return buildings.find(b => b.id === buildingId)?.name || t('unknown');
   };
 
-  if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">{t('loading')}</div>;
-  }
-
   if (!user || (!isAdmin && !isModerator)) return null;
 
   return (
@@ -249,19 +225,7 @@ const Expenses = () => {
             <h1 className="text-3xl font-bold">{t('expenses')}</h1>
           </div>
           <div className="flex gap-2 flex-wrap items-center">
-            <Select value={selectedBuildingFilter} onValueChange={setSelectedBuildingFilter}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder={t('filterByBuilding')} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t('allBuildings')}</SelectItem>
-                {buildings.map((building) => (
-                  <SelectItem key={building.id} value={building.id}>
-                    {building.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <BuildingFilter buildings={buildings} value={selectedBuildingFilter} onChange={setSelectedBuildingFilter} />
             <Button
               onClick={() => {
                 setEditingExpense(null);
@@ -559,11 +523,7 @@ const Expenses = () => {
                     ? expenseRows
                     : expenseRows.filter(r => r.expense.buildingId === selectedBuildingFilter);
                   return filtered.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center text-muted-foreground">
-                      {t('noExpensesFound')}
-                    </TableCell>
-                  </TableRow>
+                  <TableEmptyRow colSpan={7} message={t('noExpensesFound')} />
                 ) : (
                   filtered.map((row) => (
                     <TableRow key={row.expense.id}>

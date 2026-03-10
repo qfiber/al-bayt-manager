@@ -1,9 +1,10 @@
 import { useEffect, useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useCurrency } from '@/contexts/PublicSettingsContext';
+import { useRequireAuth } from '@/hooks/use-require-auth';
 import { api, ApiError } from '@/lib/api';
+import type { ApartmentData, IssueRow } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -11,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
+import { Switch } from '@/components/ui/switch';
 import {
   User,
   Lock,
@@ -21,47 +23,17 @@ import {
   Building2,
   Home,
   AlertTriangle,
+  Bell,
   Check,
   X,
 } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
 
-interface ApartmentData {
-  apartment: {
-    id: string;
-    apartmentNumber: string;
-    status: string;
-    occupancyStart: string | null;
-    subscriptionAmount: string;
-    subscriptionStatus: string;
-    cachedBalance: string;
-    buildingId: string;
-  };
-  buildingName: string;
-  buildingAddress: string;
-}
-
-interface IssueRow {
-  issue: {
-    id: string;
-    buildingId: string;
-    reporterId: string;
-    floor: number | null;
-    category: string;
-    description: string;
-    status: string;
-    resolvedAt: string | null;
-    createdAt: string;
-  };
-  buildingName: string;
-  reporterName: string;
-}
-
 const Profile = () => {
-  const { user, loading, refreshUser } = useAuth();
+  useRequireAuth();
+  const { user, refreshUser } = useAuth();
   const { t } = useLanguage();
   const { currencySymbol, formatCurrency } = useCurrency();
-  const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Phone edit state
@@ -87,20 +59,19 @@ const Profile = () => {
   // Avatar upload state
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
+  // Notification preference
+  const [emailNotificationsEnabled, setEmailNotificationsEnabled] = useState(true);
+  const [savingNotif, setSavingNotif] = useState(false);
+
   // Apartments & issues
   const [apartments, setApartments] = useState<any[]>([]);
   const [issues, setIssues] = useState<IssueRow[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
 
   useEffect(() => {
-    if (!loading && !user) {
-      navigate('/auth');
-    }
-  }, [user, loading, navigate]);
-
-  useEffect(() => {
     if (user) {
       setPhoneValue(user.phone || '');
+      setEmailNotificationsEnabled(user.emailNotificationsEnabled ?? true);
       fetchData();
     }
   }, [user]);
@@ -173,6 +144,21 @@ const Profile = () => {
     } finally {
       setUploadingAvatar(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleToggleNotifications = async (value: boolean) => {
+    setEmailNotificationsEnabled(value);
+    setSavingNotif(true);
+    try {
+      await api.put('/auth/profile', { emailNotificationsEnabled: value });
+      await refreshUser();
+      toast.success(t('profileUpdated'));
+    } catch {
+      setEmailNotificationsEnabled(!value);
+      toast.error(t('error'));
+    } finally {
+      setSavingNotif(false);
     }
   };
 
@@ -288,10 +274,6 @@ const Profile = () => {
       default: return 'outline';
     }
   };
-
-  if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">{t('loading')}</div>;
-  }
 
   if (!user) return null;
 
@@ -435,6 +417,28 @@ const Profile = () => {
         </CardContent>
       </Card>
 
+      {/* Email Notifications */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Bell className="h-5 w-5" />
+            {t('emailNotifications')}
+          </CardTitle>
+          <CardDescription>{t('emailNotificationsDesc')}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between max-w-md">
+            <Label htmlFor="email-notif-toggle">{t('emailNotifications')}</Label>
+            <Switch
+              id="email-notif-toggle"
+              checked={emailNotificationsEnabled}
+              onCheckedChange={handleToggleNotifications}
+              disabled={savingNotif}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Change Password */}
       <Card>
         <CardHeader>
@@ -462,7 +466,7 @@ const Profile = () => {
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 required
-                minLength={8}
+                minLength={16}
                 dir="ltr"
               />
             </div>
@@ -473,7 +477,7 @@ const Profile = () => {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
-                minLength={8}
+                minLength={16}
                 dir="ltr"
               />
             </div>

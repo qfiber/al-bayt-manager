@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useCurrency } from '@/contexts/PublicSettingsContext';
+import { useRequireAuth } from '@/hooks/use-require-auth';
 import { api } from '@/lib/api';
+import type { IssueRow } from '@/lib/types';
+import { BuildingFilter } from '@/components/BuildingFilter';
+import { TableEmptyRow } from '@/components/TableEmptyRow';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -24,22 +27,6 @@ interface Building {
   undergroundFloors: number | null;
 }
 
-interface IssueRow {
-  issue: {
-    id: string;
-    buildingId: string;
-    reporterId: string;
-    floor: number | null;
-    category: string;
-    description: string;
-    status: string;
-    resolvedAt: string | null;
-    createdAt: string;
-  };
-  buildingName: string;
-  reporterName: string;
-}
-
 interface Attachment {
   fileUrl: string;
   fileType: string;
@@ -49,10 +36,10 @@ interface Attachment {
 const CATEGORIES = ['plumbing', 'electrical', 'elevator', 'water_leak', 'cleaning', 'structural', 'safety', 'other'] as const;
 
 const Issues = () => {
-  const { user, isAdmin, isModerator, loading } = useAuth();
+  useRequireAuth();
+  const { user, isAdmin, isModerator } = useAuth();
   const { t } = useLanguage();
   const { currencySymbol } = useCurrency();
-  const navigate = useNavigate();
   const { toast } = useToast();
 
   const [issues, setIssues] = useState<IssueRow[]>([]);
@@ -83,10 +70,6 @@ const Issues = () => {
   const [maintCost, setMaintCost] = useState('');
 
   const canManage = isAdmin || isModerator;
-
-  useEffect(() => {
-    if (!loading && !user) navigate('/auth');
-  }, [user, loading, navigate]);
 
   useEffect(() => {
     if (user) {
@@ -246,7 +229,7 @@ const Issues = () => {
       case 'open':
         return <Badge variant="destructive">{t('open')}</Badge>;
       case 'in_progress':
-        return <Badge className="bg-yellow-500 hover:bg-yellow-600">{t('inProgress')}</Badge>;
+        return <Badge className="bg-yellow-500 hover:bg-yellow-600 text-yellow-950">{t('inProgress')}</Badge>;
       case 'resolved':
         return <Badge className="bg-green-600 hover:bg-green-700">{t('resolved')}</Badge>;
       default:
@@ -279,10 +262,6 @@ const Issues = () => {
     const d = new Date(dateStr);
     return `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`;
   };
-
-  if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">{t('loading')}</div>;
-  }
 
   if (!user) return null;
 
@@ -417,17 +396,7 @@ const Issues = () => {
             </SelectContent>
           </Select>
 
-          <Select value={filterBuilding} onValueChange={setFilterBuilding}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{t('allBuildings')}</SelectItem>
-              {buildings.map(b => (
-                <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <BuildingFilter buildings={buildings} value={filterBuilding} onChange={setFilterBuilding} />
 
           <Select value={filterCategory} onValueChange={setFilterCategory}>
             <SelectTrigger className="w-[180px]">
@@ -463,11 +432,7 @@ const Issues = () => {
                 </TableHeader>
                 <TableBody>
                   {issues.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={canManage ? 8 : 7} className="text-center text-muted-foreground">
-                        {t('noIssuesFound')}
-                      </TableCell>
-                    </TableRow>
+                    <TableEmptyRow colSpan={canManage ? 8 : 7} message={t('noIssuesFound')} />
                   ) : (
                     issues.map((row) => (
                       <TableRow key={row.issue.id} className="cursor-pointer hover:bg-muted/50" onClick={() => viewIssueDetails(row)}>

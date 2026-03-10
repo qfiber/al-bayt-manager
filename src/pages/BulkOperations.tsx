@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useCurrency } from '@/contexts/PublicSettingsContext';
+import { useRequireAuth } from '@/hooks/use-require-auth';
+import { useBuildings } from '@/hooks/use-buildings';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,11 +16,6 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { Layers, CreditCard, FileText, Bell } from 'lucide-react';
-
-interface Building {
-  id: string;
-  name: string;
-}
 
 interface Apartment {
   id: string;
@@ -41,12 +38,12 @@ interface BulkResult {
 }
 
 const BulkOperations = () => {
-  const { user, isAdmin, isModerator, loading } = useAuth();
+  const { user, isAdmin, isModerator } = useAuth();
   const { t } = useLanguage();
   const { formatCurrency } = useCurrency();
   const navigate = useNavigate();
-
-  const [buildings, setBuildings] = useState<Building[]>([]);
+  useRequireAuth('admin-or-moderator');
+  const { buildings } = useBuildings(!!user);
 
   // --- Batch Payments state ---
   const [paymentBuildingId, setPaymentBuildingId] = useState('');
@@ -71,20 +68,6 @@ const BulkOperations = () => {
   const [reminderLoading, setReminderLoading] = useState(false);
   const [reminderResult, setReminderResult] = useState<BulkResult | null>(null);
 
-  useEffect(() => {
-    if (!loading && !user) {
-      navigate('/auth');
-    } else if (!loading && !isAdmin && !isModerator) {
-      navigate('/dashboard');
-    }
-  }, [user, isAdmin, isModerator, loading, navigate]);
-
-  useEffect(() => {
-    if (user && (isAdmin || isModerator)) {
-      fetchBuildings();
-    }
-  }, [user, isAdmin, isModerator]);
-
   // Fetch apartments for batch payments when building changes
   useEffect(() => {
     if (paymentBuildingId) {
@@ -104,15 +87,6 @@ const BulkOperations = () => {
       setReminderSelectedIds(new Set());
     }
   }, [reminderBuildingId]);
-
-  const fetchBuildings = async () => {
-    try {
-      const data = await api.get<Building[]>('/buildings');
-      setBuildings(data || []);
-    } catch (err: any) {
-      toast.error(err.message || t('error'));
-    }
-  };
 
   const fetchApartmentsForPayment = async (buildingId: string) => {
     try {
@@ -259,10 +233,6 @@ const BulkOperations = () => {
       </div>
     );
   };
-
-  if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">{t('loading')}</div>;
-  }
 
   if (!user || (!isAdmin && !isModerator)) return null;
 

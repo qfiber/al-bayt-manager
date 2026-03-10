@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useCurrency } from '@/contexts/PublicSettingsContext';
+import { useRequireAuth } from '@/hooks/use-require-auth';
 import { api } from '@/lib/api';
+import { BuildingFilter } from '@/components/BuildingFilter';
+import { TableEmptyRow } from '@/components/TableEmptyRow';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -57,10 +59,10 @@ interface User {
 }
 
 const Apartments = () => {
-  const { user, isAdmin, isModerator, loading } = useAuth();
+  useRequireAuth('admin');
+  const { user, isAdmin, isModerator } = useAuth();
   const { t, language } = useLanguage();
   const { currencySymbol, formatCurrency } = useCurrency();
-  const navigate = useNavigate();
   const { toast } = useToast();
   const [apartmentItems, setApartmentItems] = useState<ApartmentListItem[]>([]);
   const [buildings, setBuildings] = useState<Building[]>([]);
@@ -83,14 +85,6 @@ const Apartments = () => {
     apartment_type: 'regular' as 'regular' | 'storage' | 'parking',
     parent_apartment_id: '',
   });
-
-  useEffect(() => {
-    if (!loading && !user) {
-      navigate('/auth');
-    } else if (!loading && !isAdmin) {
-      navigate('/dashboard');
-    }
-  }, [user, isAdmin, loading, navigate]);
 
   useEffect(() => {
     if (user && isAdmin) {
@@ -573,10 +567,6 @@ const Apartments = () => {
     }
   };
 
-  if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">{t('loading')}</div>;
-  }
-
   if (!user || !isAdmin) return null;
 
   const filteredBuildings = selectedBuildingFilter === 'all'
@@ -608,19 +598,7 @@ const Apartments = () => {
             <h1 className="text-3xl font-bold">{t('apartments')}</h1>
           </div>
           <div className="flex gap-2 flex-wrap items-center">
-            <Select value={selectedBuildingFilter} onValueChange={setSelectedBuildingFilter}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder={t('filterByBuilding')} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t('allBuildings')}</SelectItem>
-                {buildings.map((building) => (
-                  <SelectItem key={building.id} value={building.id}>
-                    {building.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <BuildingFilter buildings={buildings} value={selectedBuildingFilter} onChange={setSelectedBuildingFilter} />
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
                 <Button onClick={() => resetForm()} className="w-full sm:w-auto">
@@ -868,10 +846,10 @@ const Apartments = () => {
                                     <div className="text-muted-foreground">{t('beneficiary')}: {getBeneficiaryName(apartment.id)}</div>
                                   </div>
                                 </TableCell>
-                                <TableCell className={`text-start ${apartment.status !== 'occupied' ? 'text-muted-foreground/50' : ''}`}>
+                                <TableCell className={`text-start ${apartment.status !== 'occupied' ? 'text-muted-foreground' : ''}`}>
                                   {apartment.status === 'occupied' ? formatCurrency(subscriptionAmount) : '-'}
                                 </TableCell>
-                                <TableCell className={`text-start ${apartment.status !== 'occupied' ? 'text-muted-foreground/50' : ''}`}>
+                                <TableCell className={`text-start ${apartment.status !== 'occupied' ? 'text-muted-foreground' : ''}`}>
                                   {apartment.status === 'occupied' ? calculateMonthsOccupied(apartment.occupancyStart) : '-'}
                                 </TableCell>
                                 <TableCell className={`text-start font-semibold ${calculateTotalDebt(apartment) > 0 ? 'text-red-600' : 'text-green-600'}`}>
@@ -890,7 +868,7 @@ const Apartments = () => {
                                         size="sm"
                                         variant="outline"
                                         onClick={() => openTerminateDialog(apartment)}
-                                        className="text-orange-600 hover:text-orange-700"
+                                        className="text-orange-700 hover:text-orange-800"
                                       >
                                         <XCircle className="w-4 h-4" />
                                       </Button>
@@ -943,7 +921,7 @@ const Apartments = () => {
                                       </span>
                                     </TableCell>
                                     <TableCell className="text-start text-sm text-muted-foreground">-</TableCell>
-                                    <TableCell className={`text-start text-sm ${child.status !== 'occupied' ? 'text-muted-foreground/50' : 'text-muted-foreground'}`}>
+                                    <TableCell className={`text-start text-sm ${child.status !== 'occupied' ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
                                       {child.status === 'occupied' ? formatCurrency(childSub) : '-'}
                                     </TableCell>
                                     <TableCell className="text-start text-sm text-muted-foreground">-</TableCell>
@@ -1022,11 +1000,7 @@ const Apartments = () => {
                   </TableHeader>
                   <TableBody>
                     {apartmentPayments.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={(isAdmin || isModerator) ? 4 : 3} className="text-center text-muted-foreground">
-                          {t('noPayments')}
-                        </TableCell>
-                      </TableRow>
+                      <TableEmptyRow colSpan={(isAdmin || isModerator) ? 4 : 3} message={t('noPayments')} />
                     ) : (
                       apartmentPayments.map((payment) => (
                         <TableRow key={payment.id} className={payment.isCanceled ? 'opacity-50' : ''}>
@@ -1048,7 +1022,7 @@ const Apartments = () => {
                                   size="sm"
                                   variant="outline"
                                   onClick={() => handleCancelPayment(payment.id, payment.apartmentId, parseFloat(payment.amount))}
-                                  className="text-orange-600 hover:text-orange-700"
+                                  className="text-orange-700 hover:text-orange-800"
                                 >
                                   <XCircle className="w-4 h-4 me-1" />
                                   {t('cancel')}
@@ -1078,11 +1052,7 @@ const Apartments = () => {
                   </TableHeader>
                   <TableBody>
                     {debtDetails.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={(isAdmin || isModerator) ? 5 : 4} className="text-center text-muted-foreground">
-                          {t('noData')}
-                        </TableCell>
-                      </TableRow>
+                      <TableEmptyRow colSpan={(isAdmin || isModerator) ? 5 : 4} message={t('noData')} />
                     ) : (
                       debtDetails.map((detail, index) => (
                         <TableRow key={index}>
@@ -1104,7 +1074,7 @@ const Apartments = () => {
                                   size="sm"
                                   variant="outline"
                                   onClick={() => handleWaiveSubscription(detail.month, detail.amount_due)}
-                                  className="text-orange-600 hover:text-orange-700"
+                                  className="text-orange-700 hover:text-orange-800"
                                 >
                                   <XCircle className="w-4 h-4 me-1" />
                                   {t('waive')}
@@ -1115,7 +1085,7 @@ const Apartments = () => {
                                   size="sm"
                                   variant="outline"
                                   onClick={() => handleCancelPayment(detail.payment_id, selectedApartment!.id, detail.amount_paid)}
-                                  className="text-orange-600 hover:text-orange-700"
+                                  className="text-orange-700 hover:text-orange-800"
                                 >
                                   <XCircle className="w-4 h-4 me-1" />
                                   {t('cancelPayment')}
@@ -1165,7 +1135,7 @@ const Apartments = () => {
                                   size="sm"
                                   variant="outline"
                                   onClick={() => handleCancelExpense(expense.id, expense.apartmentId, parseFloat(expense.amount))}
-                                  className="text-orange-600 hover:text-orange-700"
+                                  className="text-orange-700 hover:text-orange-800"
                                 >
                                   <XCircle className="w-4 h-4 me-1" />
                                   {t('cancel')}

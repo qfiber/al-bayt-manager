@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useCurrency } from '@/contexts/PublicSettingsContext';
+import { useRequireAuth } from '@/hooks/use-require-auth';
 import { api } from '@/lib/api';
+import type { ApartmentData } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -12,35 +13,14 @@ import { useToast } from '@/hooks/use-toast';
 import { Home, Download, Receipt, Clock } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
 
-interface ApartmentData {
-  apartment: {
-    id: string;
-    apartmentNumber: string;
-    status: string;
-    occupancyStart: string | null;
-    subscriptionAmount: string;
-    subscriptionStatus: string;
-    cachedBalance: string;
-    buildingId: string;
-  };
-  buildingName: string;
-  buildingAddress: string;
-}
-
 const MyApartments = () => {
-  const { user, loading } = useAuth();
+  useRequireAuth();
+  const { user } = useAuth();
   const { t } = useLanguage();
   const { currencySymbol, formatCurrency } = useCurrency();
-  const navigate = useNavigate();
   const { toast } = useToast();
   const [apartments, setApartments] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    if (!loading && !user) {
-      navigate('/auth');
-    }
-  }, [user, loading, navigate]);
 
   useEffect(() => {
     if (user) {
@@ -100,7 +80,7 @@ const MyApartments = () => {
     return payments.filter((p: any) => !p.isCanceled).reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
   };
 
-  if (loading || isLoading) {
+  if (isLoading) {
     return <div className="min-h-screen flex items-center justify-center">{t('loading')}</div>;
   }
 

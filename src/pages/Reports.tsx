@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useRequireAuth } from '@/hooks/use-require-auth';
 import { useCurrency } from '@/contexts/PublicSettingsContext';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -27,10 +27,11 @@ interface MonthlyData {
 }
 
 const Reports = () => {
-  const { user, isAdmin, isModerator, loading } = useAuth();
-  const { t } = useLanguage();
+  const { user } = useAuth();
+  const { t, dir } = useLanguage();
+  const isRTL = dir === 'rtl';
   const { currencySymbol, formatCurrency } = useCurrency();
-  const navigate = useNavigate();
+  useRequireAuth('admin-or-moderator');
   const { toast } = useToast();
 
   const [totalRevenue, setTotalRevenue] = useState(0);
@@ -40,14 +41,6 @@ const Reports = () => {
   const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([]);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-
-  useEffect(() => {
-    if (!loading && !user) {
-      navigate('/auth');
-    } else if (!loading && !isAdmin && !isModerator) {
-      navigate('/dashboard');
-    }
-  }, [user, isAdmin, isModerator, loading, navigate]);
 
   useEffect(() => {
     if (user) {
@@ -104,12 +97,6 @@ const Reports = () => {
     setStartDate('');
     setEndDate('');
   };
-
-  if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">{t('loading')}</div>;
-  }
-
-  if (!user || (!isAdmin && !isModerator)) return null;
 
   const netIncome = totalRevenue - totalExpenses;
 
@@ -233,10 +220,10 @@ const Reports = () => {
             <CardContent>
               {expensesByCategory.length > 0 ? (
                 <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={expensesByCategory}>
+                  <BarChart data={expensesByCategory} margin={{ left: isRTL ? 10 : 0, right: isRTL ? 0 : 10 }}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="category" />
-                    <YAxis />
+                    <XAxis dataKey="category" reversed={isRTL} />
+                    <YAxis orientation={isRTL ? 'right' : 'left'} />
                     <Tooltip formatter={(value: number) => formatCurrency(value)} />
                     <Bar dataKey="amount" fill="hsl(var(--primary))" />
                   </BarChart>
@@ -260,10 +247,10 @@ const Reports = () => {
                     buildingName: b.buildingName,
                     occupied: b.occupiedApartments,
                     vacant: b.totalApartments - b.occupiedApartments,
-                  }))}>
+                  }))} margin={{ left: isRTL ? 10 : 0, right: isRTL ? 0 : 10 }}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="buildingName" />
-                    <YAxis />
+                    <XAxis dataKey="buildingName" reversed={isRTL} />
+                    <YAxis orientation={isRTL ? 'right' : 'left'} />
                     <Tooltip />
                     <Legend />
                     <Bar dataKey="occupied" fill="hsl(var(--primary))" name={t('occupied')} />
@@ -287,10 +274,10 @@ const Reports = () => {
           <CardContent>
             {monthlyData.length > 0 ? (
               <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={monthlyData}>
+                <LineChart data={monthlyData} margin={{ left: isRTL ? 10 : 0, right: isRTL ? 0 : 10 }}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
-                  <YAxis />
+                  <XAxis dataKey="month" reversed={isRTL} />
+                  <YAxis orientation={isRTL ? 'right' : 'left'} />
                   <Tooltip formatter={(value: number) => formatCurrency(value)} />
                   <Legend />
                   <Line type="monotone" dataKey="payments" stroke="hsl(var(--primary))" name={t('revenue')} strokeWidth={2} />

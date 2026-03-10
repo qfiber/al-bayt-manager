@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useRequireAuth } from '@/hooks/use-require-auth';
+import { TableEmptyRow } from '@/components/TableEmptyRow';
 import { useCurrency } from '@/contexts/PublicSettingsContext';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -62,10 +63,10 @@ interface EmailTemplate {
 const ACTION_TYPES = ['email_reminder', 'formal_notice', 'final_warning', 'custom'] as const;
 
 const DebtCollection = () => {
-  const { user, isAdmin, loading } = useAuth();
+  const { user, isAdmin } = useAuth();
   const { t } = useLanguage();
   const { formatCurrency } = useCurrency();
-  const navigate = useNavigate();
+  useRequireAuth('admin');
 
   // Apartments in collection
   const [apartments, setApartments] = useState<ApartmentRow[]>([]);
@@ -94,14 +95,6 @@ const DebtCollection = () => {
 
   // Processing state
   const [processing, setProcessing] = useState(false);
-
-  useEffect(() => {
-    if (!loading && !user) {
-      navigate('/auth');
-    } else if (!loading && !isAdmin) {
-      navigate('/dashboard');
-    }
-  }, [user, isAdmin, loading, navigate]);
 
   useEffect(() => {
     if (user && isAdmin) {
@@ -263,12 +256,6 @@ const DebtCollection = () => {
     }
   };
 
-  if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">{t('loading')}</div>;
-  }
-
-  if (!user || !isAdmin) return null;
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/10">
       <div className="container mx-auto px-3 py-4 sm:p-6">
@@ -315,11 +302,7 @@ const DebtCollection = () => {
                   </TableHeader>
                   <TableBody>
                     {apartments.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={6} className="text-center text-muted-foreground">
-                          {t('noApartmentsInCollection')}
-                        </TableCell>
-                      </TableRow>
+                      <TableEmptyRow colSpan={6} message={t('noApartmentsInCollection')} />
                     ) : (
                       apartments.map((row) => (
                         <TableRow key={row.apartment.id}>
@@ -388,11 +371,7 @@ const DebtCollection = () => {
                   </TableHeader>
                   <TableBody>
                     {logEntries.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={6} className="text-center text-muted-foreground">
-                          {t('noCollectionLogEntries')}
-                        </TableCell>
-                      </TableRow>
+                      <TableEmptyRow colSpan={6} message={t('noCollectionLogEntries')} />
                     ) : (
                       logEntries.map((entry) => (
                         <TableRow key={entry.id}>
@@ -457,11 +436,7 @@ const DebtCollection = () => {
                     </TableHeader>
                     <TableBody>
                       {stages.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={6} className="text-center text-muted-foreground">
-                            {t('noStagesConfigured')}
-                          </TableCell>
-                        </TableRow>
+                        <TableEmptyRow colSpan={6} message={t('noStagesConfigured')} />
                       ) : (
                         stages
                           .sort((a, b) => a.stageNumber - b.stageNumber)

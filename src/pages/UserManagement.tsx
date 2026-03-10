@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useRequireAuth } from '@/hooks/use-require-auth';
+import { useBuildings } from '@/hooks/use-buildings';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,6 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 import { Users, Pencil, Trash2, UserPlus, Key, Building2, ShieldOff, Home } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { TableEmptyRow } from '@/components/TableEmptyRow';
 
 interface UserProfile {
   id: string;
@@ -29,11 +31,6 @@ interface Apartment {
   id: string;
   apartmentNumber: string;
   buildingId: string;
-}
-
-interface Building {
-  id: string;
-  name: string;
 }
 
 interface ApiUser {
@@ -54,14 +51,14 @@ interface TwoFAStatusEntry {
 }
 
 const UserManagement = () => {
-  const { user, isAdmin, loading } = useAuth();
+  const { user, isAdmin } = useAuth();
   const { t } = useLanguage();
-  const navigate = useNavigate();
+  useRequireAuth('admin');
+  const { buildings } = useBuildings(!!user);
   const { toast } = useToast();
 
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [apartments, setApartments] = useState<Apartment[]>([]);
-  const [buildings, setBuildings] = useState<Building[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
@@ -101,16 +98,7 @@ const UserManagement = () => {
   const [users2FAStatus, setUsers2FAStatus] = useState<Map<string, boolean>>(new Map());
 
   useEffect(() => {
-    if (!loading && !user) {
-      navigate('/auth');
-    } else if (!loading && !isAdmin) {
-      navigate('/dashboard');
-    }
-  }, [user, isAdmin, loading, navigate]);
-
-  useEffect(() => {
     if (user && isAdmin) {
-      fetchBuildings();
       fetchApartments();
       fetchUsers();
       fetchUsers2FAStatus();
@@ -128,15 +116,6 @@ const UserManagement = () => {
       setUsers2FAStatus(statusMap);
     } catch (error) {
       console.error('Error fetching 2FA status:', error);
-    }
-  };
-
-  const fetchBuildings = async () => {
-    try {
-      const data = await api.get<Building[]>('/buildings');
-      setBuildings(data || []);
-    } catch (error: any) {
-      toast({ title: t('error'), description: error.message, variant: 'destructive' });
     }
   };
 
@@ -580,10 +559,6 @@ const UserManagement = () => {
     }
   };
 
-  if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">{t('loading')}</div>;
-  }
-
   if (!user || !isAdmin) return null;
 
   return (
@@ -619,11 +594,7 @@ const UserManagement = () => {
               </TableHeader>
               <TableBody>
                 {users.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground">
-                      {t('noUsersFound')}
-                    </TableCell>
-                  </TableRow>
+                  <TableEmptyRow colSpan={5} message={t('noUsersFound')} />
                 ) : (
                   users.map((userProfile) => (
                     <TableRow key={userProfile.id}>

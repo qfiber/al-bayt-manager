@@ -2,6 +2,8 @@ import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useRequireAuth } from '@/hooks/use-require-auth';
+import { TableEmptyRow } from '@/components/TableEmptyRow';
 import { useCurrency } from '@/contexts/PublicSettingsContext';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -50,10 +52,12 @@ type SortField = 'buildingName' | 'totalApartments' | 'occupiedApartments' | 'oc
 type SortDirection = 'asc' | 'desc';
 
 const Portfolio = () => {
-  const { user, isAdmin, isModerator, loading } = useAuth();
-  const { t } = useLanguage();
+  const { user, isAdmin, isModerator } = useAuth();
+  const { t, dir } = useLanguage();
+  const isRTL = dir === 'rtl';
   const { formatCurrency } = useCurrency();
   const navigate = useNavigate();
+  useRequireAuth('admin-or-moderator');
   const { toast } = useToast();
 
   const [portfolio, setPortfolio] = useState<PortfolioSummary | null>(null);
@@ -61,14 +65,6 @@ const Portfolio = () => {
   const [expenseCategories, setExpenseCategories] = useState<string[]>([]);
   const [sortField, setSortField] = useState<SortField>('buildingName');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
-
-  useEffect(() => {
-    if (!loading && !user) {
-      navigate('/auth');
-    } else if (!loading && !isAdmin && !isModerator) {
-      navigate('/dashboard');
-    }
-  }, [user, isAdmin, isModerator, loading, navigate]);
 
   useEffect(() => {
     if (user && (isAdmin || isModerator)) {
@@ -145,12 +141,6 @@ const Portfolio = () => {
     if (sortField !== field) return null;
     return sortDirection === 'asc' ? ' \u2191' : ' \u2193';
   };
-
-  if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">{t('loading')}</div>;
-  }
-
-  if (!user || (!isAdmin && !isModerator)) return null;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/10">
@@ -282,11 +272,7 @@ const Portfolio = () => {
                 </TableHeader>
                 <TableBody>
                   {sortedBuildings.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={8} className="text-center text-muted-foreground">
-                        {t('noBuildingData')}
-                      </TableCell>
-                    </TableRow>
+                    <TableEmptyRow colSpan={8} message={t('noBuildingData')} />
                   ) : (
                     sortedBuildings.map((b) => (
                       <TableRow key={b.buildingId}>
@@ -319,10 +305,10 @@ const Portfolio = () => {
             <CardContent>
               {debtChartData.length > 0 ? (
                 <ResponsiveContainer width="100%" height={Math.max(300, debtChartData.length * 50)}>
-                  <BarChart data={debtChartData} layout="vertical" margin={{ left: 20 }}>
+                  <BarChart data={debtChartData} layout="vertical" margin={{ left: isRTL ? 0 : 20, right: isRTL ? 20 : 0 }}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis type="number" tickFormatter={(value: number) => formatCurrency(value)} />
-                    <YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 12 }} />
+                    <XAxis type="number" reversed={isRTL} tickFormatter={(value: number) => formatCurrency(value)} />
+                    <YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 12 }} orientation={isRTL ? 'right' : 'left'} />
                     <Tooltip formatter={(value: number) => formatCurrency(value)} />
                     <Bar dataKey="debt" fill="hsl(var(--destructive))" name={t('debt')} />
                   </BarChart>
@@ -343,10 +329,10 @@ const Portfolio = () => {
             <CardContent>
               {expenseBreakdown.length > 0 && expenseCategories.length > 0 ? (
                 <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={expenseBreakdown}>
+                  <BarChart data={expenseBreakdown} margin={{ left: isRTL ? 10 : 0, right: isRTL ? 0 : 10 }}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="buildingName" tick={{ fontSize: 12 }} />
-                    <YAxis tickFormatter={(value: number) => formatCurrency(value)} />
+                    <XAxis dataKey="buildingName" tick={{ fontSize: 12 }} reversed={isRTL} />
+                    <YAxis tickFormatter={(value: number) => formatCurrency(value)} orientation={isRTL ? 'right' : 'left'} />
                     <Tooltip formatter={(value: number) => formatCurrency(value)} />
                     <Legend />
                     {expenseCategories.map((category, idx) => (

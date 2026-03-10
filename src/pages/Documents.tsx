@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useRequireAuth } from '@/hooks/use-require-auth';
+import { useBuildings } from '@/hooks/use-buildings';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -27,11 +29,6 @@ interface Document {
   fileSize: number;
   uploadedBy: string;
   createdAt: string;
-}
-
-interface Building {
-  id: string;
-  name: string;
 }
 
 interface ApartmentRow {
@@ -66,14 +63,15 @@ function getFileIcon(fileType: string) {
 }
 
 const Documents = () => {
-  const { user, isAdmin, isModerator, loading } = useAuth();
+  const { user, isAdmin, isModerator } = useAuth();
   const { t } = useLanguage();
   const navigate = useNavigate();
+  useRequireAuth('admin-or-moderator');
+  const { buildings } = useBuildings(!!user);
   const { toast } = useToast();
 
   const [activeTab, setActiveTab] = useState<'building' | 'apartment' | 'user'>('building');
   const [documents, setDocuments] = useState<Document[]>([]);
-  const [buildings, setBuildings] = useState<Building[]>([]);
   const [apartments, setApartments] = useState<ApartmentRow[]>([]);
   const [users, setUsers] = useState<UserItem[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -88,16 +86,7 @@ const Documents = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   useEffect(() => {
-    if (!loading && !user) {
-      navigate('/auth');
-    } else if (!loading && !isAdmin && !isModerator) {
-      navigate('/dashboard');
-    }
-  }, [user, isAdmin, isModerator, loading, navigate]);
-
-  useEffect(() => {
     if (user && (isAdmin || isModerator)) {
-      fetchBuildings();
       fetchApartments();
       fetchUsers();
     }
@@ -108,15 +97,6 @@ const Documents = () => {
       fetchDocuments(activeTab);
     }
   }, [user, isAdmin, isModerator, activeTab]);
-
-  const fetchBuildings = async () => {
-    try {
-      const data = await api.get<Building[]>('/buildings');
-      setBuildings(data || []);
-    } catch (err: any) {
-      toast({ title: t('error'), description: err.message, variant: 'destructive' });
-    }
-  };
 
   const fetchApartments = async () => {
     try {
@@ -251,10 +231,6 @@ const Documents = () => {
     }
     return null;
   };
-
-  if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">{t('loading')}</div>;
-  }
 
   if (!user || (!isAdmin && !isModerator)) return null;
 

@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, timestamp, text, date } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, timestamp, text, date, boolean } from 'drizzle-orm/pg-core';
 import { users } from './users.js';
 
 export const profiles = pgTable('profiles', {
@@ -10,6 +10,7 @@ export const profiles = pgTable('profiles', {
   idNumber: varchar('id_number', { length: 50 }),
   birthDate: date('birth_date'),
   adminNotes: text('admin_notes'),
+  emailNotificationsEnabled: boolean('email_notifications_enabled').default(true).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });

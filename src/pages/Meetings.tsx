@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useRequireAuth } from '@/hooks/use-require-auth';
+import { useBuildings } from '@/hooks/use-buildings';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,15 +15,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
+import { BuildingFilter } from '@/components/BuildingFilter';
+import { TableEmptyRow } from '@/components/TableEmptyRow';
 import { toast } from 'sonner';
 import { formatDate } from '@/lib/utils';
 import { format } from 'date-fns';
 import { CalendarDays, Plus, Edit, Trash2, Users, CheckSquare, MapPin, Building2, ArrowLeft, X } from 'lucide-react';
-
-interface Building {
-  id: string;
-  name: string;
-}
 
 interface UserOption {
   id: string;
@@ -81,13 +79,13 @@ interface MeetingDetail {
 type ViewMode = 'list' | 'detail' | 'form';
 
 const Meetings = () => {
-  const { user, isAdmin, isModerator, loading } = useAuth();
+  const { user, isAdmin, isModerator } = useAuth();
   const { t } = useLanguage();
-  const navigate = useNavigate();
+  useRequireAuth('admin-or-moderator');
+  const { buildings } = useBuildings(!!user);
 
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [meetings, setMeetings] = useState<MeetingRow[]>([]);
-  const [buildings, setBuildings] = useState<Building[]>([]);
   const [users, setUsers] = useState<UserOption[]>([]);
   const [selectedBuildingFilter, setSelectedBuildingFilter] = useState<string>('all');
 
@@ -109,17 +107,8 @@ const Meetings = () => {
   const canManage = isAdmin || isModerator;
 
   useEffect(() => {
-    if (!loading && !user) {
-      navigate('/auth');
-    } else if (!loading && !canManage) {
-      navigate('/dashboard');
-    }
-  }, [user, isAdmin, isModerator, loading, navigate]);
-
-  useEffect(() => {
     if (user && canManage) {
       fetchMeetings();
-      fetchBuildings();
       fetchUsers();
     }
   }, [user, isAdmin, isModerator]);
@@ -133,15 +122,6 @@ const Meetings = () => {
       setMeetings(data || []);
     } catch (error: any) {
       toast.error(error.message);
-    }
-  };
-
-  const fetchBuildings = async () => {
-    try {
-      const data = await api.get<Building[]>('/buildings');
-      setBuildings(data || []);
-    } catch {
-      // silently fail
     }
   };
 
@@ -321,7 +301,7 @@ const Meetings = () => {
       case 'pending':
         return <Badge variant="secondary">{t('pending')}</Badge>;
       case 'in_progress':
-        return <Badge className="bg-yellow-500 hover:bg-yellow-600">{t('inProgress')}</Badge>;
+        return <Badge className="bg-yellow-500 hover:bg-yellow-600 text-yellow-950">{t('inProgress')}</Badge>;
       case 'completed':
         return <Badge className="bg-green-600 hover:bg-green-700">{t('completed')}</Badge>;
       case 'canceled':
@@ -330,10 +310,6 @@ const Meetings = () => {
         return <Badge variant="secondary">{status}</Badge>;
     }
   };
-
-  if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">{t('loading')}</div>;
-  }
 
   if (!user || !canManage) return null;
 
@@ -707,17 +683,7 @@ const Meetings = () => {
             <h1 className="text-3xl font-bold">{t('meetings')}</h1>
           </div>
           <div className="flex gap-2 flex-wrap items-center">
-            <Select value={selectedBuildingFilter} onValueChange={setSelectedBuildingFilter}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder={t('filterByBuilding')} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t('allBuildings')}</SelectItem>
-                {buildings.map(b => (
-                  <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <BuildingFilter buildings={buildings} value={selectedBuildingFilter} onChange={setSelectedBuildingFilter} />
             <Button onClick={openCreateForm} className="w-full sm:w-auto">
               <Plus className="w-4 h-4 me-2" />
               {t('addMeeting')}
@@ -744,11 +710,7 @@ const Meetings = () => {
                 </TableHeader>
                 <TableBody>
                   {meetings.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center text-muted-foreground">
-                        {t('noMeetingsFound')}
-                      </TableCell>
-                    </TableRow>
+                    <TableEmptyRow colSpan={6} message={t('noMeetingsFound')} />
                   ) : (
                     meetings.map((row) => (
                       <TableRow

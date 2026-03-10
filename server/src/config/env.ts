@@ -18,7 +18,7 @@ const envSchema = z.object({
   UPLOAD_DIR: z.string().default('./uploads'),
   PUBLIC_UPLOAD_DIR: z.string().default('./public-uploads'),
   CORS_ORIGIN: z.string().default('http://localhost:8080'),
-  POW_DIFFICULTY: z.coerce.number().default(20),
+  POW_DIFFICULTY: z.coerce.number().default(19),
   POW_CHALLENGE_TTL_MS: z.coerce.number().default(300000),
 });
 

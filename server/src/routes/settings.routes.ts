@@ -19,6 +19,7 @@ const updateSettingsSchema = z.object({
   turnstileEnabled: z.boolean().optional(),
   turnstileSiteKey: z.string().max(255).nullable().optional(),
   turnstileSecretKey: z.string().max(255).nullable().optional(),
+  registrationEnabled: z.boolean().optional(),
   ntfyEnabled: z.boolean().optional(),
   ntfyServerUrl: z.string().url().max(500).nullable().optional(),
   currencyCode: z.string().min(3).max(3).optional(),

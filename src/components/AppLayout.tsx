@@ -5,6 +5,8 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { usePublicSettings } from '@/contexts/PublicSettingsContext';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { MobileBottomNav } from './MobileBottomNav';
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
+import { LegalFooter } from '@/components/LegalFooter';
 import {
   LayoutDashboard,
   Building2,
@@ -14,7 +16,6 @@ import {
   FileText,
   ChevronDown,
   LogOut,
-  Globe,
   Users,
   Settings,
   Key,
@@ -33,7 +34,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import type { Language } from '@/lib/i18n';
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -47,7 +47,7 @@ interface NavLink {
 
 export const AppLayout = ({ children }: AppLayoutProps) => {
   const { user, isAdmin, isModerator, loading, signOut } = useAuth();
-  const { t, language, setLanguage, dir } = useLanguage();
+  const { t, dir } = useLanguage();
   const { logoUrl, companyName } = usePublicSettings();
   const navigate = useNavigate();
   const location = useLocation();
@@ -103,12 +103,6 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
     { label: t('auditLogs'), path: '/audit-logs', icon: Shield },
     { label: t('notificationTemplates'), path: '/email-templates', icon: Mail },
     { label: t('emailLogs'), path: '/email-logs', icon: MailOpen },
-  ];
-
-  const languages: { code: Language; label: string }[] = [
-    { code: 'ar', label: 'العربية' },
-    { code: 'he', label: 'עברית' },
-    { code: 'en', label: 'English' },
   ];
 
   const adminDropdownActive = adminDropdownLinks.some((l) => isActive(l.path));
@@ -183,26 +177,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
 
             {/* End: language + user */}
             <div className="flex items-center gap-2 shrink-0">
-              {/* Language switcher */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="gap-1.5">
-                    <Globe className="h-4 w-4" />
-                    <span className="text-xs uppercase">{language}</span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {languages.map((lang) => (
-                    <DropdownMenuItem
-                      key={lang.code}
-                      onClick={() => setLanguage(lang.code)}
-                      className={language === lang.code ? 'bg-primary/10 text-primary' : ''}
-                    >
-                      {lang.label}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <LanguageSwitcher />
 
               {/* User menu */}
               <DropdownMenu>
@@ -257,25 +232,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
             </button>
 
             <div className="flex items-center gap-1">
-              {/* Language switcher */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8">
-                    <Globe className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {languages.map((lang) => (
-                    <DropdownMenuItem
-                      key={lang.code}
-                      onClick={() => setLanguage(lang.code)}
-                      className={language === lang.code ? 'bg-primary/10 text-primary' : ''}
-                    >
-                      {lang.label}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <LanguageSwitcher variant="icon" />
 
               {/* User menu */}
               <DropdownMenu>
@@ -314,16 +271,10 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
 
       {/* Footer */}
       {!isMobile && (
-        <footer className="border-t border-border py-4 text-center text-xs text-muted-foreground">
-          {t('footerPoweredBy')}{' '}
-          <a
-            href="https://qfiber.co.il"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="font-medium text-primary hover:underline"
-          >
-            qFiber LTD
-          </a>
+        <footer className="border-t border-border py-4 px-6 text-xs text-muted-foreground">
+          <div className="container mx-auto flex items-center justify-between">
+            <LegalFooter variant="spread" />
+          </div>
         </footer>
       )}
 

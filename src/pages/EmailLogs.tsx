@@ -1,11 +1,13 @@
 import { useEffect, useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useRequireAuth } from '@/hooks/use-require-auth';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { TableEmptyRow } from '@/components/TableEmptyRow';
+import { PaginationControls } from '@/components/PaginationControls';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
@@ -35,9 +37,9 @@ interface EmailTemplate {
 const PAGE_SIZE = 50;
 
 const EmailLogs = () => {
-  const { user, isAdmin, loading } = useAuth();
+  useRequireAuth('admin');
+  const { user, isAdmin } = useAuth();
   const { t, language } = useLanguage();
-  const navigate = useNavigate();
   const { toast } = useToast();
 
   const [logs, setLogs] = useState<EmailLog[]>([]);
@@ -49,14 +51,6 @@ const EmailLogs = () => {
   const [hasMore, setHasMore] = useState(false);
 
   const isRTL = language === 'ar' || language === 'he';
-
-  useEffect(() => {
-    if (!loading && !user) {
-      navigate('/auth');
-    } else if (!loading && !isAdmin) {
-      navigate('/dashboard');
-    }
-  }, [user, isAdmin, loading, navigate]);
 
   // Fetch template list for the filter dropdown
   useEffect(() => {
@@ -172,15 +166,13 @@ const EmailLogs = () => {
     setOffset((prev) => prev + PAGE_SIZE);
   };
 
-  if (loading || isLoading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-lg">{t('loading')}</div>
       </div>
     );
   }
-
-  if (!user || !isAdmin) return null;
 
   return (
     <div className="container mx-auto px-3 py-4 sm:p-6 max-w-7xl" dir={isRTL ? 'rtl' : 'ltr'}>
@@ -264,11 +256,7 @@ const EmailLogs = () => {
             </TableHeader>
             <TableBody>
               {logs.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                    {t('noLogsFound')}
-                  </TableCell>
-                </TableRow>
+                <TableEmptyRow colSpan={7} message={t('noLogsFound')} className="py-8" />
               ) : (
                 logs.map((log) => (
                   <TableRow key={log.id}>
@@ -292,27 +280,7 @@ const EmailLogs = () => {
       </Card>
 
       {/* Pagination */}
-      <div className="flex items-center justify-between mt-4">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={goToPreviousPage}
-          disabled={offset === 0}
-        >
-          {t('previous')}
-        </Button>
-        <span className="text-sm text-muted-foreground">
-          {t('page')} {currentPage}
-        </span>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={goToNextPage}
-          disabled={!hasMore}
-        >
-          {t('next')}
-        </Button>
-      </div>
+      <PaginationControls page={currentPage} hasPrevious={offset > 0} hasNext={hasMore} onPrevious={goToPreviousPage} onNext={goToNextPage} />
     </div>
   );
 };

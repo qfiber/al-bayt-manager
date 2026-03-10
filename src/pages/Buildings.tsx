@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useRequireAuth } from '@/hooks/use-require-auth';
 import { useCurrency } from '@/contexts/PublicSettingsContext';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { TableEmptyRow } from '@/components/TableEmptyRow';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Building, Plus, Pencil, Trash2 } from 'lucide-react';
@@ -24,23 +25,16 @@ interface BuildingData {
 }
 
 const Buildings = () => {
-  const { user, isAdmin, loading } = useAuth();
+  useRequireAuth('admin');
+
+  const { user, isAdmin } = useAuth();
   const { t } = useLanguage();
-  const navigate = useNavigate();
   const { toast } = useToast();
   const { currencySymbol, formatCurrency } = useCurrency();
   const [buildings, setBuildings] = useState<BuildingData[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingBuilding, setEditingBuilding] = useState<BuildingData | null>(null);
   const [formData, setFormData] = useState({ name: '', address: '', numberOfFloors: '', undergroundFloors: '', monthlyFee: '', ntfyTopicUrl: '' });
-
-  useEffect(() => {
-    if (!loading && !user) {
-      navigate('/auth');
-    } else if (!loading && !isAdmin) {
-      navigate('/dashboard');
-    }
-  }, [user, isAdmin, loading, navigate]);
 
   useEffect(() => {
     if (user && isAdmin) {
@@ -115,10 +109,6 @@ const Buildings = () => {
     setEditingBuilding(null);
     setIsDialogOpen(false);
   };
-
-  if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">{t('loading')}</div>;
-  }
 
   if (!user || !isAdmin) return null;
 
@@ -240,11 +230,7 @@ const Buildings = () => {
               </TableHeader>
               <TableBody>
                 {buildings.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground">
-                      {t('noBuildingsFound')}
-                    </TableCell>
-                  </TableRow>
+                  <TableEmptyRow colSpan={5} message={t('noBuildingsFound')} />
                 ) : (
                   buildings.map((building) => (
                     <TableRow key={building.id}>

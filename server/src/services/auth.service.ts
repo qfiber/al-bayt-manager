@@ -185,6 +185,7 @@ export async function getMe(userId: string) {
     phone: profile?.phone,
     preferredLanguage: profile?.preferredLanguage,
     avatarUrl: profile?.avatarUrl,
+    emailNotificationsEnabled: profile?.emailNotificationsEnabled ?? true,
     role,
     totpFactors: factors,
   };
@@ -255,7 +256,7 @@ export async function getFactors(userId: string) {
 /**
  * Self-service: update profile (phone, preferredLanguage, avatarUrl)
  */
-export async function updateProfile(userId: string, data: { phone?: string; preferredLanguage?: string; avatarUrl?: string }) {
+export async function updateProfile(userId: string, data: { phone?: string; preferredLanguage?: string; avatarUrl?: string; emailNotificationsEnabled?: boolean }) {
   const [profile] = await db.select().from(profiles).where(eq(profiles.id, userId)).limit(1);
 
   // If replacing avatar, delete old file
@@ -357,4 +358,5 @@ export async function adminDisable2FA(userId: string) {
  */
 export async function adminDeleteUser(userId: string) {
   await db.delete(users).where(eq(users.id, userId));
+  return { success: true };
 }

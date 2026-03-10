@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -13,6 +12,8 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { Key, Copy, Trash2, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { formatDateTime } from "@/lib/utils";
+import { useRequireAuth } from '@/hooks/use-require-auth';
+import { TableEmptyRow } from '@/components/TableEmptyRow';
 
 interface ApiKey {
   id: string;
@@ -23,8 +24,8 @@ interface ApiKey {
 }
 
 export default function ApiKeys() {
-  const { user, isAdmin, loading } = useAuth();
-  const navigate = useNavigate();
+  const { user, isAdmin } = useAuth();
+  useRequireAuth('admin');
   const { toast } = useToast();
   const { language, t } = useLanguage();
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
@@ -33,14 +34,6 @@ export default function ApiKeys() {
   const [newKeyName, setNewKeyName] = useState("");
   const [generatedKey, setGeneratedKey] = useState<string | null>(null);
   const [showKeyDialog, setShowKeyDialog] = useState(false);
-
-  useEffect(() => {
-    if (!loading && !user) {
-      navigate('/auth');
-    } else if (!loading && !isAdmin) {
-      navigate('/dashboard');
-    }
-  }, [user, isAdmin, loading, navigate]);
 
   useEffect(() => {
     if (user && isAdmin) {
@@ -128,11 +121,9 @@ export default function ApiKeys() {
     }
   };
 
-  if (loading || isLoading) {
+  if (isLoading) {
     return <div className="flex items-center justify-center min-h-screen">{t('loading')}...</div>;
   }
-
-  if (!user || !isAdmin) return null;
 
   const apiBaseUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:3000/api'}/v1`;
 
@@ -266,11 +257,7 @@ export default function ApiKeys() {
             </TableHeader>
             <TableBody>
               {apiKeys.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground">
-                    {language === 'ar' ? 'لا توجد مفاتيح API' : 'No API keys yet'}
-                  </TableCell>
-                </TableRow>
+                <TableEmptyRow colSpan={5} message={language === 'ar' ? 'لا توجد مفاتيح API' : 'No API keys yet'} />
               ) : (
                 apiKeys.map((key) => (
                   <TableRow key={key.id}>

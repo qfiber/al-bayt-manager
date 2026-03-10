@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useRequireAuth } from '@/hooks/use-require-auth';
 import { usePublicSettings } from '@/contexts/PublicSettingsContext';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -21,6 +22,7 @@ interface SettingsData {
   turnstileEnabled: boolean;
   turnstileSiteKey: string | null;
   turnstileSecretKey: string | null;
+  registrationEnabled: boolean;
   smtpEnabled: boolean;
   smtpFromEmail: string | null;
   smtpFromName: string | null;
@@ -55,7 +57,9 @@ function isMaskedValue(val: string): boolean {
 }
 
 const Settings = () => {
-  const { user, isAdmin, loading } = useAuth();
+  useRequireAuth('admin');
+
+  const { user, isAdmin } = useAuth();
   const { t, language, setLanguage } = useLanguage();
   const { refresh } = usePublicSettings();
   const navigate = useNavigate();
@@ -74,6 +78,7 @@ const Settings = () => {
   const [turnstileEnabled, setTurnstileEnabled] = useState(false);
   const [turnstileSiteKey, setTurnstileSiteKey] = useState('');
   const [turnstileSecretKey, setTurnstileSecretKey] = useState('');
+  const [registrationEnabled, setRegistrationEnabled] = useState(true);
   const [smtpEnabled, setSmtpEnabled] = useState(false);
   const [smtpFromEmail, setSmtpFromEmail] = useState('');
   const [smtpFromName, setSmtpFromName] = useState('');
@@ -92,6 +97,7 @@ const Settings = () => {
     setTurnstileEnabled(data.turnstileEnabled);
     setTurnstileSiteKey(data.turnstileSiteKey || '');
     setTurnstileSecretKey(data.turnstileSecretKey || '');
+    setRegistrationEnabled(data.registrationEnabled ?? true);
     setSmtpEnabled(data.smtpEnabled);
     setSmtpFromEmail(data.smtpFromEmail || '');
     setSmtpFromName(data.smtpFromName || '');
@@ -104,14 +110,6 @@ const Settings = () => {
     setCurrencySymbol(symbol);
     setCurrencyPreset(detectCurrencyPreset(code, symbol));
   }, []);
-
-  useEffect(() => {
-    if (!loading && !user) {
-      navigate('/auth');
-    } else if (!loading && !isAdmin) {
-      navigate('/dashboard');
-    }
-  }, [user, isAdmin, loading, navigate]);
 
   useEffect(() => {
     if (user && isAdmin) {
@@ -187,6 +185,7 @@ const Settings = () => {
         turnstileEnabled,
         turnstileSiteKey: turnstileSiteKey || null,
         turnstileSecretKey: turnstileSecretKey || null,
+        registrationEnabled,
         smtpEnabled,
         smtpFromEmail: smtpFromEmail || null,
         smtpFromName: smtpFromName || null,
@@ -219,10 +218,6 @@ const Settings = () => {
       setLogoFile({ file: null, preview: null });
     }
   };
-
-  if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">{t('loading')}</div>;
-  }
 
   if (!user || !isAdmin) return null;
 
@@ -389,6 +384,21 @@ const Settings = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Registration Toggle */}
+              <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/20">
+                <div>
+                  <Label htmlFor="registration-enabled" className="text-base font-semibold">{t('publicRegistration')}</Label>
+                  <p className="text-sm text-muted-foreground">
+                    {t('publicRegistrationDesc')}
+                  </p>
+                </div>
+                <Switch
+                  id="registration-enabled"
+                  checked={registrationEnabled}
+                  onCheckedChange={setRegistrationEnabled}
+                />
+              </div>
+
               <div className="flex items-center justify-between p-4 border rounded-lg">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">

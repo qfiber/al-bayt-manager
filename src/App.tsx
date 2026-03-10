@@ -34,6 +34,10 @@ import Portfolio from "./pages/Portfolio";
 import Meetings from "./pages/Meetings";
 import DebtCollection from "./pages/DebtCollection";
 import NotFound from "./pages/NotFound";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import TermsOfUsage from "./pages/TermsOfUsage";
+import Accessibility from "./pages/Accessibility";
+import { CookieConsentBanner } from "./components/CookieConsentBanner";
 
 const queryClient = new QueryClient();
 
@@ -64,12 +68,16 @@ const App = () => (
           <TooltipProvider>
             <Toaster />
             <Sonner />
+            <CookieConsentBanner />
             <Routes>
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
               {/* Unauthenticated routes — no AppLayout */}
               <Route path="/auth" element={<Auth />} />
               <Route path="/register" element={<Register />} />
               <Route path="/setup-2fa" element={<Setup2FA />} />
+              <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+              <Route path="/terms" element={<TermsOfUsage />} />
+              <Route path="/accessibility" element={<Accessibility />} />
               {/* Authenticated routes — wrapped in AppLayout */}
               <Route path="/dashboard" element={<AppLayout><Dashboard /></AppLayout>} />
               <Route path="/buildings" element={<AppLayout><Buildings /></AppLayout>} />

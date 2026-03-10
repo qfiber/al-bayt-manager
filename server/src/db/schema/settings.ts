@@ -12,6 +12,7 @@ export const settings = pgTable('settings', {
   turnstileEnabled: boolean('turnstile_enabled').default(false).notNull(),
   turnstileSiteKey: varchar('turnstile_site_key', { length: 255 }),
   turnstileSecretKey: varchar('turnstile_secret_key', { length: 255 }),
+  registrationEnabled: boolean('registration_enabled').default(true).notNull(),
   ntfyEnabled: boolean('ntfy_enabled').default(false).notNull(),
   ntfyServerUrl: varchar('ntfy_server_url', { length: 500 }),
   currencyCode: varchar('currency_code', { length: 10 }).default('ILS').notNull(),

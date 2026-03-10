@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useRequireAuth } from '@/hooks/use-require-auth';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -108,9 +108,9 @@ const SAMPLE_VARIABLES: Record<string, string> = {
 // ─── Component ───
 
 const EmailTemplates = () => {
-  const { user, isAdmin, loading } = useAuth();
+  const { user, isAdmin } = useAuth();
   const { t, language } = useLanguage();
-  const navigate = useNavigate();
+  useRequireAuth('admin');
   const { toast } = useToast();
 
   // Email templates state
@@ -147,14 +147,6 @@ const EmailTemplates = () => {
   });
 
   const isRTL = language === 'ar' || language === 'he';
-
-  useEffect(() => {
-    if (!loading && !user) {
-      navigate('/auth');
-    } else if (!loading && !isAdmin) {
-      navigate('/dashboard');
-    }
-  }, [user, isAdmin, loading, navigate]);
 
   useEffect(() => {
     if (user && isAdmin) {
@@ -312,7 +304,7 @@ const EmailTemplates = () => {
     return map[identifier] || identifier;
   };
 
-  if (loading || isLoading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-lg">{t('loading')}</div>

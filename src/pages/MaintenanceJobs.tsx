@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useCurrency } from '@/contexts/PublicSettingsContext';
+import { useRequireAuth } from '@/hooks/use-require-auth';
+import { useBuildings } from '@/hooks/use-buildings';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,13 +15,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { TableEmptyRow } from '@/components/TableEmptyRow';
 import { useToast } from '@/hooks/use-toast';
 import { Wrench, Plus, Pencil, Trash2 } from 'lucide-react';
-
-interface Building {
-  id: string;
-  name: string;
-}
 
 interface JobRow {
   job: {
@@ -39,14 +36,14 @@ interface JobRow {
 }
 
 const MaintenanceJobs = () => {
-  const { user, isAdmin, isModerator, loading } = useAuth();
+  const { user, isAdmin, isModerator } = useAuth();
   const { t } = useLanguage();
   const { currencySymbol, formatCurrency } = useCurrency();
-  const navigate = useNavigate();
+  useRequireAuth('admin-or-moderator');
+  const { buildings } = useBuildings(!!user);
   const { toast } = useToast();
 
   const [jobs, setJobs] = useState<JobRow[]>([]);
-  const [buildings, setBuildings] = useState<Building[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingJob, setEditingJob] = useState<JobRow | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -61,14 +58,8 @@ const MaintenanceJobs = () => {
   const canManage = isAdmin || isModerator;
 
   useEffect(() => {
-    if (!loading && !user) navigate('/auth');
-    if (!loading && user && !canManage) navigate('/dashboard');
-  }, [user, loading, canManage, navigate]);
-
-  useEffect(() => {
     if (user && canManage) {
       fetchJobs();
-      fetchBuildings();
     }
   }, [user, canManage]);
 
@@ -78,15 +69,6 @@ const MaintenanceJobs = () => {
       setJobs(data || []);
     } catch (error: any) {
       toast({ title: t('error'), description: error.message, variant: 'destructive' });
-    }
-  };
-
-  const fetchBuildings = async () => {
-    try {
-      const data = await api.get('/buildings');
-      setBuildings(data || []);
-    } catch {
-      // silently fail
     }
   };
 
@@ -155,7 +137,7 @@ const MaintenanceJobs = () => {
       case 'pending':
         return <Badge variant="secondary">{t('pending')}</Badge>;
       case 'in_progress':
-        return <Badge className="bg-yellow-500 hover:bg-yellow-600">{t('inProgress')}</Badge>;
+        return <Badge className="bg-yellow-500 hover:bg-yellow-600 text-yellow-950">{t('inProgress')}</Badge>;
       case 'completed':
         return <Badge className="bg-green-600 hover:bg-green-700">{t('completed')}</Badge>;
       default:
@@ -167,10 +149,6 @@ const MaintenanceJobs = () => {
     const d = new Date(dateStr);
     return `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`;
   };
-
-  if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">{t('loading')}</div>;
-  }
 
   if (!user || !canManage) return null;
 
@@ -291,11 +269,7 @@ const MaintenanceJobs = () => {
                 </TableHeader>
                 <TableBody>
                   {jobs.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center text-muted-foreground">
-                        {t('noMaintenanceJobs')}
-                      </TableCell>
-                    </TableRow>
+                    <TableEmptyRow colSpan={6} message={t('noMaintenanceJobs')} />
                   ) : (
                     jobs.map((row) => (
                       <TableRow key={row.job.id}>

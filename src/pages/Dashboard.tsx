@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useRequireAuth } from '@/hooks/use-require-auth';
 import { useCurrency } from '@/contexts/PublicSettingsContext';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -122,8 +123,11 @@ function relativeTime(dateStr: string, language: string): string {
 }
 
 const Dashboard = () => {
-  const { user, isAdmin, isModerator, loading } = useAuth();
-  const { t, language } = useLanguage();
+  useRequireAuth();
+
+  const { user, isAdmin, isModerator } = useAuth();
+  const { t, language, dir } = useLanguage();
+  const isRTL = dir === 'rtl';
   const { currencySymbol, formatCurrency } = useCurrency();
   const navigate = useNavigate();
 
@@ -141,12 +145,6 @@ const Dashboard = () => {
   const [dataLoading, setDataLoading] = useState(true);
 
   const canViewFinancials = isAdmin || isModerator;
-
-  useEffect(() => {
-    if (!loading && !user) {
-      navigate('/auth');
-    }
-  }, [user, loading, navigate]);
 
   useEffect(() => {
     if (!user) return;
@@ -249,14 +247,6 @@ const Dashboard = () => {
     setDialogOpen(true);
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-lg">{t('loading')}</div>
-      </div>
-    );
-  }
-
   if (!user) return null;
 
   // User role: simple welcome view
@@ -291,7 +281,7 @@ const Dashboard = () => {
           >
             <CardHeader>
               <CardTitle className="flex items-center gap-3">
-                <div className="p-3 rounded-lg bg-orange-50 text-orange-600">
+                <div className="p-3 rounded-lg bg-orange-50 text-orange-700">
                   <AlertTriangle className="w-6 h-6" />
                 </div>
                 <span className="flex items-center gap-2">
@@ -465,17 +455,18 @@ const Dashboard = () => {
               </div>
             ) : (
               <ResponsiveContainer width="100%" height={280}>
-                <ComposedChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                <ComposedChart data={chartData} margin={{ top: 5, right: isRTL ? 0 : 10, left: isRTL ? 10 : 0, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis
                     dataKey="month"
+                    reversed={isRTL}
                     tick={{ fontSize: 11 }}
                     tickFormatter={(v) => {
                       const [y, m] = v.split('-');
                       return `${m}/${y.slice(2)}`;
                     }}
                   />
-                  <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `${currencySymbol}${v}`} />
+                  <YAxis tick={{ fontSize: 11 }} orientation={isRTL ? 'right' : 'left'} tickFormatter={(v) => `${currencySymbol}${v}`} />
                   <Tooltip
                     formatter={(value: number, name: string) => [
                       formatCurrency(value),
@@ -564,7 +555,7 @@ const Dashboard = () => {
         >
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-lg bg-orange-50 text-orange-600 shrink-0">
+              <div className="p-2.5 rounded-lg bg-orange-50 text-orange-700 shrink-0">
                 <AlertTriangle className="h-5 w-5" />
               </div>
               <div className="min-w-0 flex-1">

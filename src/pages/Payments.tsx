@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useCurrency } from '@/contexts/PublicSettingsContext';
+import { useRequireAuth } from '@/hooks/use-require-auth';
+import { useBuildings } from '@/hooks/use-buildings';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,6 +14,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
+import { BuildingFilter } from '@/components/BuildingFilter';
+import { TableEmptyRow } from '@/components/TableEmptyRow';
 import { useToast } from '@/hooks/use-toast';
 import { CreditCard, Plus, Pencil, Trash2 } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
@@ -49,11 +52,6 @@ interface ApartmentRow {
   beneficiaryName: string;
 }
 
-interface Building {
-  id: string;
-  name: string;
-}
-
 interface UnpaidExpense {
   id: string;
   expenseId: string | null;
@@ -73,14 +71,14 @@ interface ExpenseAllocation {
 }
 
 const Payments = () => {
-  const { user, isAdmin, isModerator, loading } = useAuth();
+  const { user, isAdmin, isModerator } = useAuth();
   const { t } = useLanguage();
   const { currencySymbol, formatCurrency } = useCurrency();
-  const navigate = useNavigate();
   const { toast } = useToast();
+  useRequireAuth('admin-or-moderator');
+  const { buildings } = useBuildings(!!user);
   const [paymentRows, setPaymentRows] = useState<PaymentRow[]>([]);
   const [apartmentRows, setApartmentRows] = useState<ApartmentRow[]>([]);
-  const [buildings, setBuildings] = useState<Building[]>([]);
   const [selectedBuildingFilter, setSelectedBuildingFilter] = useState<string>('all');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
@@ -96,16 +94,7 @@ const Payments = () => {
   const [loadingExpenses, setLoadingExpenses] = useState(false);
 
   useEffect(() => {
-    if (!loading && !user) {
-      navigate('/auth');
-    } else if (!loading && !isAdmin && !isModerator) {
-      navigate('/dashboard');
-    }
-  }, [user, isAdmin, isModerator, loading, navigate]);
-
-  useEffect(() => {
     if (user && (isAdmin || isModerator)) {
-      fetchBuildings();
       fetchApartments();
       fetchPayments();
     }
@@ -132,15 +121,6 @@ const Payments = () => {
     }
     setAllocations({});
     setLoadingExpenses(false);
-  };
-
-  const fetchBuildings = async () => {
-    try {
-      const data = await api.get<Building[]>('/buildings');
-      setBuildings(data || []);
-    } catch (err: any) {
-      toast({ title: t('error'), description: err.message, variant: 'destructive' });
-    }
   };
 
   const fetchApartments = async () => {
@@ -306,10 +286,6 @@ const Payments = () => {
     return 'partial';
   };
 
-  if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">{t('loading')}</div>;
-  }
-
   if (!user || (!isAdmin && !isModerator)) return null;
 
   return (
@@ -321,19 +297,7 @@ const Payments = () => {
             <h1 className="text-3xl font-bold">{t('payments')}</h1>
           </div>
           <div className="flex gap-2 flex-wrap items-center">
-            <Select value={selectedBuildingFilter} onValueChange={setSelectedBuildingFilter}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder={t('filterByBuilding')} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t('allBuildings')}</SelectItem>
-                {buildings.map((building) => (
-                  <SelectItem key={building.id} value={building.id}>
-                    {building.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <BuildingFilter buildings={buildings} value={selectedBuildingFilter} onChange={setSelectedBuildingFilter} />
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
                 <Button onClick={() => resetForm()} className="w-full sm:w-auto">
@@ -498,11 +462,7 @@ const Payments = () => {
                     ? paymentRows
                     : paymentRows.filter(r => r.buildingId === selectedBuildingFilter);
                   return filtered.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={4} className="text-center text-muted-foreground">
-                      {t('noPaymentsFound')}
-                    </TableCell>
-                  </TableRow>
+                  <TableEmptyRow colSpan={4} message={t('noPaymentsFound')} />
                 ) : (
                   filtered.map((row) => (
                     <TableRow key={row.payment.id} className={row.payment.isCanceled ? 'opacity-50' : ''}>

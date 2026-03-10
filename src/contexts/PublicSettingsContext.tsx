@@ -9,6 +9,7 @@ interface PublicSettingsContextType {
   companyName: string | null;
   turnstileEnabled: boolean;
   turnstileSiteKey: string | null;
+  registrationEnabled: boolean;
   refresh: () => Promise<void>;
   /** @deprecated Use refresh() instead */
   refreshCurrency: () => Promise<void>;
@@ -22,6 +23,7 @@ const PublicSettingsContext = createContext<PublicSettingsContextType>({
   companyName: null,
   turnstileEnabled: false,
   turnstileSiteKey: null,
+  registrationEnabled: true,
   refresh: async () => {},
   refreshCurrency: async () => {},
 });
@@ -38,6 +40,7 @@ export const PublicSettingsProvider = ({ children }: { children: ReactNode }) =>
   const [companyName, setCompanyName] = useState<string | null>(null);
   const [turnstileEnabled, setTurnstileEnabled] = useState(false);
   const [turnstileSiteKey, setTurnstileSiteKey] = useState<string | null>(null);
+  const [registrationEnabled, setRegistrationEnabled] = useState(true);
 
   const fetchPublicSettings = useCallback(async () => {
     try {
@@ -49,6 +52,7 @@ export const PublicSettingsProvider = ({ children }: { children: ReactNode }) =>
         companyName: string | null;
         turnstileEnabled: boolean;
         turnstileSiteKey: string | null;
+        registrationEnabled: boolean;
       }>('/settings/public');
       if (data) {
         setCurrencyCode(data.currencyCode || 'ILS');
@@ -57,6 +61,7 @@ export const PublicSettingsProvider = ({ children }: { children: ReactNode }) =>
         setCompanyName(data.companyName || null);
         setTurnstileEnabled(data.turnstileEnabled ?? false);
         setTurnstileSiteKey(data.turnstileSiteKey || null);
+        setRegistrationEnabled(data.registrationEnabled ?? true);
       }
     } catch {
       // Use defaults on error
@@ -81,6 +86,7 @@ export const PublicSettingsProvider = ({ children }: { children: ReactNode }) =>
       companyName,
       turnstileEnabled,
       turnstileSiteKey,
+      registrationEnabled,
       refresh: fetchPublicSettings,
       refreshCurrency: fetchPublicSettings,
     }}>

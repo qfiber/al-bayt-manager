@@ -54,6 +54,7 @@ export async function getPublicSettings() {
     logoUrl: settings.logoUrl,
     turnstileEnabled: settings.turnstileEnabled,
     turnstileSiteKey: settings.turnstileSiteKey,
+    registrationEnabled: settings.registrationEnabled,
     currencyCode: settings.currencyCode,
     currencySymbol: settings.currencySymbol,
   }).from(settings).limit(1);
@@ -64,6 +65,7 @@ export async function getPublicSettings() {
       logoUrl: null,
       turnstileEnabled: false,
       turnstileSiteKey: null,
+      registrationEnabled: true,
       currencyCode: 'ILS',
       currencySymbol: '₪',
     };
@@ -82,6 +84,7 @@ export async function updateSettings(data: Partial<{
   turnstileEnabled: boolean;
   turnstileSiteKey: string | null;
   turnstileSecretKey: string | null;
+  registrationEnabled: boolean;
   ntfyEnabled: boolean;
   ntfyServerUrl: string | null;
   currencyCode: string;

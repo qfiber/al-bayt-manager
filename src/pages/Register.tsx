@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { usePublicSettings } from '@/contexts/PublicSettingsContext';
@@ -9,9 +9,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Link } from 'react-router-dom';
-import { Building } from 'lucide-react';
-import { Turnstile } from '@marsidev/react-turnstile';
+import { Building, ShieldX } from 'lucide-react';
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
+import { LegalFooter } from '@/components/LegalFooter';
+import { CaptchaField } from '@/components/CaptchaField';
 
 
 const Register = () => {
@@ -22,8 +23,8 @@ const Register = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const { signUp, user, loading } = useAuth();
-  const { t, language } = useLanguage();
-  const { logoUrl, companyName, turnstileEnabled, turnstileSiteKey } = usePublicSettings();
+  const { t } = useLanguage();
+  const { logoUrl, companyName, turnstileEnabled, registrationEnabled } = usePublicSettings();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -118,7 +119,12 @@ const Register = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-secondary/10 p-4">
-      <Card className="w-full max-w-md">
+      <div className="w-full max-w-md">
+        <div className="flex justify-end mb-2">
+          <LanguageSwitcher />
+        </div>
+
+      <Card className="w-full">
         <CardHeader className="space-y-1 text-center">
           <div className="flex justify-center mb-4">
             {logoUrl ? (
@@ -133,121 +139,107 @@ const Register = () => {
           </div>
           <CardTitle className="text-2xl font-bold">{companyName || t('buildingManagementSystem')}</CardTitle>
           <CardDescription>
-            {t('createNewAccount')}
+            {registrationEnabled ? t('createNewAccount') : t('registrationClosed')}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSignUp} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">{t('name')}</Label>
-              <Input
-                id="name"
-                type="text"
-                placeholder={t('fullName')}
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-                disabled={isLoading}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="email">{t('email')}</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="email@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                disabled={isLoading}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="phone">{t('phone')}</Label>
-              <Input
-                id="phone"
-                type="tel"
-                placeholder={t('phone')}
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                required
-                disabled={isLoading}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="password">{t('password')}</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                disabled={isLoading}
-                minLength={16}
-              />
-              <p className="text-xs text-muted-foreground">
-                {t('passwordMinLength')}
-              </p>
-            </div>
-
-            {turnstileEnabled && turnstileSiteKey && (
-              <div className="space-y-2">
-                <Label>{t('captchaVerification')}</Label>
-                <div
-                  className="flex justify-center items-center p-4 border rounded-lg bg-muted/20"
-                  dir="ltr"
-                >
-                  <Turnstile
-                    siteKey={turnstileSiteKey}
-                    onSuccess={(token) => setTurnstileToken(token)}
-                    onError={() => setTurnstileToken(null)}
-                    onExpire={() => setTurnstileToken(null)}
-                    options={{
-                      theme: 'light',
-                      size: 'normal',
-                    }}
+          {registrationEnabled ? (
+            <>
+              <form onSubmit={handleSignUp} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name">{t('name')}</Label>
+                  <Input
+                    id="name"
+                    type="text"
+                    placeholder={t('fullName')}
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    required
+                    disabled={isLoading}
                   />
                 </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="email">{t('email')}</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="email@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    disabled={isLoading}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="phone">{t('phone')}</Label>
+                  <Input
+                    id="phone"
+                    type="tel"
+                    placeholder={t('phone')}
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    required
+                    disabled={isLoading}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="password">{t('password')}</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    disabled={isLoading}
+                    minLength={16}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {t('passwordMinLength')}
+                  </p>
+                </div>
+
+                <CaptchaField onToken={setTurnstileToken} />
+
+                <Button
+                  type="submit"
+                  className="w-full"
+                  disabled={isLoading}
+                >
+                  {isLoading ? t('creatingAccount') : t('createAccount')}
+                </Button>
+              </form>
+
+              <div className="mt-6 text-center text-sm">
+                <p className="text-muted-foreground">
+                  {t('alreadyHaveAccount')}{' '}
+                  <Link to="/auth" className="text-primary hover:underline">
+                    {t('signIn')}
+                  </Link>
+                </p>
               </div>
-            )}
-
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={isLoading}
-            >
-              {isLoading ? t('creatingAccount') : t('createAccount')}
-            </Button>
-          </form>
-
-          <div className="mt-6 text-center text-sm">
-            <p className="text-muted-foreground">
-              {t('alreadyHaveAccount')}{' '}
-              <Link to="/auth" className="text-primary hover:underline">
-                {t('signIn')}
+            </>
+          ) : (
+            <div className="text-center py-6 space-y-4">
+              <ShieldX className="w-12 h-12 text-muted-foreground mx-auto" />
+              <p className="text-sm text-muted-foreground">
+                {t('registrationClosedDesc')}
+              </p>
+              <Link to="/auth">
+                <Button variant="outline" className="mt-2">
+                  {t('signIn')}
+                </Button>
               </Link>
-            </p>
-          </div>
+            </div>
+          )}
 
-          <div className="mt-4 pt-4 border-t text-center text-xs text-muted-foreground">
-            <p>
-              {language === 'ar' ? 'تصميم شركة ' : language === 'he' ? 'מופעל על ידי ' : 'Powered by '}
-              <a
-                href="https://qfiber.co.il"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary hover:underline"
-              >
-                {language === 'ar' ? 'كيوفايبر' : language === 'he' ? 'qFiber בע״מ' : 'qFiber LTD'}
-              </a>
-            </p>
-          </div>
+          <LegalFooter variant="centered" />
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 };
