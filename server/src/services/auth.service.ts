@@ -257,7 +257,7 @@ export async function getFactors(userId: string) {
 /**
  * Self-service: update profile (phone, preferredLanguage, avatarUrl)
  */
-export async function updateProfile(userId: string, data: { phone?: string; preferredLanguage?: string; avatarUrl?: string; emailNotificationsEnabled?: boolean; smsNotificationsEnabled?: boolean }) {
+export async function updateProfile(userId: string, data: { name?: string; phone?: string; preferredLanguage?: string; avatarUrl?: string; emailNotificationsEnabled?: boolean; smsNotificationsEnabled?: boolean }) {
   const [profile] = await db.select().from(profiles).where(eq(profiles.id, userId)).limit(1);
 
   // If replacing avatar, delete old file

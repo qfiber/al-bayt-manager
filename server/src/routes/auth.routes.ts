@@ -55,6 +55,7 @@ const unenroll2FASchema = z.object({
 });
 
 const updateProfileSchema = z.object({
+  name: z.string().min(1).max(255).optional(),
   phone: z.string().max(50).optional(),
   preferredLanguage: z.enum(['ar', 'he', 'en']).optional(),
   avatarUrl: z.string().max(500).optional(),

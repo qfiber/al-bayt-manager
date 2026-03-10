@@ -26,6 +26,8 @@ import {
   Bell,
   Check,
   X,
+  Package,
+  Car,
 } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
 
@@ -35,6 +37,11 @@ const Profile = () => {
   const { t } = useLanguage();
   const { currencySymbol, formatCurrency } = useCurrency();
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Name edit state
+  const [editingName, setEditingName] = useState(false);
+  const [nameValue, setNameValue] = useState('');
+  const [savingName, setSavingName] = useState(false);
 
   // Phone edit state
   const [editingPhone, setEditingPhone] = useState(false);
@@ -71,6 +78,7 @@ const Profile = () => {
 
   useEffect(() => {
     if (user) {
+      setNameValue(user.name || '');
       setPhoneValue(user.phone || '');
       setEmailNotificationsEnabled(user.emailNotificationsEnabled ?? true);
       setSmsNotificationsEnabled(user.smsNotificationsEnabled ?? true);
@@ -176,6 +184,21 @@ const Profile = () => {
       toast.error(t('error'));
     } finally {
       setSavingNotif(false);
+    }
+  };
+
+  const handleSaveName = async () => {
+    if (!nameValue.trim()) return;
+    setSavingName(true);
+    try {
+      await api.put('/auth/profile', { name: nameValue.trim() });
+      await refreshUser();
+      setEditingName(false);
+      toast.success(t('profileUpdated'));
+    } catch {
+      toast.error(t('error'));
+    } finally {
+      setSavingName(false);
     }
   };
 
@@ -349,15 +372,42 @@ const Profile = () => {
             />
           </div>
 
-          {/* Read-only fields */}
+          {/* Profile fields */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1">
               <Label className="text-muted-foreground flex items-center gap-1.5">
-                <Lock className="h-3.5 w-3.5" />
+                <User className="h-3.5 w-3.5" />
                 {t('name')}
-                <span className="text-xs text-muted-foreground">({t('readOnly')})</span>
               </Label>
-              <p className="font-medium">{user.name || '—'}</p>
+              {editingName ? (
+                <div className="flex items-center gap-2">
+                  <Input
+                    value={nameValue}
+                    onChange={(e) => setNameValue(e.target.value)}
+                    className="max-w-xs"
+                  />
+                  <Button size="icon" variant="ghost" onClick={handleSaveName} disabled={savingName || !nameValue.trim()}>
+                    <Check className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => {
+                      setEditingName(false);
+                      setNameValue(user.name || '');
+                    }}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <p className="font-medium">{user.name || '—'}</p>
+                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEditingName(true)}>
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              )}
             </div>
 
             <div className="space-y-1">
@@ -369,28 +419,46 @@ const Profile = () => {
             </div>
 
             {apartments.length > 0 && (
-              <>
-                <div className="space-y-1">
-                  <Label className="text-muted-foreground flex items-center gap-1.5">
-                    <Lock className="h-3.5 w-3.5" />
-                    {t('buildings')}
-                    <span className="text-xs text-muted-foreground">({t('readOnly')})</span>
-                  </Label>
-                  <p className="font-medium">
-                    {[...new Set(apartments.map((a) => a.buildingName))].join(', ')}
-                  </p>
+              <div className="space-y-2 sm:col-span-2">
+                <Label className="text-muted-foreground flex items-center gap-1.5">
+                  <Building2 className="h-3.5 w-3.5" />
+                  {t('buildingsAndUnits')}
+                </Label>
+                <div className="space-y-2">
+                  {[...new Map(apartments.map((a) => [a.buildingId, { name: a.buildingName, address: a.buildingAddress }])).entries()].map(([buildingId, building]) => (
+                    <div key={buildingId} className="rounded-lg border p-3 space-y-1.5">
+                      <div className="flex items-center gap-2">
+                        <Building2 className="h-4 w-4 text-primary" />
+                        <span className="font-medium">{building.name}</span>
+                        {building.address && (
+                          <span className="text-xs text-muted-foreground">— {building.address}</span>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap gap-2 ps-6">
+                        {apartments
+                          .filter((a) => a.buildingId === buildingId)
+                          .map((a) => (
+                            <Badge key={a.id} variant="secondary" className="gap-1.5 text-xs">
+                              {a.apartmentType === 'storage' ? (
+                                <Package className="h-3 w-3" />
+                              ) : a.apartmentType === 'parking' ? (
+                                <Car className="h-3 w-3" />
+                              ) : (
+                                <Home className="h-3 w-3" />
+                              )}
+                              {a.apartmentNumber}
+                              {a.apartmentType !== 'regular' && (
+                                <span className="text-muted-foreground">
+                                  ({a.apartmentType === 'storage' ? t('storageRoom') : t('parkingSpot')})
+                                </span>
+                              )}
+                            </Badge>
+                          ))}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-muted-foreground flex items-center gap-1.5">
-                    <Lock className="h-3.5 w-3.5" />
-                    {t('apartments')}
-                    <span className="text-xs text-muted-foreground">({t('readOnly')})</span>
-                  </Label>
-                  <p className="font-medium">
-                    {apartments.map((a) => a.apartmentNumber).join(', ')}
-                  </p>
-                </div>
-              </>
+              </div>
             )}
 
             {/* Editable phone */}

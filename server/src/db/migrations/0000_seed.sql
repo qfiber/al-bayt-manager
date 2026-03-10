@@ -490,6 +490,7 @@ CREATE TABLE "settings" (
 	"ntfy_server_url" varchar(500),
 	"currency_code" varchar(10) NOT NULL DEFAULT 'ILS',
 	"currency_symbol" varchar(10) NOT NULL DEFAULT '₪',
+	"registration_enabled" boolean DEFAULT true NOT NULL,
 	"sms_enabled" boolean DEFAULT false NOT NULL,
 	"sms_provider" varchar(50) DEFAULT '019',
 	"sms_api_token" varchar(500),

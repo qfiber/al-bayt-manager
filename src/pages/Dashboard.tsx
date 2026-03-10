@@ -596,17 +596,17 @@ const Dashboard = () => {
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           {/* Total Buildings */}
           <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-lg bg-blue-50 text-blue-600 shrink-0">
-                  <Building2 className="h-5 w-5" />
+            <CardContent className="p-4 sm:pt-6">
+              <div className="flex items-start gap-2.5 sm:gap-3">
+                <div className="p-2 sm:p-2.5 rounded-lg bg-blue-50 text-blue-600 shrink-0">
+                  <Building2 className="h-4 w-4 sm:h-5 sm:w-5" />
                 </div>
-                <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground truncate">{t('totalBuildings')}</p>
-                  <p className="text-lg sm:text-2xl font-bold tabular-nums">{summary?.buildings ?? 0}</p>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11px] sm:text-xs text-muted-foreground leading-tight">{t('totalBuildings')}</p>
+                  <p className="text-xl sm:text-2xl font-bold tabular-nums mt-0.5">{summary?.buildings ?? 0}</p>
                 </div>
               </div>
             </CardContent>
@@ -614,15 +614,15 @@ const Dashboard = () => {
 
           {/* Occupied Units */}
           <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-lg bg-emerald-50 text-emerald-600 shrink-0">
-                  <Home className="h-5 w-5" />
+            <CardContent className="p-4 sm:pt-6">
+              <div className="flex items-start gap-2.5 sm:gap-3">
+                <div className="p-2 sm:p-2.5 rounded-lg bg-emerald-50 text-emerald-600 shrink-0">
+                  <Home className="h-4 w-4 sm:h-5 sm:w-5" />
                 </div>
-                <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground truncate">{t('occupiedUnits')}</p>
-                  <p className="text-lg sm:text-2xl font-bold tabular-nums">{occupancyPct}%</p>
-                  <p className="text-xs text-muted-foreground">
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11px] sm:text-xs text-muted-foreground leading-tight">{t('occupiedUnits')}</p>
+                  <p className="text-xl sm:text-2xl font-bold tabular-nums mt-0.5">{occupancyPct}%</p>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground">
                     {occupiedApartments} / {totalApartments}
                   </p>
                 </div>
@@ -632,14 +632,14 @@ const Dashboard = () => {
 
           {/* Monthly Income */}
           <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-lg bg-violet-50 text-violet-600 shrink-0">
-                  <TrendingUp className="h-5 w-5" />
+            <CardContent className="p-4 sm:pt-6">
+              <div className="flex items-start gap-2.5 sm:gap-3">
+                <div className="p-2 sm:p-2.5 rounded-lg bg-violet-50 text-violet-600 shrink-0">
+                  <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5" />
                 </div>
-                <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground truncate">{t('monthlyIncome')}</p>
-                  <p className="text-lg sm:text-2xl font-bold tabular-nums">{formatCurrency(totalPayments)}</p>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11px] sm:text-xs text-muted-foreground leading-tight">{t('monthlyIncome')}</p>
+                  <p className="text-xl sm:text-2xl font-bold tabular-nums mt-0.5">{formatCurrency(totalPayments)}</p>
                 </div>
               </div>
             </CardContent>
@@ -647,14 +647,14 @@ const Dashboard = () => {
 
           {/* Outstanding Balance */}
           <Card className={totalDebt > 0 ? 'border-red-200 bg-red-50/30' : ''}>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-3">
-                <div className={`p-2.5 rounded-lg shrink-0 ${totalDebt > 0 ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-500'}`}>
-                  <AlertCircle className="h-5 w-5" />
+            <CardContent className="p-4 sm:pt-6">
+              <div className="flex items-start gap-2.5 sm:gap-3">
+                <div className={`p-2 sm:p-2.5 rounded-lg shrink-0 ${totalDebt > 0 ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-500'}`}>
+                  <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5" />
                 </div>
-                <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground truncate">{t('outstandingBalance')}</p>
-                  <p className={`text-lg sm:text-2xl font-bold tabular-nums ${totalDebt > 0 ? 'text-red-600' : ''}`}>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11px] sm:text-xs text-muted-foreground leading-tight">{t('outstandingBalance')}</p>
+                  <p className={`text-xl sm:text-2xl font-bold tabular-nums mt-0.5 ${totalDebt > 0 ? 'text-red-600' : ''}`}>
                     {formatCurrency(totalDebt)}
                   </p>
                 </div>

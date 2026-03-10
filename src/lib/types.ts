@@ -13,6 +13,8 @@ export interface ApartmentData {
     subscriptionStatus: string;
     cachedBalance: string;
     buildingId: string;
+    apartmentType: string;
+    parentApartmentId: string | null;
   };
   buildingName: string;
   buildingAddress: string;
