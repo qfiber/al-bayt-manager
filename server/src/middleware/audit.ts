@@ -10,7 +10,7 @@ const SENSITIVE_FIELDS = [
   'password', 'newPassword', 'adminPassword', 'confirmPassword',
   'resendApiKey', 'turnstileSecretKey',
   'token', 'refreshToken', 'code', 'secret',
-  'keyHash', 'key', 'htmlBody',
+  'keyHash', 'key', 'htmlBody', 'smsApiToken',
 ];
 
 function sanitizeBody(body: any): any {

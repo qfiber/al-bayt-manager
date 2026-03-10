@@ -4,6 +4,100 @@ import { settings, buildings, userRoles, moderatorBuildings, profiles, users, ap
 import { eq, inArray } from 'drizzle-orm';
 import * as emailService from './email.service.js';
 import { resolveNtfyTemplate } from './ntfy-template.service.js';
+import { resolveSmsTemplate } from './sms-template.service.js';
+import { sendSms } from './sms.service.js';
+
+/**
+ * Helper: send SMS to admins + building moderators (fire-and-forget).
+ */
+async function sendSmsToAdminsAndModerators(
+  buildingId: string,
+  templateIdentifier: string,
+  variables: Record<string, string>,
+): Promise<void> {
+  try {
+    const [config] = await db.select().from(settings).limit(1);
+    if (!config?.smsEnabled) return;
+
+    const [building] = await db.select({ name: buildings.name }).from(buildings).where(eq(buildings.id, buildingId)).limit(1);
+
+    const adminRoles = await db
+      .select({ userId: userRoles.userId })
+      .from(userRoles)
+      .where(eq(userRoles.role, 'admin'));
+
+    const modRows = await db
+      .select({ userId: moderatorBuildings.userId })
+      .from(moderatorBuildings)
+      .where(eq(moderatorBuildings.buildingId, buildingId));
+
+    const recipientIds = [...new Set([
+      ...adminRoles.map(r => r.userId),
+      ...modRows.map(r => r.userId),
+    ])];
+
+    if (recipientIds.length === 0) return;
+
+    const recipientProfiles = await db
+      .select({ id: profiles.id, phone: profiles.phone, preferredLanguage: profiles.preferredLanguage, smsNotificationsEnabled: profiles.smsNotificationsEnabled })
+      .from(profiles)
+      .where(inArray(profiles.id, recipientIds));
+
+    const vars = { ...variables, buildingName: building?.name || '' };
+
+    for (const profile of recipientProfiles) {
+      if (!profile.phone || profile.smsNotificationsEnabled === false) continue;
+      const lang = profile.preferredLanguage || 'ar';
+      const message = await resolveSmsTemplate(templateIdentifier, lang, vars);
+      if (message) {
+        sendSms(profile.phone, message, { templateIdentifier, userId: profile.id, languageUsed: lang })
+          .catch(err => logger.error(err, `Failed to send SMS (${templateIdentifier})`));
+      }
+    }
+  } catch (err) {
+    logger.error(err, `Failed to send SMS to admins/moderators (${templateIdentifier})`);
+  }
+}
+
+/**
+ * Helper: send SMS to apartment tenants (fire-and-forget).
+ */
+async function sendSmsToApartmentTenants(
+  apartmentId: string,
+  templateIdentifier: string,
+  variables: Record<string, string>,
+): Promise<void> {
+  try {
+    const [config] = await db.select().from(settings).limit(1);
+    if (!config?.smsEnabled) return;
+
+    const assignments = await db
+      .select({ userId: userApartments.userId })
+      .from(userApartments)
+      .where(eq(userApartments.apartmentId, apartmentId));
+
+    if (assignments.length === 0) return;
+
+    const userIds = assignments.map(a => a.userId);
+    const tenantProfiles = await db
+      .select({ id: profiles.id, phone: profiles.phone, name: profiles.name, preferredLanguage: profiles.preferredLanguage, smsNotificationsEnabled: profiles.smsNotificationsEnabled })
+      .from(profiles)
+      .where(inArray(profiles.id, userIds));
+
+    for (const profile of tenantProfiles) {
+      if (!profile.phone || profile.smsNotificationsEnabled === false) continue;
+      const lang = profile.preferredLanguage || 'ar';
+      const vars = { ...variables, tenantName: profile.name || '' };
+      const message = await resolveSmsTemplate(templateIdentifier, lang, vars);
+      if (message) {
+        sendSms(profile.phone, message, { templateIdentifier, userId: profile.id, languageUsed: lang })
+          .catch(err => logger.error(err, `Failed to send SMS (${templateIdentifier})`));
+      }
+    }
+  } catch (err) {
+    logger.error(err, `Failed to send SMS to tenants (${templateIdentifier})`);
+  }
+}
 
 /**
  * Send a push notification to a building's ntfy topic using a DB template.
@@ -63,6 +157,9 @@ export async function notifyNewIssue(buildingId: string, issueDetails: {
 
   // Send ntfy push
   sendNtfyNotification(buildingId, 'ntfy_new_issue', variables).catch(() => {});
+
+  // Send SMS to admins + moderators
+  sendSmsToAdminsAndModerators(buildingId, 'sms_new_issue_report', variables).catch(() => {});
 
   // Send emails to admins + moderators
   try {
@@ -129,31 +226,56 @@ export async function notifyIssueResolved(reporterId: string, issueDetails: {
 }): Promise<void> {
   try {
     const [profile] = await db
-      .select({ preferredLanguage: profiles.preferredLanguage, emailNotificationsEnabled: profiles.emailNotificationsEnabled })
+      .select({
+        preferredLanguage: profiles.preferredLanguage,
+        emailNotificationsEnabled: profiles.emailNotificationsEnabled,
+        smsNotificationsEnabled: profiles.smsNotificationsEnabled,
+        phone: profiles.phone,
+        name: profiles.name,
+      })
       .from(profiles)
       .where(eq(profiles.id, reporterId))
       .limit(1);
 
-    if (profile?.emailNotificationsEnabled === false) return;
+    const lang = profile?.preferredLanguage || 'ar';
 
-    const [user] = await db
-      .select({ email: users.email })
-      .from(users)
-      .where(eq(users.id, reporterId))
-      .limit(1);
+    // Send email
+    if (profile?.emailNotificationsEnabled !== false) {
+      const [user] = await db
+        .select({ email: users.email })
+        .from(users)
+        .where(eq(users.id, reporterId))
+        .limit(1);
 
-    if (!user?.email) return;
+      if (user?.email) {
+        emailService.sendEmail({
+          templateIdentifier: 'issue_resolved',
+          recipientEmail: user.email,
+          userId: reporterId,
+          preferredLanguage: lang,
+          variables: {
+            category: issueDetails.category,
+            description: issueDetails.description.slice(0, 500),
+          },
+        }).catch(err => logger.error(err, 'Failed to send issue resolved email'));
+      }
+    }
 
-    await emailService.sendEmail({
-      templateIdentifier: 'issue_resolved',
-      recipientEmail: user.email,
-      userId: reporterId,
-      preferredLanguage: profile?.preferredLanguage || 'ar',
-      variables: {
-        category: issueDetails.category,
-        description: issueDetails.description.slice(0, 500),
-      },
-    });
+    // Send SMS
+    if (profile?.smsNotificationsEnabled !== false && profile?.phone) {
+      const [config] = await db.select().from(settings).limit(1);
+      if (config?.smsEnabled) {
+        const message = await resolveSmsTemplate('sms_issue_resolved', lang, {
+          tenantName: profile.name || '',
+          category: issueDetails.category,
+          description: issueDetails.description.slice(0, 200),
+        });
+        if (message) {
+          sendSms(profile.phone, message, { templateIdentifier: 'sms_issue_resolved', userId: reporterId, languageUsed: lang })
+            .catch(err => logger.error(err, 'Failed to send issue resolved SMS'));
+        }
+      }
+    }
   } catch (err) {
     logger.error(err, 'Failed to notify issue resolved');
   }
@@ -210,6 +332,14 @@ export async function sendPaymentReminder(apartmentId: string): Promise<void> {
     sendNtfyNotification(apt.buildingId, 'ntfy_payment_reminder', {
       apartmentNumber: apt.apartmentNumber,
       balance: apt.cachedBalance,
+    }).catch(() => {});
+
+    // Also send SMS to tenants
+    sendSmsToApartmentTenants(apartmentId, 'sms_monthly_reminder', {
+      apartmentNumber: apt.apartmentNumber,
+      buildingName: building?.name || '',
+      subscriptionAmount: apt.subscriptionAmount || '0',
+      currencySymbol: (await db.select({ currencySymbol: settings.currencySymbol }).from(settings).limit(1))[0]?.currencySymbol || '₪',
     }).catch(() => {});
   } catch (err) {
     logger.error(err, 'Failed to send payment reminder');
@@ -268,6 +398,15 @@ export async function notifyPaymentCreated(apartmentId: string, amount: number, 
         },
       }).catch(err => logger.error(err, 'Failed to send payment confirmation email'));
     }
+
+    // Also send SMS
+    sendSmsToApartmentTenants(apartmentId, 'sms_payment_confirmation', {
+      amount: amount.toFixed(2),
+      month,
+      apartmentNumber: apt.apartmentNumber,
+      buildingName: building?.name || '',
+      currencySymbol,
+    }).catch(() => {});
   } catch (err) {
     logger.error(err, 'Failed to notify payment created');
   }

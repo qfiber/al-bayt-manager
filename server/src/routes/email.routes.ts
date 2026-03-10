@@ -6,6 +6,10 @@ import { requireRole } from '../middleware/roles.js';
 import { auditLog } from '../middleware/audit.js';
 import * as emailService from '../services/email.service.js';
 import * as ntfyTemplateService from '../services/ntfy-template.service.js';
+import * as smsTemplateService from '../services/sms-template.service.js';
+import { listSmsLogs } from '../services/sms.service.js';
+import { sendMonthlyReminders, sendOverdueReminders } from '../services/sms-cron.service.js';
+import { dbRateLimit } from '../middleware/db-rate-limit.js';
 
 export const emailRoutes = Router();
 
@@ -29,6 +33,13 @@ const ntfyTranslationsSchema = z.object({
     language: z.enum(['ar', 'en', 'he']),
     title: z.string().min(1).max(500),
     message: z.string().min(1).max(5000),
+  })).max(3),
+});
+
+const smsTranslationsSchema = z.object({
+  translations: z.array(z.object({
+    language: z.enum(['ar', 'en', 'he']),
+    message: z.string().min(1).max(1005),
   })).max(3),
 });
 
@@ -121,5 +132,76 @@ emailRoutes.put('/ntfy-templates/:id/translations', requireAuth, requireRole('ad
   try {
     const result = await ntfyTemplateService.updateNtfyTranslations(req.params.id as string, req.body.translations);
     res.json(result);
+  } catch (err) { next(err); }
+});
+
+// ─── SMS Template Routes ───
+
+emailRoutes.get('/sms-templates', requireAuth, requireRole('admin'), async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const result = await smsTemplateService.listSmsTemplates();
+    res.json(result);
+  } catch (err) { next(err); }
+});
+
+emailRoutes.get('/sms-templates/variables', requireAuth, requireRole('admin'), (_req: Request, res: Response) => {
+  res.json(smsTemplateService.SMS_TEMPLATE_VARIABLES);
+});
+
+emailRoutes.get('/sms-templates/:id', requireAuth, requireRole('admin'), validate({ params: idParams }), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const result = await smsTemplateService.getSmsTemplate(req.params.id as string);
+    res.json(result);
+  } catch (err) { next(err); }
+});
+
+emailRoutes.put('/sms-templates/:id', requireAuth, requireRole('admin'), validate({ params: idParams, body: updateTemplateSchema }), auditLog('update', 'sms_templates'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const result = await smsTemplateService.updateSmsTemplate(req.params.id as string, req.body);
+    res.json(result);
+  } catch (err) { next(err); }
+});
+
+emailRoutes.put('/sms-templates/:id/translations', requireAuth, requireRole('admin'), validate({ params: idParams, body: smsTranslationsSchema }), auditLog('update', 'sms_template_translations'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const result = await smsTemplateService.updateSmsTranslations(req.params.id as string, req.body.translations);
+    res.json(result);
+  } catch (err) { next(err); }
+});
+
+// ─── SMS Logs ───
+
+const smsLogQuerySchema = z.object({
+  status: z.enum(['sent', 'failed']).optional(),
+  templateIdentifier: z.string().max(100).optional(),
+  startDate: z.string().regex(dateRegex).optional(),
+  endDate: z.string().regex(dateRegex).optional(),
+  limit: z.coerce.number().int().min(1).max(500).default(100),
+  offset: z.coerce.number().int().min(0).default(0),
+});
+
+emailRoutes.get('/sms-logs', requireAuth, requireRole('admin'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const query = smsLogQuerySchema.parse(req.query);
+    const result = await listSmsLogs(query);
+    res.json(result);
+  } catch (err) { next(err); }
+});
+
+// ─── Manual SMS Trigger ───
+
+const triggerSchema = z.object({
+  type: z.enum(['monthly', 'overdue']),
+});
+
+emailRoutes.post('/sms-trigger', requireAuth, requireRole('admin'), dbRateLimit({ prefix: 'sms_trigger', windowMs: 10 * 60 * 1000, max: 3 }), validate(triggerSchema), auditLog('create', 'sms_trigger'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { type } = req.body;
+    if (type === 'monthly') {
+      sendMonthlyReminders().catch(() => {});
+    } else {
+      sendOverdueReminders().catch(() => {});
+    }
+    res.json({ success: true, message: `${type} SMS reminders triggered` });
   } catch (err) { next(err); }
 });

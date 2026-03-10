@@ -61,6 +61,7 @@ const Profile = () => {
 
   // Notification preference
   const [emailNotificationsEnabled, setEmailNotificationsEnabled] = useState(true);
+  const [smsNotificationsEnabled, setSmsNotificationsEnabled] = useState(true);
   const [savingNotif, setSavingNotif] = useState(false);
 
   // Apartments & issues
@@ -72,6 +73,7 @@ const Profile = () => {
     if (user) {
       setPhoneValue(user.phone || '');
       setEmailNotificationsEnabled(user.emailNotificationsEnabled ?? true);
+      setSmsNotificationsEnabled(user.smsNotificationsEnabled ?? true);
       fetchData();
     }
   }, [user]);
@@ -147,7 +149,7 @@ const Profile = () => {
     }
   };
 
-  const handleToggleNotifications = async (value: boolean) => {
+  const handleToggleEmailNotifications = async (value: boolean) => {
     setEmailNotificationsEnabled(value);
     setSavingNotif(true);
     try {
@@ -156,6 +158,21 @@ const Profile = () => {
       toast.success(t('profileUpdated'));
     } catch {
       setEmailNotificationsEnabled(!value);
+      toast.error(t('error'));
+    } finally {
+      setSavingNotif(false);
+    }
+  };
+
+  const handleToggleSmsNotifications = async (value: boolean) => {
+    setSmsNotificationsEnabled(value);
+    setSavingNotif(true);
+    try {
+      await api.put('/auth/profile', { smsNotificationsEnabled: value });
+      await refreshUser();
+      toast.success(t('profileUpdated'));
+    } catch {
+      setSmsNotificationsEnabled(!value);
       toast.error(t('error'));
     } finally {
       setSavingNotif(false);
@@ -417,22 +434,31 @@ const Profile = () => {
         </CardContent>
       </Card>
 
-      {/* Email Notifications */}
+      {/* Notification Preferences */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Bell className="h-5 w-5" />
-            {t('emailNotifications')}
+            {t('notificationPreferences')}
           </CardTitle>
-          <CardDescription>{t('emailNotificationsDesc')}</CardDescription>
+          <CardDescription>{t('notificationPreferencesDesc')}</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           <div className="flex items-center justify-between max-w-md">
             <Label htmlFor="email-notif-toggle">{t('emailNotifications')}</Label>
             <Switch
               id="email-notif-toggle"
               checked={emailNotificationsEnabled}
-              onCheckedChange={handleToggleNotifications}
+              onCheckedChange={handleToggleEmailNotifications}
+              disabled={savingNotif}
+            />
+          </div>
+          <div className="flex items-center justify-between max-w-md">
+            <Label htmlFor="sms-notif-toggle">{t('smsNotifications')}</Label>
+            <Switch
+              id="sms-notif-toggle"
+              checked={smsNotificationsEnabled}
+              onCheckedChange={handleToggleSmsNotifications}
               disabled={savingNotif}
             />
           </div>

@@ -13,6 +13,7 @@ import {
   Users,
   Key,
   Shield,
+  Bell,
   Mail,
   MailOpen,
   Receipt,
@@ -55,7 +56,7 @@ export const MobileBottomNav = () => {
     { label: t('settings'), icon: Settings, path: '/settings' },
     { label: t('apiKeys'), icon: Key, path: '/api-keys' },
     { label: t('auditLogs'), icon: Shield, path: '/audit-logs' },
-    { label: t('notificationTemplates'), icon: Mail, path: '/email-templates' },
+    { label: t('notificationTemplates'), icon: Bell, path: '/email-templates' },
     { label: t('emailLogs'), icon: MailOpen, path: '/email-logs' },
   ];
 

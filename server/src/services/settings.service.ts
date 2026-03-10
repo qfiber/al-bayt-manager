@@ -31,7 +31,7 @@ async function getOrCreateSettings(): Promise<SettingsRow> {
 function maskSensitiveFields(row: SettingsRow): Record<string, unknown> {
   const masked: Record<string, unknown> = { ...row };
   masked.logoUrl = normalizeLogoUrl(row.logoUrl);
-  for (const field of ['resendApiKey', 'turnstileSecretKey'] as const) {
+  for (const field of ['resendApiKey', 'turnstileSecretKey', 'smsApiToken'] as const) {
     const val = row[field];
     if (val) {
       masked[field] = val.length > 8
@@ -87,6 +87,11 @@ export async function updateSettings(data: Partial<{
   registrationEnabled: boolean;
   ntfyEnabled: boolean;
   ntfyServerUrl: string | null;
+  smsEnabled: boolean;
+  smsProvider: string | null;
+  smsApiToken: string | null;
+  smsUsername: string | null;
+  smsSenderName: string | null;
   currencyCode: string;
   currencySymbol: string;
 }>) {
@@ -100,6 +105,9 @@ export async function updateSettings(data: Partial<{
   }
   if (updateData.turnstileSecretKey && /^\*+$/.test(updateData.turnstileSecretKey)) {
     delete updateData.turnstileSecretKey;
+  }
+  if ((updateData as any).smsApiToken && /^\*+$/.test((updateData as any).smsApiToken)) {
+    delete (updateData as any).smsApiToken;
   }
 
   const [result] = await db

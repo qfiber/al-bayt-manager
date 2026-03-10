@@ -27,6 +27,15 @@ import {
   FolderOpen,
   BarChart3,
   CalendarDays,
+  Wallet,
+  ArrowUpRight,
+  ArrowDownRight,
+  Download,
+  ChevronRight,
+  Receipt,
+  CircleCheck,
+  CircleAlert,
+  Megaphone,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -39,6 +48,7 @@ import {
   Tooltip,
   Legend,
 } from 'recharts';
+import { formatDate } from '@/lib/utils';
 import { GeneralInformationCard } from '@/components/GeneralInformationCard';
 import { GeneralInformationDialog } from '@/components/GeneralInformationDialog';
 import { toast } from 'sonner';
@@ -144,6 +154,9 @@ const Dashboard = () => {
   const [selectedInfoId, setSelectedInfoId] = useState<string | undefined>();
   const [dataLoading, setDataLoading] = useState(true);
 
+  // Tenant dashboard state
+  const [tenantApartments, setTenantApartments] = useState<any[]>([]);
+
   const canViewFinancials = isAdmin || isModerator;
 
   useEffect(() => {
@@ -179,6 +192,40 @@ const Dashboard = () => {
           setTrends(getValue(results[3]));
           setBuildingsReport(getValue(results[4]) || []);
           setAuditLogs(getValue(results[5]) || []);
+        }
+
+        // Tenant: fetch apartment details inline
+        if (!canViewFinancials) {
+          try {
+            const apts: any[] = await api.get('/my-apartments');
+            if (apts && apts.length > 0) {
+              const withDetails = await Promise.all(
+                apts.map(async (item: any) => {
+                  try {
+                    const details = await api.get(`/apartments/${item.apartment.id}/debt-details`);
+                    return {
+                      ...item.apartment,
+                      buildingName: item.buildingName,
+                      buildingAddress: item.buildingAddress,
+                      payments: details.payments || [],
+                      expenses: details.expenses || [],
+                      balance: details.balance,
+                    };
+                  } catch {
+                    return {
+                      ...item.apartment,
+                      buildingName: item.buildingName,
+                      buildingAddress: item.buildingAddress,
+                      payments: [],
+                      expenses: [],
+                      balance: parseFloat(item.apartment.cachedBalance),
+                    };
+                  }
+                }),
+              );
+              setTenantApartments(withDetails);
+            }
+          } catch { /* silent */ }
         }
       } finally {
         setDataLoading(false);
@@ -249,98 +296,274 @@ const Dashboard = () => {
 
   if (!user) return null;
 
-  // User role: simple welcome view
+  // User role: rich tenant dashboard
   if (!canViewFinancials) {
-    return (
-      <div className="container mx-auto px-3 py-4 sm:p-6 space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold">{t('welcomeBack')}, {user.name || user.email}</h1>
-        </div>
+    // Compute aggregate tenant stats
+    const totalBalance = tenantApartments.reduce((sum, a) => sum + (typeof a.balance === 'number' ? a.balance : parseFloat(a.cachedBalance || '0')), 0);
+    const totalPaid = tenantApartments.reduce((sum, a) => sum + (a.payments || []).filter((p: any) => !p.isCanceled).reduce((s: number, p: any) => s + parseFloat(p.amount), 0), 0);
+    const totalExpenses = tenantApartments.reduce((sum, a) => sum + (a.expenses || []).filter((e: any) => !e.isCanceled).reduce((s: number, e: any) => s + parseFloat(e.amount), 0), 0);
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card
-            className="cursor-pointer hover:shadow-md transition-shadow"
-            onClick={() => navigate('/my-apartments')}
-          >
-            <CardHeader>
-              <CardTitle className="flex items-center gap-3">
-                <div className="p-3 rounded-lg bg-primary/10 text-primary">
-                  <Home className="w-6 h-6" />
-                </div>
-                {t('myApartments')}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">{t('clickToManage')}</p>
-            </CardContent>
-          </Card>
+    // Merge all transactions for recent activity
+    const allTransactions = tenantApartments.flatMap((apt) => [
+      ...(apt.payments || []).map((p: any) => ({
+        id: p.id,
+        date: p.createdAt,
+        description: t('paymentForMonth').replace('{month}', p.month),
+        type: 'payment' as const,
+        amount: parseFloat(p.amount),
+        isCanceled: p.isCanceled,
+        aptNumber: apt.apartmentNumber,
+      })),
+      ...(apt.expenses || []).map((e: any) => ({
+        id: e.id,
+        date: e.createdAt,
+        description: e.expenseDescription || t('buildingExpense'),
+        type: 'expense' as const,
+        amount: parseFloat(e.amount),
+        isCanceled: e.isCanceled,
+        aptNumber: apt.apartmentNumber,
+      })),
+    ]).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 8);
 
-          <Card
-            className="cursor-pointer hover:shadow-md transition-shadow"
-            onClick={() => navigate('/issues')}
-          >
-            <CardHeader>
-              <CardTitle className="flex items-center gap-3">
-                <div className="p-3 rounded-lg bg-orange-50 text-orange-700">
-                  <AlertTriangle className="w-6 h-6" />
-                </div>
-                <span className="flex items-center gap-2">
-                  {t('issues')}
-                  {openIssueCount > 0 && (
-                    <Badge variant="destructive" className="text-xs">{openIssueCount}</Badge>
-                  )}
-                </span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">{t('reportIssue')}</p>
-            </CardContent>
-          </Card>
-
-          <Card
-            className="cursor-pointer hover:shadow-md transition-shadow"
-            onClick={() => navigate('/profile')}
-          >
-            <CardHeader>
-              <CardTitle className="flex items-center gap-3">
-                <div className="p-3 rounded-lg bg-violet-50 text-violet-600">
-                  <User className="w-6 h-6" />
-                </div>
-                {t('profile')}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">{t('manageProfile')}</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* General Information */}
-        {generalInfo.length > 0 && (
-          <div>
-            <div className="flex items-center gap-2 mb-4">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                <Info className="h-4 w-4 text-primary" />
+    // Loading skeleton for tenant dashboard
+    if (dataLoading) {
+      return (
+        <div className="min-h-screen bg-gradient-to-b from-primary/[0.03] to-background">
+          <div className="container mx-auto px-4 py-5 sm:p-6 max-w-lg sm:max-w-2xl space-y-5">
+            <div className="animate-pulse space-y-5">
+              <div className="flex items-center justify-between">
+                <div><div className="h-7 w-40 bg-muted rounded-lg" /><div className="h-4 w-28 bg-muted rounded mt-2" /></div>
+                <div className="h-9 w-9 bg-muted rounded-full" />
               </div>
-              <h2 className="text-xl font-bold">{t('generalInformation')}</h2>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {generalInfo.map((info) => (
-                <GeneralInformationCard
-                  key={info.id}
-                  id={info.id}
-                  title={info.title}
-                  text_1={info.text1}
-                  text_2={info.text2}
-                  text_3={info.text3}
-                  isAdmin={false}
-                  onEdit={() => {}}
-                  onDelete={() => {}}
-                />
-              ))}
+              <div className="h-48 bg-muted rounded-2xl" />
+              <div className="grid grid-cols-2 gap-3"><div className="h-28 bg-muted rounded-xl" /><div className="h-28 bg-muted rounded-xl" /></div>
+              <div className="h-64 bg-muted rounded-xl" />
             </div>
           </div>
-        )}
+        </div>
+      );
+    }
+
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-primary/[0.03] to-background" dir={isRTL ? 'rtl' : 'ltr'}>
+        <div className="container mx-auto px-4 py-5 sm:p-6 max-w-lg sm:max-w-2xl space-y-5">
+
+          {/* ─── Header ─── */}
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <h1 className="text-xl sm:text-2xl font-bold truncate">{t('welcomeBack')}</h1>
+              <p className="text-sm text-muted-foreground truncate mt-0.5">{user.name || user.email}</p>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9 rounded-full shrink-0"
+              onClick={() => navigate('/profile')}
+            >
+              <div className="h-9 w-9 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-semibold">
+                {(user.name || user.email || '?')[0].toUpperCase()}
+              </div>
+            </Button>
+          </div>
+
+          {/* ─── Announcements / General Information ─── */}
+          {generalInfo.length > 0 && (
+            <div className="space-y-2.5">
+              {generalInfo.map((info) => {
+                const texts = [info.text1, info.text2, info.text3].filter(Boolean) as string[];
+                return (
+                  <div
+                    key={info.id}
+                    className="flex gap-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-800/40 px-3.5 py-3"
+                  >
+                    <div className="h-8 w-8 rounded-lg bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center shrink-0 mt-0.5">
+                      <Megaphone className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-amber-900 dark:text-amber-200 leading-tight">{info.title}</p>
+                      {texts.length > 0 && (
+                        <p className="text-xs text-amber-700/80 dark:text-amber-300/70 mt-1 leading-relaxed line-clamp-2">
+                          {texts.join(' · ')}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* ─── Hero Balance Card ─── */}
+          {tenantApartments.length > 0 && (
+            <div className={`relative overflow-hidden rounded-2xl shadow-lg ${
+              totalBalance >= 0
+                ? 'bg-gradient-to-br from-emerald-500 via-emerald-600 to-teal-700'
+                : 'bg-gradient-to-br from-rose-500 via-rose-600 to-red-700'
+            } text-white`}>
+              {/* Decorative circles */}
+              <div className="absolute -top-8 -end-8 h-32 w-32 rounded-full bg-white/[0.07]" />
+              <div className="absolute -bottom-10 -start-10 h-28 w-28 rounded-full bg-white/[0.05]" />
+
+              <div className="relative p-5 sm:p-7">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2 text-white/80 text-xs font-medium uppercase tracking-wider">
+                    <Wallet className="h-3.5 w-3.5" />
+                    {t('accountBalance')}
+                  </div>
+                  <div className={`h-8 w-8 rounded-full flex items-center justify-center ${totalBalance >= 0 ? 'bg-white/20' : 'bg-white/15'}`}>
+                    {totalBalance >= 0 ? <CircleCheck className="h-4 w-4" /> : <CircleAlert className="h-4 w-4" />}
+                  </div>
+                </div>
+
+                <p className="text-3xl sm:text-4xl font-extrabold tracking-tight">
+                  {formatCurrency(Math.abs(totalBalance))}
+                </p>
+                <p className="text-white/70 text-xs mt-1.5 font-medium">
+                  {totalBalance >= 0 ? t('inGoodStanding') : t('overdue')}
+                </p>
+
+                <div className="grid grid-cols-2 gap-3 mt-5 pt-4 border-t border-white/20">
+                  <div className="bg-white/10 rounded-xl px-3 py-2.5">
+                    <p className="text-white/60 text-[10px] uppercase tracking-wider mb-1">{t('totalPaid')}</p>
+                    <p className="text-base sm:text-lg font-bold flex items-center gap-1">
+                      <ArrowUpRight className="h-3.5 w-3.5 text-white/60" />
+                      {formatCurrency(totalPaid)}
+                    </p>
+                  </div>
+                  <div className="bg-white/10 rounded-xl px-3 py-2.5">
+                    <p className="text-white/60 text-[10px] uppercase tracking-wider mb-1">{t('totalExpenses')}</p>
+                    <p className="text-base sm:text-lg font-bold flex items-center gap-1">
+                      <ArrowDownRight className="h-3.5 w-3.5 text-white/60" />
+                      {formatCurrency(totalExpenses)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ─── Quick Actions Row ─── */}
+          <div className="grid grid-cols-4 gap-2">
+            {[
+              { icon: Receipt, label: t('payments'), path: '/my-apartments', color: 'text-primary', bg: 'bg-primary/10' },
+              { icon: AlertTriangle, label: t('issues'), path: '/issues', color: 'text-orange-600', bg: 'bg-orange-50 dark:bg-orange-950/40', badge: openIssueCount },
+              { icon: User, label: t('profile'), path: '/profile', color: 'text-violet-600', bg: 'bg-violet-50 dark:bg-violet-950/40' },
+              { icon: Home, label: t('myApartments'), path: '/my-apartments', color: 'text-blue-600', bg: 'bg-blue-50 dark:bg-blue-950/40' },
+            ].map((action) => (
+              <button
+                key={action.path + action.label}
+                onClick={() => navigate(action.path)}
+                className="flex flex-col items-center gap-1.5 py-3 px-1 rounded-xl active:scale-95 transition-transform"
+              >
+                <div className={`relative h-11 w-11 rounded-xl ${action.bg} flex items-center justify-center`}>
+                  <action.icon className={`h-5 w-5 ${action.color}`} />
+                  {action.badge ? (
+                    <span className="absolute -top-1 -end-1 h-4 min-w-4 px-1 rounded-full bg-destructive text-destructive-foreground text-[9px] font-bold flex items-center justify-center">
+                      {action.badge}
+                    </span>
+                  ) : null}
+                </div>
+                <span className="text-[11px] font-medium text-muted-foreground text-center leading-tight line-clamp-1">{action.label}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* ─── Apartment Cards ─── */}
+          {tenantApartments.length > 0 && (
+            <div className="space-y-3">
+              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2 px-0.5">
+                <Home className="h-4 w-4" />
+                {t('myApartments')}
+              </h2>
+              <div className="space-y-3">
+                {tenantApartments.map((apt) => {
+                  const bal = typeof apt.balance === 'number' ? apt.balance : parseFloat(apt.cachedBalance || '0');
+                  const sub = parseFloat(apt.subscriptionAmount || '0');
+                  const paidCount = (apt.payments || []).filter((p: any) => !p.isCanceled).length;
+                  return (
+                    <button
+                      key={apt.id}
+                      onClick={() => navigate('/my-apartments')}
+                      className="w-full text-start rounded-xl border border-border/60 bg-card shadow-sm hover:shadow-md active:scale-[0.98] transition-all p-4 group"
+                    >
+                      <div className="flex items-center gap-3 mb-3.5">
+                        <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center text-primary font-bold text-sm shrink-0 shadow-sm">
+                          {apt.apartmentNumber}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-sm truncate">{apt.buildingName}</p>
+                          <p className="text-xs text-muted-foreground truncate">{apt.buildingAddress}</p>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground/50 group-hover:text-primary transition-colors shrink-0 rtl:rotate-180" />
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="rounded-lg bg-muted/50 p-2 text-center">
+                          <p className="text-[10px] text-muted-foreground font-medium mb-0.5">{t('balance')}</p>
+                          <p className={`text-sm font-bold tabular-nums ${bal >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                            {formatCurrency(bal)}
+                          </p>
+                        </div>
+                        <div className="rounded-lg bg-muted/50 p-2 text-center">
+                          <p className="text-[10px] text-muted-foreground font-medium mb-0.5">{t('monthly')}</p>
+                          <p className="text-sm font-bold tabular-nums">{formatCurrency(sub)}</p>
+                        </div>
+                        <div className="rounded-lg bg-muted/50 p-2 text-center">
+                          <p className="text-[10px] text-muted-foreground font-medium mb-0.5">{t('payments')}</p>
+                          <p className="text-sm font-bold tabular-nums">{paidCount}</p>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* ─── Recent Activity ─── */}
+          {allTransactions.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between px-0.5">
+                <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  {t('recentActivity')}
+                </h2>
+                <button onClick={() => navigate('/my-apartments')} className="text-xs text-primary font-medium">
+                  {t('viewAll')}
+                </button>
+              </div>
+              <div className="rounded-xl border border-border/60 bg-card shadow-sm overflow-hidden divide-y divide-border/40">
+                {allTransactions.map((tx) => (
+                  <div key={tx.id} className="flex items-center gap-3 px-4 py-3 active:bg-muted/40 transition-colors">
+                    <div className={`h-9 w-9 rounded-full flex items-center justify-center shrink-0 ${
+                      tx.type === 'payment'
+                        ? tx.isCanceled ? 'bg-muted text-muted-foreground' : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400'
+                        : tx.isCanceled ? 'bg-muted text-muted-foreground' : 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400'
+                    }`}>
+                      {tx.type === 'payment' ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm font-medium truncate ${tx.isCanceled ? 'line-through text-muted-foreground' : ''}`}>
+                        {tx.description}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">
+                        {formatDate(tx.date)} · #{tx.aptNumber}
+                      </p>
+                    </div>
+                    <p className={`text-sm font-semibold tabular-nums whitespace-nowrap ${
+                      tx.isCanceled ? 'text-muted-foreground' :
+                      tx.type === 'payment' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
+                    }`}>
+                      {tx.type === 'payment' ? '+' : '-'}{formatCurrency(tx.amount)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Bottom spacer for mobile nav */}
+          <div className="h-2" />
+        </div>
       </div>
     );
   }

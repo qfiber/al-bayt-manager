@@ -6,6 +6,8 @@ import { startSubscriptionCron } from './services/subscription.service.js';
 import { startDebtCollectionCron } from './services/debt-collection.service.js';
 import { ensureDefaultTemplates } from './services/email.service.js';
 import { ensureDefaultNtfyTemplates } from './services/ntfy-template.service.js';
+import { ensureDefaultSmsTemplates } from './services/sms-template.service.js';
+import { startSmsCron } from './services/sms-cron.service.js';
 
 async function main() {
   try {
@@ -18,6 +20,7 @@ async function main() {
   try {
     await ensureDefaultTemplates();
     await ensureDefaultNtfyTemplates();
+    await ensureDefaultSmsTemplates();
   } catch (err) {
     logger.error(err, 'Failed to seed default templates');
   }
@@ -28,6 +31,7 @@ async function main() {
     logger.info(`Server running on port ${env.PORT} in ${env.NODE_ENV} mode`);
     startSubscriptionCron();
     startDebtCollectionCron();
+    startSmsCron();
   });
 }
 

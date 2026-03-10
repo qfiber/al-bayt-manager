@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { Switch } from '@/components/ui/switch';
-import { Settings as SettingsIcon, Save, Globe, Upload, Shield, Mail, Bell, DollarSign, Building2 } from 'lucide-react';
+import { Settings as SettingsIcon, Save, Globe, Upload, Shield, Mail, Bell, DollarSign, Building2, MessageSquare } from 'lucide-react';
 
 interface SettingsData {
   id: string;
@@ -29,6 +29,11 @@ interface SettingsData {
   resendApiKey: string | null;
   ntfyEnabled: boolean;
   ntfyServerUrl: string | null;
+  smsEnabled: boolean;
+  smsProvider: string | null;
+  smsApiToken: string | null;
+  smsUsername: string | null;
+  smsSenderName: string | null;
   currencyCode: string;
   currencySymbol: string;
 }
@@ -85,6 +90,12 @@ const Settings = () => {
   const [resendApiKey, setResendApiKey] = useState('');
   const [ntfyEnabled, setNtfyEnabled] = useState(false);
   const [ntfyServerUrl, setNtfyServerUrl] = useState('');
+  const [smsEnabled, setSmsEnabled] = useState(false);
+  const [smsApiToken, setSmsApiToken] = useState('');
+  const [smsUsername, setSmsUsername] = useState('');
+  const [smsSenderName, setSmsSenderName] = useState('');
+  const [smsTestPhone, setSmsTestPhone] = useState('');
+  const [smsTestLoading, setSmsTestLoading] = useState(false);
   const [currencyPreset, setCurrencyPreset] = useState('ILS');
   const [currencyCode, setCurrencyCode] = useState('ILS');
   const [currencySymbol, setCurrencySymbol] = useState('₪');
@@ -104,6 +115,10 @@ const Settings = () => {
     setResendApiKey(data.resendApiKey || '');
     setNtfyEnabled(data.ntfyEnabled);
     setNtfyServerUrl(data.ntfyServerUrl || '');
+    setSmsEnabled(data.smsEnabled);
+    setSmsApiToken(data.smsApiToken || '');
+    setSmsUsername(data.smsUsername || '');
+    setSmsSenderName(data.smsSenderName || '');
     const code = data.currencyCode || 'ILS';
     const symbol = data.currencySymbol || '₪';
     setCurrencyCode(code);
@@ -192,6 +207,10 @@ const Settings = () => {
         resendApiKey: resendApiKey || null,
         ntfyEnabled,
         ntfyServerUrl: ntfyServerUrl || null,
+        smsEnabled,
+        smsApiToken: smsApiToken || null,
+        smsUsername: smsUsername || null,
+        smsSenderName: smsSenderName || null,
         currencyCode,
         currencySymbol,
       });
@@ -617,6 +636,129 @@ const Settings = () => {
                   <p className="text-xs text-muted-foreground">
                     {t('ntfyServerUrlHelp')}
                   </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* SMS Settings (019) */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <MessageSquare className="w-5 h-5" />
+                {t('smsConfiguration')}
+              </CardTitle>
+              <CardDescription>
+                {t('smsConfigDesc')}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/20">
+                <div>
+                  <Label htmlFor="sms-enabled">{t('smsEnabled')}</Label>
+                  <p className="text-sm text-muted-foreground">
+                    {t('smsEnabledDesc')}
+                  </p>
+                </div>
+                <Switch
+                  id="sms-enabled"
+                  checked={smsEnabled}
+                  onCheckedChange={setSmsEnabled}
+                />
+              </div>
+
+              {smsEnabled && (
+                <div className="space-y-4 pt-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="sms-username">{t('smsUsername')}</Label>
+                    <Input
+                      id="sms-username"
+                      type="text"
+                      placeholder="my019user"
+                      value={smsUsername}
+                      onChange={(e) => setSmsUsername(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      {t('smsUsernameHelp')}
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="sms-api-token">{t('smsApiToken')}</Label>
+                      {isMaskedValue(smsApiToken) && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setSmsApiToken('')}
+                        >
+                          {t('changeKey')}
+                        </Button>
+                      )}
+                    </div>
+                    <Input
+                      id="sms-api-token"
+                      type="password"
+                      placeholder="your-019-api-token"
+                      value={smsApiToken}
+                      onChange={(e) => setSmsApiToken(e.target.value)}
+                      readOnly={isMaskedValue(smsApiToken)}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      {t('smsApiTokenHelp')}
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="sms-sender-name">{t('smsSenderName')}</Label>
+                    <Input
+                      id="sms-sender-name"
+                      type="text"
+                      placeholder="AlBayt"
+                      value={smsSenderName}
+                      onChange={(e) => setSmsSenderName(e.target.value)}
+                      maxLength={11}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      {t('smsSenderNameHelp')}
+                    </p>
+                  </div>
+
+                  <div className="border-t pt-4 mt-4">
+                    <Label className="text-base font-semibold">{t('smsTestSend')}</Label>
+                    <div className="flex gap-2 mt-2">
+                      <Input
+                        type="tel"
+                        placeholder="05xxxxxxxx"
+                        value={smsTestPhone}
+                        onChange={(e) => setSmsTestPhone(e.target.value)}
+                        className="max-w-[200px]"
+                        dir="ltr"
+                      />
+                      <Button
+                        variant="outline"
+                        disabled={smsTestLoading || !smsTestPhone}
+                        onClick={async () => {
+                          setSmsTestLoading(true);
+                          try {
+                            const result = await api.post('/settings/test-sms', { phone: smsTestPhone });
+                            toast({
+                              title: result.success ? t('smsTestSuccess') : t('smsTestFailed'),
+                              description: result.error || undefined,
+                              variant: result.success ? 'default' : 'destructive',
+                            });
+                          } catch (err: any) {
+                            toast({ title: t('smsTestFailed'), description: err.message, variant: 'destructive' });
+                          } finally {
+                            setSmsTestLoading(false);
+                          }
+                        }}
+                      >
+                        {smsTestLoading ? t('loading') : t('smsTestSend')}
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               )}
             </CardContent>

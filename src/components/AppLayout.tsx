@@ -20,6 +20,7 @@ import {
   Settings,
   Key,
   Shield,
+  Bell,
   Mail,
   MailOpen,
   AlertTriangle,
@@ -101,7 +102,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
     { label: t('settings'), path: '/settings', icon: Settings },
     { label: t('apiKeys'), path: '/api-keys', icon: Key },
     { label: t('auditLogs'), path: '/audit-logs', icon: Shield },
-    { label: t('notificationTemplates'), path: '/email-templates', icon: Mail },
+    { label: t('notificationTemplates'), path: '/email-templates', icon: Bell },
     { label: t('emailLogs'), path: '/email-logs', icon: MailOpen },
   ];
 

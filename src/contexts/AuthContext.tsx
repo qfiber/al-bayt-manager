@@ -9,6 +9,8 @@ interface UserData {
   phone?: string;
   preferredLanguage?: string;
   avatarUrl?: string;
+  emailNotificationsEnabled?: boolean;
+  smsNotificationsEnabled?: boolean;
   role: string;
   totpFactors?: { id: string; status: string; friendlyName?: string }[];
 }

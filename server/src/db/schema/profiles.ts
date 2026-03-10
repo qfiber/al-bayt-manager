@@ -11,6 +11,7 @@ export const profiles = pgTable('profiles', {
   birthDate: date('birth_date'),
   adminNotes: text('admin_notes'),
   emailNotificationsEnabled: boolean('email_notifications_enabled').default(true).notNull(),
+  smsNotificationsEnabled: boolean('sms_notifications_enabled').default(true).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });

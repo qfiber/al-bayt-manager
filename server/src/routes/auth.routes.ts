@@ -59,6 +59,7 @@ const updateProfileSchema = z.object({
   preferredLanguage: z.enum(['ar', 'he', 'en']).optional(),
   avatarUrl: z.string().max(500).optional(),
   emailNotificationsEnabled: z.boolean().optional(),
+  smsNotificationsEnabled: z.boolean().optional(),
 });
 
 const changePasswordSchema = z.object({

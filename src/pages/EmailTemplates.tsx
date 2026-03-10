@@ -12,7 +12,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Bell, Mail, Pencil, Eye, Code } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Bell, Mail, Pencil, Eye, Code, MessageSquare, Send } from 'lucide-react';
 
 // ─── Email template types ───
 
@@ -80,6 +81,38 @@ function toNtfyTranslationMap(template: NtfyTemplate): NtfyTemplateWithMap {
   return { ...template, translations: map };
 }
 
+// ─── SMS template types ───
+
+interface SmsTemplateTranslation {
+  language: 'ar' | 'en' | 'he';
+  message: string;
+}
+
+interface SmsTemplate {
+  id: string;
+  identifier: string;
+  name: string;
+  description: string | null;
+  createdAt: string;
+  translations: SmsTemplateTranslation[];
+}
+
+interface SmsTemplateWithMap extends Omit<SmsTemplate, 'translations'> {
+  translations: {
+    ar?: { message: string };
+    en?: { message: string };
+    he?: { message: string };
+  };
+}
+
+function toSmsTranslationMap(template: SmsTemplate): SmsTemplateWithMap {
+  const map: SmsTemplateWithMap['translations'] = {};
+  template.translations?.forEach(t => {
+    map[t.language] = { message: t.message };
+  });
+  return { ...template, translations: map };
+}
+
 // ─── Per-template placeholder variables ───
 
 const EMAIL_TEMPLATE_VARIABLES: Record<string, string[]> = {
@@ -92,6 +125,14 @@ const EMAIL_TEMPLATE_VARIABLES: Record<string, string[]> = {
 const NTFY_TEMPLATE_VARIABLES: Record<string, string[]> = {
   ntfy_new_issue: ['category', 'description', 'reporterName'],
   ntfy_payment_reminder: ['apartmentNumber', 'balance'],
+};
+
+const SMS_TEMPLATE_VARIABLES: Record<string, string[]> = {
+  sms_monthly_reminder: ['tenantName', 'apartmentNumber', 'buildingName', 'subscriptionAmount', 'currencySymbol'],
+  sms_overdue_reminder: ['tenantName', 'apartmentNumber', 'buildingName', 'balance', 'currencySymbol'],
+  sms_payment_confirmation: ['tenantName', 'apartmentNumber', 'buildingName', 'amount', 'month', 'currencySymbol'],
+  sms_new_issue_report: ['buildingName', 'category', 'description', 'reporterName'],
+  sms_issue_resolved: ['tenantName', 'category', 'description'],
 };
 
 const SAMPLE_VARIABLES: Record<string, string> = {
@@ -146,6 +187,18 @@ const EmailTemplates = () => {
     he_message: '',
   });
 
+  // SMS templates state
+  const [smsTemplates, setSmsTemplates] = useState<SmsTemplateWithMap[]>([]);
+  const [isSmsDialogOpen, setIsSmsDialogOpen] = useState(false);
+  const [editingSmsTemplate, setEditingSmsTemplate] = useState<SmsTemplateWithMap | null>(null);
+  const [smsFormData, setSmsFormData] = useState({
+    name: '',
+    description: '',
+    ar_message: '',
+    en_message: '',
+    he_message: '',
+  });
+
   const isRTL = language === 'ar' || language === 'he';
 
   useEffect(() => {
@@ -157,12 +210,14 @@ const EmailTemplates = () => {
   const fetchAll = async () => {
     setIsLoading(true);
     try {
-      const [emailData, ntfyData] = await Promise.all([
+      const [emailData, ntfyData, smsData] = await Promise.all([
         api.get<EmailTemplate[]>('/email/templates'),
         api.get<NtfyTemplate[]>('/email/ntfy-templates'),
+        api.get<SmsTemplate[]>('/email/sms-templates'),
       ]);
       setEmailTemplates((emailData || []).map(toEmailTranslationMap));
       setNtfyTemplates((ntfyData || []).map(toNtfyTranslationMap));
+      setSmsTemplates((smsData || []).map(toSmsTranslationMap));
     } catch (error: any) {
       toast({ title: t('error'), description: error.message, variant: 'destructive' });
     } finally {
@@ -275,6 +330,50 @@ const EmailTemplates = () => {
     }
   };
 
+  // ─── SMS template handlers ───
+
+  const handleEditSms = (template: SmsTemplateWithMap) => {
+    setEditingSmsTemplate(template);
+    setSmsFormData({
+      name: template.name,
+      description: template.description || '',
+      ar_message: template.translations.ar?.message || '',
+      en_message: template.translations.en?.message || '',
+      he_message: template.translations.he?.message || '',
+    });
+    setIsSmsDialogOpen(true);
+  };
+
+  const handleSaveSms = async () => {
+    if (!editingSmsTemplate) return;
+    try {
+      await api.put(`/email/sms-templates/${editingSmsTemplate.id}`, {
+        name: smsFormData.name,
+        description: smsFormData.description || null,
+      });
+
+      const translations: { language: string; message: string }[] = [];
+      if (smsFormData.ar_message.trim()) {
+        translations.push({ language: 'ar', message: smsFormData.ar_message });
+      }
+      if (smsFormData.en_message.trim()) {
+        translations.push({ language: 'en', message: smsFormData.en_message });
+      }
+      if (smsFormData.he_message.trim()) {
+        translations.push({ language: 'he', message: smsFormData.he_message });
+      }
+      if (translations.length > 0) {
+        await api.put(`/email/sms-templates/${editingSmsTemplate.id}/translations`, { translations });
+      }
+
+      toast({ title: t('success'), description: t('updateSuccess') });
+      fetchAll();
+      setIsSmsDialogOpen(false);
+    } catch (error: any) {
+      toast({ title: t('error'), description: error.message, variant: 'destructive' });
+    }
+  };
+
   // ─── Shared helpers ───
 
   const getTranslationBadges = (translations: Record<string, any>) => {
@@ -300,6 +399,17 @@ const EmailTemplates = () => {
     const map: Record<string, string> = {
       ntfy_new_issue: t('ntfyNewIssueTemplate'),
       ntfy_payment_reminder: t('ntfyPaymentReminderTemplate'),
+    };
+    return map[identifier] || identifier;
+  };
+
+  const getSmsDisplayName = (identifier: string): string => {
+    const map: Record<string, string> = {
+      sms_monthly_reminder: t('smsMonthlyReminderTemplate'),
+      sms_overdue_reminder: t('smsOverdueReminderTemplate'),
+      sms_payment_confirmation: t('smsPaymentConfirmationTemplate'),
+      sms_new_issue_report: t('smsNewIssueReportTemplate'),
+      sms_issue_resolved: t('smsIssueResolvedTemplate'),
     };
     return map[identifier] || identifier;
   };
@@ -392,6 +502,110 @@ const EmailTemplates = () => {
                       </CardDescription>
                     </div>
                     <Button variant="ghost" size="icon" onClick={() => handleEditNtfy(template)}>
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0 space-y-3">
+                  {template.description && (
+                    <p className="text-sm text-muted-foreground">{template.description}</p>
+                  )}
+                  <div>
+                    <div className="flex items-center gap-1 mb-1.5">
+                      <Code className="h-3.5 w-3.5 text-muted-foreground" />
+                      <span className="text-xs text-muted-foreground font-medium">{t('templateVariables')}</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {variables.map((v) => (
+                        <code key={v} className="bg-muted px-1.5 py-0.5 rounded text-xs">{`{{${v}}}`}</code>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">{t('translations')}:</span>
+                    <div className="flex gap-1">{getTranslationBadges(template.translations)}</div>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ═══ SMS Templates Section ═══ */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold flex items-center gap-2">
+            <MessageSquare className="h-5 w-5" />
+            {t('smsTemplates')}
+          </h2>
+          <div className="flex gap-2">
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Send className="h-4 w-4 me-1" />
+                  {t('triggerMonthlyReminders')}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>{t('triggerMonthlyReminders')}</AlertDialogTitle>
+                  <AlertDialogDescription>{t('smsTriggerConfirm')}</AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
+                  <AlertDialogAction onClick={async () => {
+                    try {
+                      await api.post('/email/sms-trigger', { type: 'monthly' });
+                      toast({ title: t('success'), description: t('smsTriggerSuccess') });
+                    } catch (error: any) {
+                      toast({ title: t('error'), description: error.message, variant: 'destructive' });
+                    }
+                  }}>{t('confirm')}</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Send className="h-4 w-4 me-1" />
+                  {t('triggerOverdueReminders')}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>{t('triggerOverdueReminders')}</AlertDialogTitle>
+                  <AlertDialogDescription>{t('smsTriggerConfirm')}</AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
+                  <AlertDialogAction onClick={async () => {
+                    try {
+                      await api.post('/email/sms-trigger', { type: 'overdue' });
+                      toast({ title: t('success'), description: t('smsTriggerSuccess') });
+                    } catch (error: any) {
+                      toast({ title: t('error'), description: error.message, variant: 'destructive' });
+                    }
+                  }}>{t('confirm')}</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {smsTemplates.map((template) => {
+            const variables = SMS_TEMPLATE_VARIABLES[template.identifier] || [];
+            return (
+              <Card key={template.id} className="hover:shadow-md transition-shadow">
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <CardTitle className="text-lg">{getSmsDisplayName(template.identifier)}</CardTitle>
+                      <CardDescription className="mt-1">
+                        <code className="text-xs bg-muted px-1.5 py-0.5 rounded">{template.identifier}</code>
+                      </CardDescription>
+                    </div>
+                    <Button variant="ghost" size="icon" onClick={() => handleEditSms(template)}>
                       <Pencil className="h-4 w-4" />
                     </Button>
                   </div>
@@ -586,6 +800,84 @@ const EmailTemplates = () => {
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setIsNtfyDialogOpen(false)}>{t('cancel')}</Button>
               <Button onClick={handleSaveNtfy}>{t('save')}</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ═══ SMS Edit Dialog ═══ */}
+      <Dialog open={isSmsDialogOpen} onOpenChange={setIsSmsDialogOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {t('editTemplate')}
+              {editingSmsTemplate && (
+                <code className="text-sm font-normal bg-muted px-2 py-0.5 rounded ms-2">{editingSmsTemplate.identifier}</code>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>{t('templateName')}</Label>
+                <Input
+                  value={smsFormData.name}
+                  onChange={(e) => setSmsFormData({ ...smsFormData, name: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label>{t('description')} ({t('optional')})</Label>
+                <Input
+                  value={smsFormData.description}
+                  onChange={(e) => setSmsFormData({ ...smsFormData, description: e.target.value })}
+                />
+              </div>
+            </div>
+
+            {editingSmsTemplate && SMS_TEMPLATE_VARIABLES[editingSmsTemplate.identifier] && (
+              <div className="bg-muted/50 rounded-md p-3">
+                <div className="flex items-center gap-1.5 mb-2">
+                  <Code className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">{t('templateVariables')}</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {SMS_TEMPLATE_VARIABLES[editingSmsTemplate.identifier].map((v) => (
+                    <code key={v} className="bg-background px-2 py-1 rounded text-sm border">{`{{${v}}}`}</code>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <Tabs defaultValue="ar" className="w-full">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="ar">{t('arabic')}</TabsTrigger>
+                <TabsTrigger value="en">{t('english')}</TabsTrigger>
+                <TabsTrigger value="he">{t('hebrew')}</TabsTrigger>
+              </TabsList>
+              {(['ar', 'en', 'he'] as const).map((lang) => (
+                <TabsContent key={lang} value={lang} className="space-y-4">
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <Label>{t('smsMessage')}</Label>
+                      <span className={`text-xs font-mono ${(smsFormData[`${lang}_message`]?.length || 0) > 1005 ? 'text-destructive' : 'text-muted-foreground'}`}>
+                        {smsFormData[`${lang}_message`]?.length || 0} / 1005
+                      </span>
+                    </div>
+                    <Textarea
+                      value={smsFormData[`${lang}_message`]}
+                      onChange={(e) => setSmsFormData({ ...smsFormData, [`${lang}_message`]: e.target.value })}
+                      rows={5}
+                      dir={lang === 'en' ? 'ltr' : 'rtl'}
+                      maxLength={1005}
+                    />
+                  </div>
+                </TabsContent>
+              ))}
+            </Tabs>
+
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setIsSmsDialogOpen(false)}>{t('cancel')}</Button>
+              <Button onClick={handleSaveSms}>{t('save')}</Button>
             </div>
           </div>
         </DialogContent>
