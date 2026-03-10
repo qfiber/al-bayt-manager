@@ -583,22 +583,87 @@ ALTER TABLE "ntfy_template_translations" ADD CONSTRAINT "ntfy_template_translati
 
 -- ==================== INDEXES ====================
 
-CREATE INDEX "apartment_ledger_apartment_id_created_at_idx" ON "apartment_ledger" USING btree ("apartment_id","created_at");--> statement-breakpoint
-CREATE INDEX "occupancy_periods_apartment_id_idx" ON "occupancy_periods" ("apartment_id");--> statement-breakpoint
+-- Auth (CRITICAL — token_hash lookup on every authenticated request)
+CREATE UNIQUE INDEX "idx_refresh_tokens_token_hash" ON "refresh_tokens" ("token_hash");--> statement-breakpoint
+CREATE INDEX "idx_refresh_tokens_user_id" ON "refresh_tokens" ("user_id");--> statement-breakpoint
+CREATE INDEX "idx_refresh_tokens_expires_at" ON "refresh_tokens" ("expires_at");--> statement-breakpoint
+
+-- Rate limiting (CRITICAL — checked on every rate-limited request)
+CREATE INDEX "idx_rate_limit_key_window" ON "rate_limit_entries" ("key", "window_start" DESC);--> statement-breakpoint
+CREATE INDEX "idx_rate_limit_created" ON "rate_limit_entries" ("created_at");--> statement-breakpoint
+
+-- Account lockouts
+CREATE INDEX "idx_account_lockouts_email" ON "account_lockouts" ("email");--> statement-breakpoint
+
+-- Apartments
+CREATE INDEX "idx_apartments_building_id" ON "apartments" ("building_id");--> statement-breakpoint
+CREATE INDEX "idx_apartments_building_status_type" ON "apartments" ("building_id", "status", "apartment_type");--> statement-breakpoint
+CREATE INDEX "idx_apartments_parent_apartment_id" ON "apartments" ("parent_apartment_id");--> statement-breakpoint
+
+-- User apartments & moderator buildings
+CREATE INDEX "idx_user_apartments_user_id" ON "user_apartments" ("user_id");--> statement-breakpoint
+CREATE INDEX "idx_user_apartments_apartment_id" ON "user_apartments" ("apartment_id");--> statement-breakpoint
+CREATE INDEX "idx_moderator_buildings_user_id" ON "moderator_buildings" ("user_id");--> statement-breakpoint
+
+-- Payments
+CREATE INDEX "idx_payments_apartment_id" ON "payments" ("apartment_id");--> statement-breakpoint
+CREATE INDEX "idx_payments_apartment_month" ON "payments" ("apartment_id", "month");--> statement-breakpoint
+
+-- Expenses
+CREATE INDEX "idx_expenses_building_id" ON "expenses" ("building_id");--> statement-breakpoint
+CREATE INDEX "idx_expenses_building_date" ON "expenses" ("building_id", "expense_date" DESC);--> statement-breakpoint
+
+-- Apartment expenses
+CREATE INDEX "idx_apartment_expenses_apartment_id" ON "apartment_expenses" ("apartment_id");--> statement-breakpoint
+CREATE INDEX "idx_apartment_expenses_expense_id" ON "apartment_expenses" ("expense_id", "is_canceled");--> statement-breakpoint
+
+-- Payment allocations
+CREATE INDEX "idx_payment_allocations_payment_id" ON "payment_allocations" ("payment_id");--> statement-breakpoint
+CREATE INDEX "idx_payment_allocations_ledger_entry_id" ON "payment_allocations" ("ledger_entry_id");--> statement-breakpoint
+CREATE INDEX "idx_payment_allocations_apartment_expense_id" ON "payment_allocations" ("apartment_expense_id");--> statement-breakpoint
+
+-- Apartment ledger
+CREATE INDEX "idx_apartment_ledger_apt_created" ON "apartment_ledger" USING btree ("apartment_id", "created_at");--> statement-breakpoint
+CREATE INDEX "idx_apartment_ledger_apt_ref" ON "apartment_ledger" ("apartment_id", "reference_type", "reference_id");--> statement-breakpoint
+
+-- Occupancy periods
+CREATE INDEX "idx_occupancy_periods_apartment_id" ON "occupancy_periods" ("apartment_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "occupancy_periods_one_active_per_apartment" ON "occupancy_periods" ("apartment_id") WHERE status = 'active';--> statement-breakpoint
+
+-- Receipts & invoices
 CREATE INDEX "idx_receipts_payment_id" ON "receipts" ("payment_id");--> statement-breakpoint
 CREATE INDEX "idx_receipts_apartment_id" ON "receipts" ("apartment_id");--> statement-breakpoint
 CREATE INDEX "idx_invoices_apartment_id" ON "invoices" ("apartment_id");--> statement-breakpoint
 CREATE INDEX "idx_invoices_apartment_month" ON "invoices" ("apartment_id", "month");--> statement-breakpoint
+
+-- Documents
 CREATE INDEX "idx_documents_scope" ON "documents" ("scope_type", "scope_id");--> statement-breakpoint
 CREATE INDEX "idx_documents_uploaded_by" ON "documents" ("uploaded_by");--> statement-breakpoint
+
+-- Issues & maintenance
+CREATE INDEX "idx_issue_reports_building_id" ON "issue_reports" ("building_id");--> statement-breakpoint
+CREATE INDEX "idx_issue_reports_reporter_id" ON "issue_reports" ("reporter_id");--> statement-breakpoint
+CREATE INDEX "idx_issue_reports_status" ON "issue_reports" ("status", "created_at" DESC);--> statement-breakpoint
+CREATE INDEX "idx_maintenance_jobs_building_id" ON "maintenance_jobs" ("building_id");--> statement-breakpoint
+
+-- Meetings
 CREATE INDEX "idx_meetings_building_id" ON "meetings" ("building_id");--> statement-breakpoint
 CREATE INDEX "idx_meeting_decisions_meeting_id" ON "meeting_decisions" ("meeting_id");--> statement-breakpoint
+
+-- Debt collection
 CREATE INDEX "idx_debt_collection_log_apartment" ON "debt_collection_log" ("apartment_id");--> statement-breakpoint
-CREATE INDEX "idx_rate_limit_key_window" ON "rate_limit_entries" ("key", "window_start");--> statement-breakpoint
-CREATE INDEX "idx_rate_limit_created" ON "rate_limit_entries" ("created_at");--> statement-breakpoint
+
+-- Audit logs
+CREATE INDEX "idx_audit_logs_created_at" ON "audit_logs" ("created_at" DESC);--> statement-breakpoint
+CREATE INDEX "idx_audit_logs_user_created" ON "audit_logs" ("user_id", "created_at" DESC);--> statement-breakpoint
+
+-- Email logs
+CREATE INDEX "idx_email_logs_created_at" ON "email_logs" ("created_at" DESC);--> statement-breakpoint
+CREATE INDEX "idx_email_logs_status_created" ON "email_logs" ("status", "created_at" DESC);--> statement-breakpoint
+
+-- SMS logs
 CREATE INDEX "idx_sms_logs_created_at" ON "sms_logs" ("created_at" DESC);--> statement-breakpoint
-CREATE INDEX "idx_sms_logs_status" ON "sms_logs" ("status");--> statement-breakpoint
+CREATE INDEX "idx_sms_logs_status_created" ON "sms_logs" ("status", "created_at" DESC);--> statement-breakpoint
 CREATE INDEX "idx_sms_logs_template" ON "sms_logs" ("template_identifier");--> statement-breakpoint
 
 -- ==================== SEED DATA ====================

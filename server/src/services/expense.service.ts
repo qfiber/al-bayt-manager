@@ -295,38 +295,44 @@ export async function getApartmentExpenses(apartmentId: string) {
       ),
     );
 
-  // Compute amountPaid for each subscription entry from payment_allocations
+  // Compute amountPaid for all subscription entries in a single query (avoid N+1)
   const subscriptionItems: typeof expenseItems = [];
-  for (const entry of subscriptionEntries) {
-    const amount = parseFloat(entry.amount);
-
-    const [allocSum] = await db
+  if (subscriptionEntries.length > 0) {
+    const subscriptionIds = subscriptionEntries.map((e) => e.id);
+    const allocSums = await db
       .select({
+        ledgerEntryId: paymentAllocations.ledgerEntryId,
         total: sql<string>`COALESCE(SUM(${paymentAllocations.amountAllocated}::numeric), 0)`,
       })
       .from(paymentAllocations)
-      .where(eq(paymentAllocations.ledgerEntryId, entry.id));
+      .where(inArray(paymentAllocations.ledgerEntryId, subscriptionIds))
+      .groupBy(paymentAllocations.ledgerEntryId);
 
-    const amountPaid = parseFloat(allocSum.total);
-    const remaining = Math.max(0, amount - amountPaid);
+    const allocMap = new Map(allocSums.map((a) => [a.ledgerEntryId, parseFloat(a.total)]));
 
-    if (remaining <= 0) continue; // Skip fully paid subscriptions
+    for (const entry of subscriptionEntries) {
+      const amount = parseFloat(entry.amount);
+      const amountPaid = allocMap.get(entry.id) || 0;
+      const remaining = Math.max(0, amount - amountPaid);
 
-    subscriptionItems.push({
-      id: entry.id,
-      apartmentId: entry.apartmentId,
-      expenseId: null as any,
-      amount,
-      amountPaid,
-      remaining,
-      isCanceled: false,
-      createdAt: entry.createdAt,
-      description: entry.description || 'Subscription',
-      category: null as any,
-      expenseDate: null as any,
-      expenseAmount: null as any,
-      isSubscription: true,
-    });
+      if (remaining <= 0) continue; // Skip fully paid subscriptions
+
+      subscriptionItems.push({
+        id: entry.id,
+        apartmentId: entry.apartmentId,
+        expenseId: null as any,
+        amount,
+        amountPaid,
+        remaining,
+        isCanceled: false,
+        createdAt: entry.createdAt,
+        description: entry.description || 'Subscription',
+        category: null as any,
+        expenseDate: null as any,
+        expenseAmount: null as any,
+        isSubscription: true,
+      });
+    }
   }
 
   // Sort: subscriptions first (by date), then expenses (by date)

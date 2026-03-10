@@ -4,6 +4,16 @@ import { emailTemplates, emailTemplateTranslations, emailLogs, settings } from '
 import { eq, and, desc, gte, lte } from 'drizzle-orm';
 import { AppError } from '../middleware/error-handler.js';
 
+/** Escape HTML special characters to prevent injection in email bodies */
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // ─── Default template definitions (used by ensureDefaultTemplates) ───
 
 const DEFAULT_TEMPLATES = [
@@ -274,7 +284,7 @@ export async function sendEmail(data: {
   if (data.variables) {
     for (const [key, value] of Object.entries(data.variables)) {
       subject = subject.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), value);
-      body = body.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), value);
+      body = body.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), escapeHtml(value));
     }
   }
 

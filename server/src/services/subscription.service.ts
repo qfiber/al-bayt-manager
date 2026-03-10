@@ -44,11 +44,13 @@ export async function backfillSubscriptions(apartmentId: string, tx: TxOrDb) {
   if (amount <= 0) return;
   if (!apt.occupancyStart) return;
 
-  // Determine if this is a child apartment (storage/parking) that routes charges to parent
-  const isChild = apt.apartmentType !== 'regular' && !!apt.parentApartmentId;
-  const targetApartmentId = isChild ? apt.parentApartmentId! : apartmentId;
+  // Determine if this is a linked child apartment (storage/parking with parent) that routes charges to parent
+  // Standalone storage/parking charge their own ledger
+  const isLinkedChild = apt.apartmentType !== 'regular' && !!apt.parentApartmentId;
+  const targetApartmentId = isLinkedChild ? apt.parentApartmentId! : apartmentId;
 
   // Build description prefix for child apartments (e.g. "Storage S-1 subscription 2026-02")
+  const isChildType = apt.apartmentType !== 'regular';
   const typeLabel = apt.apartmentType === 'storage' ? 'Storage' : apt.apartmentType === 'parking' ? 'Parking' : '';
 
   // Look up active period ID to tag ledger entries
@@ -63,7 +65,13 @@ export async function backfillSubscriptions(apartmentId: string, tx: TxOrDb) {
     const month = months[i];
 
     // Idempotency check
-    if (isChild) {
+    if (isLinkedChild) {
+      // Linked child: use description-based check on parent's ledger
+      const desc = `${typeLabel} ${apt.apartmentNumber} subscription ${month}`;
+      const exists = await ledgerService.hasSubscriptionByDescription(targetApartmentId, desc, tx);
+      if (exists) continue;
+    } else if (isChildType) {
+      // Standalone child: use description-based check on own ledger
       const desc = `${typeLabel} ${apt.apartmentNumber} subscription ${month}`;
       const exists = await ledgerService.hasSubscriptionByDescription(targetApartmentId, desc, tx);
       if (exists) continue;
@@ -94,7 +102,7 @@ export async function backfillSubscriptions(apartmentId: string, tx: TxOrDb) {
     }
 
     if (chargeAmount > 0) {
-      const description = isChild
+      const description = isChildType
         ? `${typeLabel} ${apt.apartmentNumber} subscription ${month}`
         : undefined;
       await ledgerService.recordSubscriptionCharge(targetApartmentId, chargeAmount, month, null, tx, description, periodId);

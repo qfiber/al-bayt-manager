@@ -129,9 +129,20 @@ export async function sendNtfyNotification(
       topicUrl = `${serverUrl.replace(/\/$/, '')}/${topicUrl}`;
     }
 
+    // SSRF protection: only allow https/http to public ntfy servers
+    const parsedUrl = new URL(topicUrl);
+    const hostname = parsedUrl.hostname.toLowerCase();
+    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1' || hostname.endsWith('.local') || hostname.startsWith('10.') || hostname.startsWith('192.168.') || /^172\.(1[6-9]|2\d|3[01])\./.test(hostname)) {
+      logger.warn(`Blocked ntfy request to private address: ${hostname}`);
+      return;
+    }
+
+    // Strip CRLF from header values to prevent header injection
+    const safeTitle = resolved.title.replace(/[\r\n]/g, ' ');
+
     await fetch(topicUrl, {
       method: 'POST',
-      headers: { Title: resolved.title },
+      headers: { Title: safeTitle },
       body: resolved.message,
     });
   } catch (err) {

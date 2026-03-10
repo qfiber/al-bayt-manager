@@ -78,13 +78,13 @@ export async function createApartment(data: {
     // Validate apartment type and parent relationship
     const aptType = data.apartmentType || 'regular';
     if (aptType === 'storage' || aptType === 'parking') {
-      if (!data.parentApartmentId) {
-        throw new AppError(400, 'Parent apartment is required for storage/parking units');
+      // Parent is optional — storage/parking can be standalone
+      if (data.parentApartmentId) {
+        const [parent] = await tx.select().from(apartments).where(eq(apartments.id, data.parentApartmentId)).limit(1);
+        if (!parent) throw new AppError(404, 'Parent apartment not found');
+        if (parent.apartmentType !== 'regular') throw new AppError(400, 'Parent apartment must be a regular apartment');
+        if (parent.buildingId !== data.buildingId) throw new AppError(400, 'Parent apartment must be in the same building');
       }
-      const [parent] = await tx.select().from(apartments).where(eq(apartments.id, data.parentApartmentId)).limit(1);
-      if (!parent) throw new AppError(404, 'Parent apartment not found');
-      if (parent.apartmentType !== 'regular') throw new AppError(400, 'Parent apartment must be a regular apartment');
-      if (parent.buildingId !== data.buildingId) throw new AppError(400, 'Parent apartment must be in the same building');
     } else {
       // Regular apartments cannot have a parent
       data.parentApartmentId = undefined;
@@ -143,13 +143,13 @@ export async function updateApartment(id: string, data: Partial<{
     const aptType = data.apartmentType ?? oldApt.apartmentType;
     if (aptType === 'storage' || aptType === 'parking') {
       const parentId = data.parentApartmentId !== undefined ? data.parentApartmentId : oldApt.parentApartmentId;
-      if (!parentId) {
-        throw new AppError(400, 'Parent apartment is required for storage/parking units');
+      // Parent is optional — storage/parking can be standalone
+      if (parentId) {
+        const [parent] = await tx.select().from(apartments).where(eq(apartments.id, parentId)).limit(1);
+        if (!parent) throw new AppError(404, 'Parent apartment not found');
+        if (parent.apartmentType !== 'regular') throw new AppError(400, 'Parent apartment must be a regular apartment');
+        if (parent.buildingId !== oldApt.buildingId) throw new AppError(400, 'Parent apartment must be in the same building');
       }
-      const [parent] = await tx.select().from(apartments).where(eq(apartments.id, parentId)).limit(1);
-      if (!parent) throw new AppError(404, 'Parent apartment not found');
-      if (parent.apartmentType !== 'regular') throw new AppError(400, 'Parent apartment must be a regular apartment');
-      if (parent.buildingId !== oldApt.buildingId) throw new AppError(400, 'Parent apartment must be in the same building');
     } else if (data.apartmentType === 'regular') {
       // If changing to regular, clear parent
       data.parentApartmentId = null;
@@ -219,9 +219,9 @@ export async function terminateOccupancy(id: string, userId: string) {
     if (!apt) throw new AppError(404, 'Apartment not found');
     if (apt.status !== 'occupied') throw new AppError(400, 'Apartment is not occupied');
 
-    // Determine where prorated credit goes (parent's ledger for child units)
-    const isChild = apt.apartmentType !== 'regular' && !!apt.parentApartmentId;
-    const creditTargetId = isChild ? apt.parentApartmentId! : id;
+    // Determine where prorated credit goes (parent's ledger for linked child units, own ledger for standalone)
+    const isLinkedChild = apt.apartmentType !== 'regular' && !!apt.parentApartmentId;
+    const creditTargetId = isLinkedChild ? apt.parentApartmentId! : id;
 
     // Get the active period ID for tagging the occupancy credit
     const activePeriodId = await occupancyPeriodService.getActivePeriodId(creditTargetId, tx);
@@ -293,8 +293,8 @@ export async function terminateOccupancy(id: string, userId: string) {
     await tx.delete(userApartments).where(eq(userApartments.apartmentId, id));
 
     await ledgerService.refreshCachedBalance(creditTargetId, tx);
-    // Also refresh the child's own balance if it's a child
-    if (isChild) {
+    // Also refresh the child's own balance if it's a linked child
+    if (isLinkedChild) {
       await ledgerService.refreshCachedBalance(id, tx);
     }
 

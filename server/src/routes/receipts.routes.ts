@@ -21,9 +21,15 @@ receiptRoutes.get('/receipts/:paymentId/download', requireAuth, async (req: Requ
 });
 
 // List invoices
+const invoiceListSchema = z.object({
+  apartmentId: z.string().uuid().optional(),
+  buildingId: z.string().uuid().optional(),
+  month: z.string().regex(/^\d{4}-\d{2}$/).optional(),
+});
+
 receiptRoutes.get('/invoices', requireAuth, requireRole('admin', 'moderator'), scopeToModeratorBuildings, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { apartmentId, buildingId, month } = req.query as any;
+    const { apartmentId, buildingId, month } = invoiceListSchema.parse(req.query);
     const result = await receiptService.listInvoices({
       apartmentId,
       buildingId,

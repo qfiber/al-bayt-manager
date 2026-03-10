@@ -18,16 +18,17 @@ export async function listDocuments(filters?: {
     conditions.push(eq(documents.scopeId, filters.scopeId));
   }
 
-  // For building scope, enforce moderator access
+  // For building scope, enforce moderator access (parameterized to prevent SQL injection)
   if (filters?.allowedBuildingIds?.length) {
-    // Documents scoped to buildings the user has access to,
-    // or apartments in those buildings, or user scope (all)
+    const buildingApartmentIds = db
+      .select({ id: apartments.id })
+      .from(apartments)
+      .where(inArray(apartments.buildingId, filters.allowedBuildingIds));
+
     conditions.push(
       sql`(
-        (${documents.scopeType} = 'building' AND ${documents.scopeId} IN ${sql.raw(`('${filters.allowedBuildingIds.join("','")}')`)} )
-        OR (${documents.scopeType} = 'apartment' AND ${documents.scopeId} IN (
-          SELECT id FROM apartments WHERE building_id IN ${sql.raw(`('${filters.allowedBuildingIds.join("','")}')`)}
-        ))
+        (${documents.scopeType} = 'building' AND ${documents.scopeId} IN ${sql`(SELECT unnest(${filters.allowedBuildingIds}::uuid[]))`})
+        OR (${documents.scopeType} = 'apartment' AND ${documents.scopeId} IN (${buildingApartmentIds}))
         OR ${documents.scopeType} = 'user'
       )`,
     );

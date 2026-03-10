@@ -655,14 +655,15 @@ const Apartments = () => {
                     <div>
                       <Label>{t('parentApartment')}</Label>
                       <Select
-                        value={formData.parent_apartment_id}
-                        onValueChange={(value) => setFormData({ ...formData, parent_apartment_id: value })}
+                        value={formData.parent_apartment_id || 'none'}
+                        onValueChange={(value) => setFormData({ ...formData, parent_apartment_id: value === 'none' ? '' : value })}
                         disabled={!formData.building_id}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder={t('selectParentApartment')} />
                         </SelectTrigger>
                         <SelectContent>
+                          <SelectItem value="none">{t('standalone')}</SelectItem>
                           {formData.building_id && getRegularApartmentsForBuilding(formData.building_id).map((apt) => (
                             <SelectItem key={apt.id} value={apt.id}>
                               {t('apt')} {apt.apartmentNumber}
@@ -670,6 +671,9 @@ const Apartments = () => {
                           ))}
                         </SelectContent>
                       </Select>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {t('standaloneHint')}
+                      </p>
                     </div>
                   )}
                   <div>
@@ -893,7 +897,7 @@ const Apartments = () => {
                                   </div>
                                 </TableCell>
                               </TableRow>
-                              {/* Child sub-rows (storage rooms / parking lots) */}
+                              {/* Child sub-rows (storage rooms / parking lots linked to parent) */}
                               {children.map((child) => {
                                 const childSub = parseFloat(child.subscriptionAmount);
                                 return (

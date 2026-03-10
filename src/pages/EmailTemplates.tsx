@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import DOMPurify from 'dompurify';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useRequireAuth } from '@/hooks/use-require-auth';
@@ -898,7 +899,7 @@ const EmailTemplates = () => {
               <Label className="text-sm text-muted-foreground">{t('emailBody')}</Label>
               <div
                 className="border rounded-md p-4 mt-2 bg-white"
-                dangerouslySetInnerHTML={{ __html: previewContent.body }}
+                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(previewContent.body) }}
               />
             </div>
           </div>

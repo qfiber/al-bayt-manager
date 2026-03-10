@@ -568,6 +568,8 @@ export const translations = {
     parentRequired: "דירת אם נדרשת עבור מחסנים/חניות",
     cannotDeleteParent: "לא ניתן למחוק דירה עם מחסנים/חניות מקושרים",
     linkedTo: "משויך ל",
+    standalone: "עצמאי (ללא דירת אם)",
+    standaloneHint: "עצמאי: החיובים נרשמים ישירות ליחידה. עם דירת אם: החיובים מתווספים לחשבון הדירה.",
 
     // Issues & Maintenance
     issues: "תקלות",
@@ -1552,6 +1554,8 @@ export const translations = {
     parentRequired: "الشقة الأم مطلوبة للمخازن/المواقف",
     cannotDeleteParent: "لا يمكن حذف شقة مرتبطة بمخازن/مواقف",
     linkedTo: "مرتبط بـ",
+    standalone: "مستقل (بدون شقة أم)",
+    standaloneHint: "مستقل: الرسوم تُسجّل مباشرة على الوحدة. مع شقة أم: الرسوم تُضاف لحساب الشقة.",
 
     // Issues & Maintenance
     issues: "أعطال",
@@ -2541,6 +2545,8 @@ export const translations = {
     parentRequired: "Parent apartment is required for storage/parking units",
     cannotDeleteParent: "Cannot delete apartment with linked storage/parking units",
     linkedTo: "Linked to",
+    standalone: "Standalone (no parent)",
+    standaloneHint: "Standalone: charges go directly to this unit. With parent: charges are added to the parent apartment's account.",
 
     // Issues & Maintenance
     issues: "Issues",
