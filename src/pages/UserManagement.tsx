@@ -292,9 +292,7 @@ const UserManagement = () => {
       return;
     }
 
-    // Validate password strength (14+ chars, uppercase, lowercase, number, special char)
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[A-Za-z\d]{14,}$/;
-    if (!passwordRegex.test(passwordFormData.newPassword)) {
+    if (passwordFormData.newPassword.length < 16 || passwordFormData.newPassword.length > 72) {
       toast({ title: t('error'), description: t('passwordTooWeak'), variant: 'destructive' });
       return;
     }
@@ -828,6 +826,12 @@ const UserManagement = () => {
                   required
                   placeholder={t('minimumCharacters')}
                 />
+                {createFormData.password.length > 0 && createFormData.password.length < 16 && (
+                  <p className="text-sm text-destructive mt-1">{t('passwordTooWeak')}</p>
+                )}
+                {createFormData.password.length > 72 && (
+                  <p className="text-sm text-destructive mt-1">{t('passwordTooLong')}</p>
+                )}
               </div>
               <div>
                 <Label htmlFor="create_name">{t('nameLabel')} *</Label>
@@ -903,6 +907,12 @@ const UserManagement = () => {
                   required
                   placeholder={t('minimumCharacters')}
                 />
+                {passwordFormData.newPassword.length > 0 && passwordFormData.newPassword.length < 16 && (
+                  <p className="text-sm text-destructive mt-1">{t('passwordTooWeak')}</p>
+                )}
+                {passwordFormData.newPassword.length > 72 && (
+                  <p className="text-sm text-destructive mt-1">{t('passwordTooLong')}</p>
+                )}
               </div>
               <div>
                 <Label htmlFor="confirm_password">{t('confirmPassword')}</Label>
@@ -913,6 +923,9 @@ const UserManagement = () => {
                   onChange={(e) => setPasswordFormData({ ...passwordFormData, confirmPassword: e.target.value })}
                   required
                 />
+                {passwordFormData.confirmPassword.length > 0 && passwordFormData.newPassword !== passwordFormData.confirmPassword && (
+                  <p className="text-sm text-destructive mt-1">{t('passwordsDoNotMatch')}</p>
+                )}
               </div>
               <div className="flex gap-2">
                 <Button onClick={handleSavePassword} className="flex-1" disabled={isChangingPassword}>

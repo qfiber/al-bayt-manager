@@ -222,6 +222,10 @@ const Profile = () => {
       toast.error(t('passwordMismatch'));
       return;
     }
+    if (newPassword.length < 16 || newPassword.length > 72) {
+      toast.error(t('passwordTooWeak'));
+      return;
+    }
     setSavingPassword(true);
     try {
       await api.post('/auth/change-password', { currentPassword, newPassword });
@@ -561,8 +565,13 @@ const Profile = () => {
                 onChange={(e) => setNewPassword(e.target.value)}
                 required
                 minLength={16}
+                maxLength={72}
                 dir="ltr"
+                placeholder={t('minimumCharacters')}
               />
+              {newPassword.length > 0 && newPassword.length < 16 && (
+                <p className="text-sm text-destructive">{t('passwordTooWeak')}</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label>{t('confirmPassword')}</Label>
@@ -572,8 +581,12 @@ const Profile = () => {
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
                 minLength={16}
+                maxLength={72}
                 dir="ltr"
               />
+              {confirmPassword.length > 0 && newPassword !== confirmPassword && (
+                <p className="text-sm text-destructive">{t('passwordsDoNotMatch')}</p>
+              )}
             </div>
             <Button type="submit" disabled={savingPassword}>
               {savingPassword ? t('saving') : t('changePassword')}
