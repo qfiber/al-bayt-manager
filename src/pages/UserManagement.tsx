@@ -121,8 +121,12 @@ const UserManagement = () => {
 
   const fetchApartments = async () => {
     try {
-      const data = await api.get<Apartment[]>('/apartments');
-      setApartments(data || []);
+      const data = await api.get<any[]>('/apartments');
+      setApartments((data || []).map((item: any) => ({
+        id: item.apartment.id,
+        apartmentNumber: item.apartment.apartmentNumber,
+        buildingId: item.apartment.buildingId,
+      })));
     } catch (error: any) {
       toast({ title: t('error'), description: error.message, variant: 'destructive' });
     }
