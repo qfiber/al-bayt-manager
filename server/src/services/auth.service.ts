@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import { db } from '../config/database.js';
-import { users, profiles, userRoles, refreshTokens, totpFactors, organizationMembers, organizations } from '../db/schema/index.js';
+import { users, profiles, userRoles, refreshTokens, totpFactors, organizationMembers, organizations, settings } from '../db/schema/index.js';
 import { eq, and } from 'drizzle-orm';
 import { hashPassword, comparePassword } from '../utils/bcrypt.js';
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../utils/jwt.js';
@@ -137,7 +137,7 @@ export async function verifyTotpLogin(sessionToken: string, code: string) {
   return { accessToken, refreshToken, userId };
 }
 
-export async function signUp(email: string, password: string, name: string, phone?: string) {
+export async function signUp(email: string, password: string, name: string, phone?: string, organizationName?: string) {
   const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
   if (existing) throw new AppError(409, 'Email already registered');
 
@@ -155,10 +155,34 @@ export async function signUp(email: string, password: string, name: string, phon
       phone,
     });
 
-    await tx.insert(userRoles).values({
-      userId: user.id,
-      role: 'user',
-    });
+    if (organizationName) {
+      // Create a new organization
+      const [org] = await tx.insert(organizations).values({ name: organizationName }).returning();
+
+      // Create default settings for the org
+      await tx.insert(settings).values({
+        organizationId: org.id,
+        companyName: organizationName,
+      });
+
+      // Add user as org_admin
+      await tx.insert(organizationMembers).values({
+        userId: user.id,
+        organizationId: org.id,
+        role: 'org_admin',
+      });
+
+      // Legacy role table
+      await tx.insert(userRoles).values({
+        userId: user.id,
+        role: 'admin',
+      });
+    } else {
+      await tx.insert(userRoles).values({
+        userId: user.id,
+        role: 'user',
+      });
+    }
 
     return { id: user.id, email: user.email };
   });

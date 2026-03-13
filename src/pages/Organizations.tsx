@@ -21,7 +21,6 @@ import { Building2, Plus, Pencil, Trash2, Users, UserPlus } from 'lucide-react';
 interface Organization {
   id: string;
   name: string;
-  slug: string;
   isActive: boolean;
   createdAt: string;
 }
@@ -44,17 +43,17 @@ const Organizations = () => {
   const [orgs, setOrgs] = useState<Organization[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingOrg, setEditingOrg] = useState<Organization | null>(null);
-  const [formData, setFormData] = useState({ name: '', slug: '' });
+  const [formData, setFormData] = useState({ name: '' });
 
   // Members dialog
   const [membersDialogOpen, setMembersDialogOpen] = useState(false);
   const [selectedOrg, setSelectedOrg] = useState<Organization | null>(null);
   const [members, setMembers] = useState<OrgMember[]>([]);
-  const [addMemberForm, setAddMemberForm] = useState({ userId: '', role: 'user' });
+  const [addMemberForm, setAddMemberForm] = useState({ email: '', role: 'user' });
 
   const { search, setSearch, paginated, page, hasPrevious, hasNext, onPrevious, onNext } = usePaginatedSearch({
     items: orgs,
-    searchFields: ['name', 'slug'] as (keyof Organization)[],
+    searchFields: ['name'] as (keyof Organization)[],
   });
 
   useEffect(() => {
@@ -100,12 +99,12 @@ const Organizations = () => {
 
   const handleEdit = (org: Organization) => {
     setEditingOrg(org);
-    setFormData({ name: org.name, slug: org.slug });
+    setFormData({ name: org.name });
     setIsDialogOpen(true);
   };
 
   const resetForm = () => {
-    setFormData({ name: '', slug: '' });
+    setFormData({ name: '' });
     setEditingOrg(null);
     setIsDialogOpen(false);
   };
@@ -122,13 +121,13 @@ const Organizations = () => {
   };
 
   const handleAddMember = async () => {
-    if (!selectedOrg || !addMemberForm.userId) return;
+    if (!selectedOrg || !addMemberForm.email) return;
     try {
       await api.post(`/organizations/${selectedOrg.id}/members`, addMemberForm);
       toast({ title: t('success'), description: t('memberAdded') });
       const data = await api.get<OrgMember[]>(`/organizations/${selectedOrg.id}/members`);
       setMembers(data || []);
-      setAddMemberForm({ userId: '', role: 'user' });
+      setAddMemberForm({ email: '', role: 'user' });
     } catch (err: any) {
       toast({ title: t('error'), description: err.message, variant: 'destructive' });
     }
@@ -143,10 +142,6 @@ const Organizations = () => {
     } catch (err: any) {
       toast({ title: t('error'), description: err.message, variant: 'destructive' });
     }
-  };
-
-  const autoSlug = (name: string) => {
-    return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   };
 
   if (!user || !isSuperAdmin) return null;
@@ -178,26 +173,9 @@ const Organizations = () => {
                     <Input
                       id="orgName"
                       value={formData.name}
-                      onChange={(e) => {
-                        const name = e.target.value;
-                        setFormData({
-                          name,
-                          slug: editingOrg ? formData.slug : autoSlug(name),
-                        });
-                      }}
+                      onChange={(e) => setFormData({ name: e.target.value })}
                       required
                     />
-                  </div>
-                  <div>
-                    <Label htmlFor="orgSlug">{t('organizationSlug')}</Label>
-                    <Input
-                      id="orgSlug"
-                      value={formData.slug}
-                      onChange={(e) => setFormData({ ...formData, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') })}
-                      required
-                      pattern="^[a-z0-9-]+$"
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">{t('slugHelp')}</p>
                   </div>
                   <div className="flex gap-2">
                     <Button type="submit" className="flex-1">
@@ -222,19 +200,17 @@ const Organizations = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead className="text-start">{t('nameLabel')}</TableHead>
-                  <TableHead className="text-start">{t('organizationSlug')}</TableHead>
                   <TableHead className="text-start">{t('status')}</TableHead>
                   <TableHead className="text-start">{t('actions')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {paginated.length === 0 ? (
-                  <TableEmptyRow colSpan={4} message={t('noOrganizationsFound')} />
+                  <TableEmptyRow colSpan={3} message={t('noOrganizationsFound')} />
                 ) : (
                   paginated.map((org) => (
                     <TableRow key={org.id}>
                       <TableCell className="font-medium text-start">{org.name}</TableCell>
-                      <TableCell className="text-start font-mono text-sm">{org.slug}</TableCell>
                       <TableCell className="text-start">
                         <Badge variant={org.isActive ? 'default' : 'secondary'}>
                           {org.isActive ? t('active') : t('inactive')}
@@ -272,11 +248,12 @@ const Organizations = () => {
               {/* Add member */}
               <div className="flex gap-2 items-end">
                 <div className="flex-1">
-                  <Label>{t('userId')}</Label>
+                  <Label>{t('email')}</Label>
                   <Input
-                    value={addMemberForm.userId}
-                    onChange={(e) => setAddMemberForm({ ...addMemberForm, userId: e.target.value })}
-                    placeholder="user UUID"
+                    type="email"
+                    value={addMemberForm.email}
+                    onChange={(e) => setAddMemberForm({ ...addMemberForm, email: e.target.value })}
+                    placeholder="user@example.com"
                   />
                 </div>
                 <div className="w-32">

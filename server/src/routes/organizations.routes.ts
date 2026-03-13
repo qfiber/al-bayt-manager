@@ -10,19 +10,17 @@ export const organizationRoutes = Router();
 
 const createOrgSchema = z.object({
   name: z.string().min(1).max(255),
-  slug: z.string().min(1).max(100).regex(/^[a-z0-9-]+$/, 'Slug must be lowercase alphanumeric with hyphens'),
 });
 
 const updateOrgSchema = z.object({
   name: z.string().min(1).max(255).optional(),
-  slug: z.string().min(1).max(100).regex(/^[a-z0-9-]+$/).optional(),
   isActive: z.boolean().optional(),
 });
 
 const idParams = z.object({ id: z.string().uuid() });
 
 const addMemberSchema = z.object({
-  userId: z.string().uuid(),
+  email: z.string().email(),
   role: z.enum(['org_admin', 'moderator', 'user']),
 });
 
@@ -77,7 +75,7 @@ organizationRoutes.get('/:id/members', requireAuth, requireSuperAdmin, validate(
 // Add member to organization
 organizationRoutes.post('/:id/members', requireAuth, requireSuperAdmin, validate({ params: idParams, body: addMemberSchema }), auditLog('create', 'organization_members'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const result = await organizationService.addMember(req.params.id as string, req.body.userId, req.body.role);
+    const result = await organizationService.addMemberByEmail(req.params.id as string, req.body.email, req.body.role);
     res.status(201).json(result);
   } catch (err) { next(err); }
 });

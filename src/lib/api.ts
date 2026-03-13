@@ -127,9 +127,9 @@ export const auth = {
     return api.post<{ success: boolean }>('/auth/login/2fa', { sessionToken, code });
   },
 
-  register: async (email: string, password: string, name: string, phone?: string) => {
+  register: async (email: string, password: string, name: string, phone?: string, organizationName?: string) => {
     const pow = await solveChallenge();
-    return api.post('/auth/register', { email, password, name, phone, ...pow });
+    return api.post('/auth/register', { email, password, name, phone, organizationName, ...pow });
   },
 
   logout: async () => {

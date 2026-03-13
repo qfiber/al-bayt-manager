@@ -20,6 +20,7 @@ const Register = () => {
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  const [organizationName, setOrganizationName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const { signUp, user, loading } = useAuth();
@@ -82,7 +83,7 @@ const Register = () => {
           return;
         }
       }
-      const { error } = await signUp(email, password, name, phone);
+      const { error } = await signUp(email, password, name, phone, organizationName || undefined);
 
       if (error) {
         toast({
@@ -183,6 +184,19 @@ const Register = () => {
                     required
                     disabled={isLoading}
                   />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="organizationName">{t('organizationName')}</Label>
+                  <Input
+                    id="organizationName"
+                    type="text"
+                    placeholder={t('organizationNamePlaceholder')}
+                    value={organizationName}
+                    onChange={(e) => setOrganizationName(e.target.value)}
+                    disabled={isLoading}
+                  />
+                  <p className="text-xs text-muted-foreground">{t('organizationNameHelp')}</p>
                 </div>
 
                 <div className="space-y-2">

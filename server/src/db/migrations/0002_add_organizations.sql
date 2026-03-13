@@ -9,7 +9,6 @@ END $$;
 CREATE TABLE IF NOT EXISTS organizations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name VARCHAR(255) NOT NULL,
-  slug VARCHAR(100) NOT NULL UNIQUE,
   is_active BOOLEAN NOT NULL DEFAULT true,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -50,10 +49,10 @@ DECLARE
   default_org_id UUID;
 BEGIN
   -- Create default org
-  INSERT INTO organizations (name, slug) VALUES ('Default Organization', 'default')
-  ON CONFLICT (slug) DO NOTHING;
+  INSERT INTO organizations (name) VALUES ('Default Organization')
+  ON CONFLICT DO NOTHING;
 
-  SELECT id INTO default_org_id FROM organizations WHERE slug = 'default';
+  SELECT id INTO default_org_id FROM organizations WHERE name = 'Default Organization';
 
   -- Backfill all tables
   UPDATE buildings SET organization_id = default_org_id WHERE organization_id IS NULL;

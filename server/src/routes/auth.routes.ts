@@ -40,6 +40,7 @@ const registerSchema = z.object({
   password: z.string().min(16).max(72),
   name: z.string().min(1).max(255),
   phone: z.string().max(50).optional(),
+  organizationName: z.string().min(1).max(255).optional(),
   challengeId: z.string().uuid(),
   nonce: z.string(),
 });
@@ -153,7 +154,7 @@ authRoutes.post('/login/2fa', authRateLimit, validate(login2FASchema), async (re
 
 authRoutes.post('/register', authRateLimit, requirePow, validate(registerSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const result = await authService.signUp(req.body.email, req.body.password, req.body.name, req.body.phone);
+    const result = await authService.signUp(req.body.email, req.body.password, req.body.name, req.body.phone, req.body.organizationName);
     logAuditEvent({
       userId: result.id,
       userEmail: req.body.email,

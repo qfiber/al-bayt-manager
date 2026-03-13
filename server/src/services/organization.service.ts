@@ -13,11 +13,7 @@ export async function getOrganization(id: string) {
   return org;
 }
 
-export async function createOrganization(data: { name: string; slug: string }) {
-  // Check slug uniqueness
-  const [existing] = await db.select({ id: organizations.id }).from(organizations).where(eq(organizations.slug, data.slug)).limit(1);
-  if (existing) throw new AppError(409, 'Slug already taken');
-
+export async function createOrganization(data: { name: string }) {
   return await db.transaction(async (tx) => {
     const [org] = await tx.insert(organizations).values(data).returning();
 
@@ -31,7 +27,7 @@ export async function createOrganization(data: { name: string; slug: string }) {
   });
 }
 
-export async function updateOrganization(id: string, data: Partial<{ name: string; slug: string; isActive: boolean }>) {
+export async function updateOrganization(id: string, data: Partial<{ name: string; isActive: boolean }>) {
   const [org] = await db.update(organizations).set({ ...data, updatedAt: new Date() }).where(eq(organizations.id, id)).returning();
   if (!org) throw new AppError(404, 'Organization not found');
   return org;
@@ -79,6 +75,12 @@ export async function removeMember(organizationId: string, userId: string) {
     .returning();
   if (!member) throw new AppError(404, 'Member not found');
   return member;
+}
+
+export async function addMemberByEmail(organizationId: string, email: string, role: 'org_admin' | 'moderator' | 'user') {
+  const [user] = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
+  if (!user) throw new AppError(404, 'User not found with this email');
+  return addMember(organizationId, user.id, role);
 }
 
 export async function updateMemberRole(organizationId: string, userId: string, role: 'org_admin' | 'moderator' | 'user') {
