@@ -54,8 +54,9 @@ async function request<T = any>(
         credentials: 'include',
       });
     } else {
-      // Only redirect if not already on /login (prevents infinite reload loop)
-      if (window.location.pathname !== '/login') {
+      // Only redirect from authenticated pages (not landing, login, register, etc.)
+      const publicPaths = ['/', '/login', '/auth', '/register', '/privacy-policy', '/terms', '/accessibility'];
+      if (!publicPaths.includes(window.location.pathname)) {
         window.location.href = '/login';
       }
       throw new Error('Session expired');

@@ -9,12 +9,17 @@ import { Building2, Shield, BarChart3, Users, Globe, CreditCard, FileText, Wrenc
 const LandingPage = () => {
   const navigate = useNavigate();
   const { t, language, setLanguage } = useLanguage();
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const { companyName, logoUrl } = usePublicSettings();
 
   // If already logged in, go to dashboard
   if (user) {
     navigate('/dashboard', { replace: true });
+    return null;
+  }
+
+  // Show nothing while checking auth status to avoid flicker
+  if (loading) {
     return null;
   }
 
