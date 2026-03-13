@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { validate } from '../middleware/validate.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireRole } from '../middleware/roles.js';
+import { requireOrgScope } from '../middleware/org-scope.js';
 import { auditLog } from '../middleware/audit.js';
 import * as userService from '../services/user.service.js';
 import * as authService from '../services/auth.service.js';
@@ -38,16 +39,16 @@ const assignmentSchema = z.object({
   ids: z.array(z.string().uuid()),
 });
 
-userRoutes.get('/', requireAuth, requireRole('admin'), async (_req: Request, res: Response, next: NextFunction) => {
+userRoutes.get('/', requireAuth, requireRole('admin'), requireOrgScope, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const result = await userService.listUsers();
+    const result = await userService.listUsers(req.organizationId);
     res.json(result);
   } catch (err) { next(err); }
 });
 
-userRoutes.get('/2fa-status', requireAuth, requireRole('admin'), async (_req: Request, res: Response, next: NextFunction) => {
+userRoutes.get('/2fa-status', requireAuth, requireRole('admin'), requireOrgScope, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const result = await userService.get2FAStatuses();
+    const result = await userService.get2FAStatuses(req.organizationId);
     res.json(result);
   } catch (err) { next(err); }
 });
@@ -59,10 +60,10 @@ userRoutes.get('/:id', requireAuth, requireRole('admin'), validate({ params: idP
   } catch (err) { next(err); }
 });
 
-userRoutes.post('/', requireAuth, requireRole('admin'), validate(createUserSchema), auditLog('create', 'users'), async (req: Request, res: Response, next: NextFunction) => {
+userRoutes.post('/', requireAuth, requireRole('admin'), requireOrgScope, validate(createUserSchema), auditLog('create', 'users'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { email, password, name, role, phone } = req.body;
-    const result = await authService.adminCreateUser(email, password, name, role, phone);
+    const result = await authService.adminCreateUser(email, password, name, role, phone, req.organizationId);
     res.status(201).json(result);
   } catch (err) { next(err); }
 });

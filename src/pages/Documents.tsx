@@ -15,6 +15,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
+import { SearchInput } from '@/components/SearchInput';
+import { PaginationControls } from '@/components/PaginationControls';
+import { usePaginatedSearch } from '@/hooks/use-paginated-search';
 import { FolderOpen, Upload, Trash2, FileText, Download, Building2, Home, User } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
 
@@ -77,6 +80,21 @@ const Documents = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Document | null>(null);
+
+  const {
+    search,
+    setSearch: handleSearch,
+    page,
+    paginated,
+    hasPrevious,
+    hasNext,
+    onPrevious,
+    onNext,
+  } = usePaginatedSearch<Document>({
+    items: documents,
+    searchFields: ['title', 'description'],
+    pageSize: 20,
+  });
 
   const [formData, setFormData] = useState({
     title: '',
@@ -243,6 +261,7 @@ const Documents = () => {
             <h1 className="text-3xl font-bold">{t('documents')}</h1>
           </div>
           <div className="flex gap-2 flex-wrap items-center">
+            <SearchInput value={search} onChange={handleSearch} />
             <Button variant="outline" onClick={() => navigate('/dashboard')}>
               {t('backToDashboard')}
             </Button>
@@ -368,7 +387,7 @@ const Documents = () => {
   );
 
   function renderDocumentsList() {
-    if (documents.length === 0) {
+    if (paginated.length === 0) {
       return (
         <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
           <FileText className="w-12 h-12 mb-3 opacity-50" />
@@ -378,8 +397,9 @@ const Documents = () => {
     }
 
     return (
+      <>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
-        {documents.map((doc) => (
+        {paginated.map((doc) => (
           <Card key={doc.id} className="flex flex-col">
             <CardHeader className="pb-2">
               <div className="flex items-start justify-between gap-2">
@@ -429,6 +449,14 @@ const Documents = () => {
           </Card>
         ))}
       </div>
+      <PaginationControls
+        page={page}
+        hasPrevious={hasPrevious}
+        hasNext={hasNext}
+        onPrevious={onPrevious}
+        onNext={onNext}
+      />
+      </>
     );
   }
 };

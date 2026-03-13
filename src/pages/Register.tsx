@@ -216,7 +216,7 @@ const Register = () => {
               <div className="mt-6 text-center text-sm">
                 <p className="text-muted-foreground">
                   {t('alreadyHaveAccount')}{' '}
-                  <Link to="/auth" className="text-primary hover:underline">
+                  <Link to="/login" className="text-primary hover:underline">
                     {t('signIn')}
                   </Link>
                 </p>
@@ -228,7 +228,7 @@ const Register = () => {
               <p className="text-sm text-muted-foreground">
                 {t('registrationClosedDesc')}
               </p>
-              <Link to="/auth">
+              <Link to="/login">
                 <Button variant="outline" className="mt-2">
                   {t('signIn')}
                 </Button>

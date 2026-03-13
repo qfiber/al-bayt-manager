@@ -4,6 +4,33 @@ import {
 } from '../db/schema/index.js';
 import { eq, and, sql, desc, inArray, gte, lte, count } from 'drizzle-orm';
 
+/**
+ * Resolve effective building IDs considering organization scope and moderator scope.
+ * If organizationId is set, only buildings belonging to that org are included.
+ * If allowedBuildingIds is set (moderator), intersect with org buildings.
+ */
+export async function resolveOrgBuildingIds(
+  organizationId?: string,
+  allowedBuildingIds?: string[],
+): Promise<string[] | undefined> {
+  if (!organizationId) return allowedBuildingIds;
+
+  const orgBuildings = await db
+    .select({ id: buildings.id })
+    .from(buildings)
+    .where(eq(buildings.organizationId, organizationId));
+
+  const orgBuildingIds = orgBuildings.map((b) => b.id);
+
+  if (allowedBuildingIds?.length) {
+    // Intersect: only buildings in both org and moderator scope
+    const orgSet = new Set(orgBuildingIds);
+    return allowedBuildingIds.filter((id) => orgSet.has(id));
+  }
+
+  return orgBuildingIds;
+}
+
 export async function getSummary(allowedBuildingIds?: string[], startDate?: string, endDate?: string) {
   const buildingConditions: any[] = [];
   if (allowedBuildingIds?.length) {
@@ -164,7 +191,12 @@ export async function getExpensesByCategory(allowedBuildingIds?: string[], start
  * Reconciliation: Compare cachedBalance vs actual ledger SUM for all apartments.
  * Returns only apartments with discrepancies.
  */
-export async function getReconciliation() {
+export async function getReconciliation(allowedBuildingIds?: string[]) {
+  const conditions: any[] = [];
+  if (allowedBuildingIds?.length) {
+    conditions.push(inArray(apartments.buildingId, allowedBuildingIds));
+  }
+
   const rows = await db
     .select({
       apartmentId: apartments.id,
@@ -181,6 +213,7 @@ export async function getReconciliation() {
     .from(apartments)
     .innerJoin(buildings, eq(apartments.buildingId, buildings.id))
     .leftJoin(apartmentLedger, eq(apartments.id, apartmentLedger.apartmentId))
+    .where(conditions.length ? and(...conditions) : undefined)
     .groupBy(apartments.id, apartments.apartmentNumber, apartments.buildingId, buildings.name, apartments.cachedBalance);
 
   const discrepancies = rows

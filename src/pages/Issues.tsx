@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useCurrency } from '@/contexts/PublicSettingsContext';
@@ -6,6 +6,8 @@ import { useRequireAuth } from '@/hooks/use-require-auth';
 import { api } from '@/lib/api';
 import type { IssueRow } from '@/lib/types';
 import { BuildingFilter } from '@/components/BuildingFilter';
+import { SearchInput } from '@/components/SearchInput';
+import { PaginationControls } from '@/components/PaginationControls';
 import { TableEmptyRow } from '@/components/TableEmptyRow';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -49,6 +51,9 @@ const Issues = () => {
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterBuilding, setFilterBuilding] = useState('all');
   const [filterCategory, setFilterCategory] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 20;
 
   // Form state
   const [formBuildingId, setFormBuildingId] = useState('');
@@ -263,6 +268,28 @@ const Issues = () => {
     return `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`;
   };
 
+  // Reset page when search or filters change
+  useEffect(() => {
+    setPage(1);
+  }, [searchQuery, filterStatus, filterBuilding, filterCategory]);
+
+  // Client-side search on top of server-filtered issues, then paginate
+  const filteredIssues = useMemo(() => {
+    if (!searchQuery.trim()) return issues;
+    const q = searchQuery.toLowerCase();
+    return issues.filter((row) =>
+      row.buildingName?.toLowerCase().includes(q) ||
+      row.reporterName?.toLowerCase().includes(q) ||
+      row.issue.description?.toLowerCase().includes(q) ||
+      row.issue.category?.toLowerCase().includes(q) ||
+      row.issue.status?.toLowerCase().includes(q)
+    );
+  }, [issues, searchQuery]);
+
+  const totalFiltered = filteredIssues.length;
+  const totalPages = Math.max(1, Math.ceil(totalFiltered / PAGE_SIZE));
+  const paginatedIssues = filteredIssues.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
   if (!user) return null;
 
   return (
@@ -384,6 +411,8 @@ const Issues = () => {
 
         {/* Filters */}
         <div className="flex flex-wrap gap-3 mb-6">
+          <SearchInput value={searchQuery} onChange={setSearchQuery} />
+
           <Select value={filterStatus} onValueChange={setFilterStatus}>
             <SelectTrigger className="w-[160px]">
               <SelectValue />
@@ -431,10 +460,10 @@ const Issues = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {issues.length === 0 ? (
+                  {paginatedIssues.length === 0 ? (
                     <TableEmptyRow colSpan={canManage ? 8 : 7} message={t('noIssuesFound')} />
                   ) : (
-                    issues.map((row) => (
+                    paginatedIssues.map((row) => (
                       <TableRow key={row.issue.id} className="cursor-pointer hover:bg-muted/50" onClick={() => viewIssueDetails(row)}>
                         <TableCell className="text-start">{row.buildingName}</TableCell>
                         <TableCell className="text-start">{getCategoryLabel(row.issue.category)}</TableCell>
@@ -486,6 +515,16 @@ const Issues = () => {
             </div>
           </CardContent>
         </Card>
+
+        {totalFiltered > PAGE_SIZE && (
+          <PaginationControls
+            page={page}
+            hasPrevious={page > 1}
+            hasNext={page < totalPages}
+            onPrevious={() => setPage(p => p - 1)}
+            onNext={() => setPage(p => p + 1)}
+          />
+        )}
 
         {/* Issue Detail Dialog */}
         <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>

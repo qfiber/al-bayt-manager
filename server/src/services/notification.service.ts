@@ -16,10 +16,14 @@ async function sendSmsToAdminsAndModerators(
   variables: Record<string, string>,
 ): Promise<void> {
   try {
-    const [config] = await db.select().from(settings).limit(1);
-    if (!config?.smsEnabled) return;
+    const [building] = await db.select({ name: buildings.name, organizationId: buildings.organizationId }).from(buildings).where(eq(buildings.id, buildingId)).limit(1);
 
-    const [building] = await db.select({ name: buildings.name }).from(buildings).where(eq(buildings.id, buildingId)).limit(1);
+    let settingsQuery = db.select().from(settings);
+    if (building?.organizationId) {
+      settingsQuery = settingsQuery.where(eq(settings.organizationId, building.organizationId)) as any;
+    }
+    const [config] = await settingsQuery.limit(1);
+    if (!config?.smsEnabled) return;
 
     const adminRoles = await db
       .select({ userId: userRoles.userId })
@@ -68,7 +72,15 @@ async function sendSmsToApartmentTenants(
   variables: Record<string, string>,
 ): Promise<void> {
   try {
-    const [config] = await db.select().from(settings).limit(1);
+    // Look up apartment's building to get organizationId for settings scoping
+    const [apt] = await db.select({ buildingId: apartments.buildingId }).from(apartments).where(eq(apartments.id, apartmentId)).limit(1);
+    const [bldg] = apt ? await db.select({ organizationId: buildings.organizationId }).from(buildings).where(eq(buildings.id, apt.buildingId)).limit(1) : [undefined];
+
+    let settingsQuery = db.select().from(settings);
+    if (bldg?.organizationId) {
+      settingsQuery = settingsQuery.where(eq(settings.organizationId, bldg.organizationId)) as any;
+    }
+    const [config] = await settingsQuery.limit(1);
     if (!config?.smsEnabled) return;
 
     const assignments = await db
@@ -110,11 +122,15 @@ export async function sendNtfyNotification(
   preferredLanguage: string = 'ar',
 ): Promise<void> {
   try {
-    const [config] = await db.select().from(settings).limit(1);
-    if (!config?.ntfyEnabled) return;
-
     const [building] = await db.select().from(buildings).where(eq(buildings.id, buildingId)).limit(1);
     if (!building?.ntfyTopicUrl) return;
+
+    let ntfySettingsQuery = db.select().from(settings);
+    if (building.organizationId) {
+      ntfySettingsQuery = ntfySettingsQuery.where(eq(settings.organizationId, building.organizationId)) as any;
+    }
+    const [config] = await ntfySettingsQuery.limit(1);
+    if (!config?.ntfyEnabled) return;
 
     const resolved = await resolveNtfyTemplate(templateIdentifier, preferredLanguage, variables);
     if (!resolved) {
@@ -322,7 +338,7 @@ export async function sendPaymentReminder(apartmentId: string): Promise<void> {
     const langMap = new Map(recipientProfiles.map(p => [p.id, p.preferredLanguage]));
     const notifMap = new Map(recipientProfiles.map(p => [p.id, p.emailNotificationsEnabled]));
 
-    const [building] = await db.select({ name: buildings.name }).from(buildings).where(eq(buildings.id, apt.buildingId)).limit(1);
+    const [building] = await db.select({ name: buildings.name, organizationId: buildings.organizationId }).from(buildings).where(eq(buildings.id, apt.buildingId)).limit(1);
 
     for (const user of recipientUsers) {
       if (notifMap.get(user.id) === false) continue;
@@ -345,12 +361,16 @@ export async function sendPaymentReminder(apartmentId: string): Promise<void> {
       balance: apt.cachedBalance,
     }).catch(() => {});
 
-    // Also send SMS to tenants
+    // Also send SMS to tenants -- scope settings by building's org
+    let reminderSettingsQuery = db.select({ currencySymbol: settings.currencySymbol }).from(settings);
+    if (building?.organizationId) {
+      reminderSettingsQuery = reminderSettingsQuery.where(eq(settings.organizationId, building.organizationId)) as any;
+    }
     sendSmsToApartmentTenants(apartmentId, 'sms_monthly_reminder', {
       apartmentNumber: apt.apartmentNumber,
       buildingName: building?.name || '',
       subscriptionAmount: apt.subscriptionAmount || '0',
-      currencySymbol: (await db.select({ currencySymbol: settings.currencySymbol }).from(settings).limit(1))[0]?.currencySymbol || '₪',
+      currencySymbol: (await reminderSettingsQuery.limit(1))[0]?.currencySymbol || '₪',
     }).catch(() => {});
   } catch (err) {
     logger.error(err, 'Failed to send payment reminder');
@@ -365,7 +385,7 @@ export async function notifyPaymentCreated(apartmentId: string, amount: number, 
     const [apt] = await db.select().from(apartments).where(eq(apartments.id, apartmentId)).limit(1);
     if (!apt) return;
 
-    const [building] = await db.select({ name: buildings.name }).from(buildings).where(eq(buildings.id, apt.buildingId)).limit(1);
+    const [building] = await db.select({ name: buildings.name, organizationId: buildings.organizationId }).from(buildings).where(eq(buildings.id, apt.buildingId)).limit(1);
 
     // Find assigned users for this apartment
     const assignments = await db
@@ -389,8 +409,12 @@ export async function notifyPaymentCreated(apartmentId: string, amount: number, 
     const langMap = new Map(recipientProfiles.map(p => [p.id, p.preferredLanguage]));
     const notifMap = new Map(recipientProfiles.map(p => [p.id, p.emailNotificationsEnabled]));
 
-    // Fetch currency symbol from settings
-    const [config] = await db.select({ currencySymbol: settings.currencySymbol }).from(settings).limit(1);
+    // Fetch currency symbol from settings (scoped by org)
+    let pcSettingsQuery = db.select({ currencySymbol: settings.currencySymbol }).from(settings);
+    if (building?.organizationId) {
+      pcSettingsQuery = pcSettingsQuery.where(eq(settings.organizationId, building.organizationId)) as any;
+    }
+    const [config] = await pcSettingsQuery.limit(1);
     const currencySymbol = config?.currencySymbol || '₪';
 
     for (const user of recipientUsers) {
@@ -431,7 +455,7 @@ export async function notifyPaymentCanceled(apartmentId: string, amount: number,
     const [apt] = await db.select().from(apartments).where(eq(apartments.id, apartmentId)).limit(1);
     if (!apt) return;
 
-    const [building] = await db.select({ name: buildings.name }).from(buildings).where(eq(buildings.id, apt.buildingId)).limit(1);
+    const [building] = await db.select({ name: buildings.name, organizationId: buildings.organizationId }).from(buildings).where(eq(buildings.id, apt.buildingId)).limit(1);
 
     const assignments = await db
       .select({ userId: userApartments.userId })
@@ -454,7 +478,12 @@ export async function notifyPaymentCanceled(apartmentId: string, amount: number,
     const langMap = new Map(recipientProfiles.map(p => [p.id, p.preferredLanguage]));
     const notifMap = new Map(recipientProfiles.map(p => [p.id, p.emailNotificationsEnabled]));
 
-    const [config] = await db.select({ currencySymbol: settings.currencySymbol }).from(settings).limit(1);
+    // Fetch currency symbol from settings (scoped by org)
+    let cancelSettingsQuery = db.select({ currencySymbol: settings.currencySymbol }).from(settings);
+    if (building?.organizationId) {
+      cancelSettingsQuery = cancelSettingsQuery.where(eq(settings.organizationId, building.organizationId)) as any;
+    }
+    const [config] = await cancelSettingsQuery.limit(1);
     const currencySymbol = config?.currencySymbol || '₪';
 
     for (const user of recipientUsers) {

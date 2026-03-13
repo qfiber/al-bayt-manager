@@ -33,6 +33,7 @@ meetingRoutes.get('/', requireAuth, requireRole('admin', 'moderator'), scopeToMo
     const result = await meetingService.listMeetings({
       buildingId,
       allowedBuildingIds: req.allowedBuildingIds,
+      organizationId: req.organizationId,
     });
     res.json(result);
   } catch (err) { next(err); }

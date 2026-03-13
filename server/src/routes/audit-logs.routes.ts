@@ -20,7 +20,7 @@ const auditQuerySchema = z.object({
 auditLogRoutes.get('/', requireAuth, requireRole('admin', 'moderator'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const query = auditQuerySchema.parse(req.query);
-    const result = await auditService.listAuditLogs(query);
+    const result = await auditService.listAuditLogs({ ...query, organizationId: req.organizationId });
     res.json(result);
   } catch (err) { next(err); }
 });

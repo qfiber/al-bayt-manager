@@ -54,9 +54,9 @@ async function request<T = any>(
         credentials: 'include',
       });
     } else {
-      // Only redirect if not already on /auth (prevents infinite reload loop)
-      if (window.location.pathname !== '/auth') {
-        window.location.href = '/auth';
+      // Only redirect if not already on /login (prevents infinite reload loop)
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
       }
       throw new Error('Session expired');
     }

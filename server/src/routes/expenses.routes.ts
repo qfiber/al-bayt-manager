@@ -44,6 +44,7 @@ expenseRoutes.get('/', requireAuth, requireRole('admin', 'moderator'), scopeToMo
     const result = await expenseService.listExpenses({
       buildingId: query.buildingId,
       allowedBuildingIds: req.allowedBuildingIds,
+      organizationId: req.organizationId,
     });
     res.json(result);
   } catch (err) { next(err); }
@@ -58,6 +59,38 @@ expenseRoutes.get('/:id', requireAuth, requireRole('admin', 'moderator'), scopeT
       return;
     }
     res.json(result);
+  } catch (err) { next(err); }
+});
+
+const batchExpenseSchema = z.object({
+  buildingIds: z.array(z.string().uuid()).min(1),
+  description: z.string().max(500).optional(),
+  amount: z.number().positive().max(9999999999),
+  expenseDate: z.string().regex(dateRegex, 'Date must be YYYY-MM-DD format'),
+  category: z.string().max(100).optional(),
+  isRecurring: z.boolean().optional(),
+  recurringType: z.enum(['monthly', 'yearly']).optional(),
+  recurringStartDate: z.string().regex(dateRegex, 'Date must be YYYY-MM-DD format').optional(),
+  recurringEndDate: z.string().regex(dateRegex, 'Date must be YYYY-MM-DD format').optional(),
+});
+
+expenseRoutes.post('/batch', requireAuth, requireRole('admin', 'moderator'), scopeToModeratorBuildings, validate(batchExpenseSchema), auditLog('create', 'expenses'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { buildingIds, ...expenseData } = req.body;
+    // Moderators: verify all buildings are authorized
+    if (req.allowedBuildingIds) {
+      const unauthorized = buildingIds.filter((id: string) => !req.allowedBuildingIds!.includes(id));
+      if (unauthorized.length > 0) {
+        res.status(403).json({ error: 'Not authorized for some buildings' });
+        return;
+      }
+    }
+    const results = [];
+    for (const buildingId of buildingIds) {
+      const result = await expenseService.createExpense({ ...expenseData, buildingId }, req.user!.userId);
+      results.push(result);
+    }
+    res.status(201).json(results);
   } catch (err) { next(err); }
 });
 

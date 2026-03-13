@@ -1,7 +1,9 @@
 import { pgTable, uuid, varchar, text, timestamp } from 'drizzle-orm/pg-core';
+import { organizations } from './organizations.js';
 
 export const smsLogs = pgTable('sms_logs', {
   id: uuid('id').defaultRandom().primaryKey(),
+  organizationId: uuid('organization_id').references(() => organizations.id, { onDelete: 'cascade' }),
   templateIdentifier: varchar('template_identifier', { length: 255 }),
   recipientPhone: varchar('recipient_phone', { length: 50 }).notNull(),
   userId: uuid('user_id'),

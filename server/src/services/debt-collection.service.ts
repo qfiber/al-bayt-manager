@@ -8,8 +8,12 @@ import * as notificationService from './notification.service.js';
 
 // --- CRUD for stages ---
 
-export async function listStages() {
-  return db.select().from(debtCollectionStages).orderBy(asc(debtCollectionStages.stageNumber));
+export async function listStages(organizationId?: string) {
+  let query = db.select().from(debtCollectionStages);
+  if (organizationId) {
+    query = query.where(eq(debtCollectionStages.organizationId, organizationId)) as any;
+  }
+  return query.orderBy(asc(debtCollectionStages.stageNumber));
 }
 
 export async function createStage(data: {
@@ -20,6 +24,7 @@ export async function createStage(data: {
   templateId?: string;
   settings?: any;
   isActive?: boolean;
+  organizationId?: string;
 }) {
   const [stage] = await db
     .insert(debtCollectionStages)
@@ -31,6 +36,7 @@ export async function createStage(data: {
       templateId: data.templateId || null,
       settings: data.settings || {},
       isActive: data.isActive ?? true,
+      organizationId: data.organizationId,
     })
     .returning();
   return stage;

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useCurrency } from '@/contexts/PublicSettingsContext';
@@ -15,9 +15,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { BuildingFilter } from '@/components/BuildingFilter';
+import { SearchInput } from '@/components/SearchInput';
+import { PaginationControls } from '@/components/PaginationControls';
 import { TableEmptyRow } from '@/components/TableEmptyRow';
 import { useToast } from '@/hooks/use-toast';
-import { CreditCard, Plus, Pencil, Trash2 } from 'lucide-react';
+import { downloadCsv } from '@/lib/csv-export';
+import { CreditCard, Plus, Pencil, Trash2, Download } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
 
 interface Payment {
@@ -80,6 +83,29 @@ const Payments = () => {
   const [paymentRows, setPaymentRows] = useState<PaymentRow[]>([]);
   const [apartmentRows, setApartmentRows] = useState<ApartmentRow[]>([]);
   const [selectedBuildingFilter, setSelectedBuildingFilter] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 20;
+
+  const filteredPaymentRows = useMemo(() => {
+    const buildingFiltered = selectedBuildingFilter === 'all'
+      ? paymentRows
+      : paymentRows.filter(r => r.buildingId === selectedBuildingFilter);
+    const query = searchQuery.toLowerCase().trim();
+    if (!query) return buildingFiltered;
+    return buildingFiltered.filter(r =>
+      r.apartmentNumber.toLowerCase().includes(query) ||
+      r.buildingName.toLowerCase().includes(query) ||
+      r.payment.month.toLowerCase().includes(query) ||
+      r.payment.amount.toString().includes(query)
+    );
+  }, [paymentRows, selectedBuildingFilter, searchQuery]);
+
+  const totalPages = Math.ceil(filteredPaymentRows.length / PAGE_SIZE);
+  const paginatedRows = filteredPaymentRows.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE
+  );
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
   const [formBuildingId, setFormBuildingId] = useState('');
@@ -297,7 +323,24 @@ const Payments = () => {
             <h1 className="text-3xl font-bold">{t('payments')}</h1>
           </div>
           <div className="flex gap-2 flex-wrap items-center">
-            <BuildingFilter buildings={buildings} value={selectedBuildingFilter} onChange={setSelectedBuildingFilter} />
+            <SearchInput value={searchQuery} onChange={(val) => { setSearchQuery(val); setCurrentPage(1); }} />
+            <BuildingFilter buildings={buildings} value={selectedBuildingFilter} onChange={(val) => { setSelectedBuildingFilter(val); setCurrentPage(1); }} />
+            <Button
+              variant="outline"
+              onClick={() => {
+                const rows = paymentRows.map(r => [
+                  r.buildingName,
+                  r.apartmentNumber,
+                  String(r.payment.amount),
+                  r.payment.month,
+                  r.payment.isCanceled ? 'Canceled' : 'Active',
+                ]);
+                downloadCsv('payments.csv', ['Building', 'Apartment', 'Amount', 'Month', 'Status'], rows);
+              }}
+            >
+              <Download className="w-4 h-4 me-2" />
+              {t('exportCsv')}
+            </Button>
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
                 <Button onClick={() => resetForm()} className="w-full sm:w-auto">
@@ -457,14 +500,10 @@ const Payments = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {(() => {
-                  const filtered = selectedBuildingFilter === 'all'
-                    ? paymentRows
-                    : paymentRows.filter(r => r.buildingId === selectedBuildingFilter);
-                  return filtered.length === 0 ? (
+                {paginatedRows.length === 0 ? (
                   <TableEmptyRow colSpan={4} message={t('noPaymentsFound')} />
                 ) : (
-                  filtered.map((row) => (
+                  paginatedRows.map((row) => (
                     <TableRow key={row.payment.id} className={row.payment.isCanceled ? 'opacity-50' : ''}>
                       <TableCell className="font-medium text-start">
                         {row.buildingName} - {t('apt')} {row.apartmentNumber}
@@ -488,10 +527,18 @@ const Payments = () => {
                       </TableCell>
                     </TableRow>
                   ))
-                );
-                })()}
+                )}
               </TableBody>
             </Table>
+            {totalPages > 1 && (
+              <PaginationControls
+                page={currentPage}
+                hasPrevious={currentPage > 1}
+                hasNext={currentPage < totalPages}
+                onPrevious={() => setCurrentPage(p => p - 1)}
+                onNext={() => setCurrentPage(p => p + 1)}
+              />
+            )}
           </CardContent>
         </Card>
       </div>

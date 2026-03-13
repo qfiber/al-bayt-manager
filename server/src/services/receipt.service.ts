@@ -10,13 +10,13 @@ import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 type TxOrDb = NodePgDatabase<any> | typeof db;
 
-export async function getNextNumber(prefix: 'R' | 'INV', txOrDb: TxOrDb = db): Promise<string> {
+export async function getNextNumber(prefix: 'R' | 'INV', txOrDb: TxOrDb = db, organizationId?: string): Promise<string> {
   const year = new Date().getFullYear();
 
   // Upsert: insert or increment
   const [seq] = await txOrDb
     .insert(documentSequences)
-    .values({ prefix, year, lastNumber: 1 })
+    .values({ prefix, year, lastNumber: 1, organizationId })
     .onConflictDoUpdate({
       target: [documentSequences.prefix, documentSequences.year],
       set: { lastNumber: sql`${documentSequences.lastNumber} + 1` },
@@ -172,6 +172,7 @@ export async function listInvoices(filters?: {
   buildingId?: string;
   month?: string;
   allowedBuildingIds?: string[];
+  organizationId?: string;
 }) {
   let query = db
     .select({
@@ -184,6 +185,7 @@ export async function listInvoices(filters?: {
     .innerJoin(buildings, eq(invoices.buildingId, buildings.id));
 
   const conditions: any[] = [];
+  if (filters?.organizationId) conditions.push(eq(buildings.organizationId, filters.organizationId));
   if (filters?.apartmentId) conditions.push(eq(invoices.apartmentId, filters.apartmentId));
   if (filters?.buildingId) conditions.push(eq(invoices.buildingId, filters.buildingId));
   if (filters?.month) conditions.push(eq(invoices.month, filters.month));

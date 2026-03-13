@@ -43,6 +43,7 @@ paymentRoutes.get('/', requireAuth, requireRole('admin', 'moderator'), scopeToMo
       buildingId: query.buildingId,
       apartmentId: query.apartmentId,
       allowedBuildingIds: req.allowedBuildingIds,
+      organizationId: req.organizationId,
     });
     res.json(result);
   } catch (err) { next(err); }

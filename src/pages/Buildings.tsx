@@ -12,7 +12,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { TableEmptyRow } from '@/components/TableEmptyRow';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Building, Plus, Pencil, Trash2 } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { SearchInput } from '@/components/SearchInput';
+import { PaginationControls } from '@/components/PaginationControls';
+import { usePaginatedSearch } from '@/hooks/use-paginated-search';
+import { Building, Plus, Pencil, Trash2, Copy } from 'lucide-react';
 
 interface BuildingData {
   id: string;
@@ -35,6 +39,10 @@ const Buildings = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingBuilding, setEditingBuilding] = useState<BuildingData | null>(null);
   const [formData, setFormData] = useState({ name: '', address: '', numberOfFloors: '', undergroundFloors: '', monthlyFee: '', ntfyTopicUrl: '' });
+  const [generateApartments, setGenerateApartments] = useState(false);
+  const [uniformMode, setUniformMode] = useState(true);
+  const [uniformCount, setUniformCount] = useState('');
+  const [perFloorCounts, setPerFloorCounts] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (user && isAdmin) {
@@ -63,6 +71,19 @@ const Buildings = () => {
         monthlyFee: formData.monthlyFee || '0',
         ntfyTopicUrl: formData.ntfyTopicUrl || null,
       };
+
+      if (!editingBuilding && generateApartments && formData.numberOfFloors) {
+        payload.generateApartments = true;
+        if (uniformMode) {
+          payload.uniformApartmentsPerFloor = parseInt(uniformCount) || 0;
+        } else {
+          const mapped: Record<string, number> = {};
+          for (const [key, val] of Object.entries(perFloorCounts)) {
+            mapped[key] = parseInt(val) || 0;
+          }
+          payload.apartmentsPerFloor = mapped;
+        }
+      }
 
       if (editingBuilding) {
         await api.put(`/buildings/${editingBuilding.id}`, payload);
@@ -104,11 +125,30 @@ const Buildings = () => {
     setIsDialogOpen(true);
   };
 
+  const handleClone = async (id: string) => {
+    try {
+      await api.post(`/buildings/${id}/clone`);
+      toast({ title: t('success'), description: t('buildingClonedSuccess') });
+      fetchBuildings();
+    } catch (error: any) {
+      toast({ title: t('error'), description: error.message, variant: 'destructive' });
+    }
+  };
+
   const resetForm = () => {
     setFormData({ name: '', address: '', numberOfFloors: '', undergroundFloors: '', monthlyFee: '', ntfyTopicUrl: '' });
     setEditingBuilding(null);
     setIsDialogOpen(false);
+    setGenerateApartments(false);
+    setUniformMode(true);
+    setUniformCount('');
+    setPerFloorCounts({});
   };
+
+  const { search, setSearch, paginated, page, hasPrevious, hasNext, onPrevious, onNext } = usePaginatedSearch({
+    items: buildings,
+    searchFields: ['name', 'address'] as (keyof BuildingData)[],
+  });
 
   if (!user || !isAdmin) return null;
 
@@ -120,7 +160,8 @@ const Buildings = () => {
             <Building className="w-8 h-8 text-primary" />
             <h1 className="text-3xl font-bold">{t('buildings')}</h1>
           </div>
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-2 flex-wrap items-center">
+            <SearchInput value={search} onChange={setSearch} />
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
                 <Button onClick={() => resetForm()} className="w-full sm:w-auto">
@@ -199,6 +240,74 @@ const Buildings = () => {
                       placeholder="building-topic-name"
                     />
                   </div>
+                  {!editingBuilding && formData.numberOfFloors && (
+                    <div className="space-y-3 border rounded-lg p-3">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="generateApartments">{t('autoGenerateApartments')}</Label>
+                        <Switch
+                          id="generateApartments"
+                          checked={generateApartments}
+                          onCheckedChange={setGenerateApartments}
+                        />
+                      </div>
+                      {generateApartments && (
+                        <div className="space-y-3">
+                          <div className="flex gap-2">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant={uniformMode ? 'default' : 'outline'}
+                              onClick={() => setUniformMode(true)}
+                            >
+                              {t('sameForAllFloors')}
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant={!uniformMode ? 'default' : 'outline'}
+                              onClick={() => setUniformMode(false)}
+                            >
+                              {t('customPerFloor')}
+                            </Button>
+                          </div>
+                          {uniformMode ? (
+                            <div>
+                              <Label htmlFor="uniformCount">{t('apartmentsPerFloor')}</Label>
+                              <Input
+                                id="uniformCount"
+                                type="number"
+                                min="1"
+                                max="100"
+                                value={uniformCount}
+                                onChange={(e) => setUniformCount(e.target.value)}
+                                placeholder="4"
+                              />
+                            </div>
+                          ) : (
+                            <div className="space-y-2 max-h-48 overflow-y-auto">
+                              {Array.from({ length: parseInt(formData.numberOfFloors) || 0 }, (_, i) => (
+                                <div key={i} className="flex items-center gap-2">
+                                  <Label className="min-w-[80px] text-sm">
+                                    {i === 0 ? t('groundFloor') : `${t('floor')} ${i}`}
+                                  </Label>
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    max="100"
+                                    value={perFloorCounts[String(i)] || ''}
+                                    onChange={(e) => setPerFloorCounts(prev => ({ ...prev, [String(i)]: e.target.value }))}
+                                    placeholder="0"
+                                    className="w-20"
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          <p className="text-xs text-muted-foreground">{t('autoGenerateApartmentsHelp')}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <div className="flex gap-2">
                     <Button type="submit" className="flex-1">
                       {editingBuilding ? t('update') : t('create')}
@@ -229,10 +338,10 @@ const Buildings = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {buildings.length === 0 ? (
+                {paginated.length === 0 ? (
                   <TableEmptyRow colSpan={5} message={t('noBuildingsFound')} />
                 ) : (
-                  buildings.map((building) => (
+                  paginated.map((building) => (
                     <TableRow key={building.id}>
                       <TableCell className="font-medium text-start">{building.name}</TableCell>
                       <TableCell className="text-start">{building.address}</TableCell>
@@ -244,6 +353,9 @@ const Buildings = () => {
                       </TableCell>
                       <TableCell className="text-start">
                         <div className="flex justify-end gap-2">
+                          <Button size="sm" variant="outline" onClick={() => handleClone(building.id)} title={t('cloneBuilding')}>
+                            <Copy className="w-4 h-4" />
+                          </Button>
                           <Button size="sm" variant="outline" onClick={() => handleEdit(building)}>
                             <Pencil className="w-4 h-4" />
                           </Button>
@@ -257,6 +369,7 @@ const Buildings = () => {
                 )}
               </TableBody>
             </Table>
+            <PaginationControls page={page} hasPrevious={hasPrevious} hasNext={hasNext} onPrevious={onPrevious} onNext={onNext} />
           </CardContent>
         </Card>
       </div>

@@ -118,8 +118,12 @@ export async function ensureDefaultTemplates() {
 
 // ─── Template CRUD ───
 
-export async function listTemplates() {
-  const templates = await db.select().from(emailTemplates).orderBy(emailTemplates.name);
+export async function listTemplates(organizationId?: string) {
+  let query = db.select().from(emailTemplates);
+  if (organizationId) {
+    query = query.where(eq(emailTemplates.organizationId, organizationId)) as any;
+  }
+  const templates = await query.orderBy(emailTemplates.name);
 
   const translations = await db.select().from(emailTemplateTranslations);
 
@@ -352,12 +356,14 @@ export async function listEmailLogs(filters?: {
   endDate?: string;
   limit?: number;
   offset?: number;
+  organizationId?: string;
 }) {
   const { limit = 100, offset = 0 } = filters || {};
 
   let query = db.select().from(emailLogs);
 
   const conditions: any[] = [];
+  if (filters?.organizationId) conditions.push(eq(emailLogs.organizationId, filters.organizationId));
   if (filters?.status) conditions.push(eq(emailLogs.status, filters.status));
   if (filters?.templateIdentifier) conditions.push(eq(emailLogs.templateIdentifier, filters.templateIdentifier));
   if (filters?.startDate) conditions.push(gte(emailLogs.createdAt, new Date(filters.startDate)));

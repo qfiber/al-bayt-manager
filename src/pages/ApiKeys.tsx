@@ -14,6 +14,9 @@ import { Badge } from "@/components/ui/badge";
 import { formatDateTime } from "@/lib/utils";
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { TableEmptyRow } from '@/components/TableEmptyRow';
+import { SearchInput } from '@/components/SearchInput';
+import { PaginationControls } from '@/components/PaginationControls';
+import { usePaginatedSearch } from '@/hooks/use-paginated-search';
 
 interface ApiKey {
   id: string;
@@ -30,6 +33,21 @@ export default function ApiKeys() {
   const { language, t } = useLanguage();
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  const {
+    search,
+    setSearch: handleSearch,
+    page,
+    paginated,
+    hasPrevious,
+    hasNext,
+    onPrevious,
+    onNext,
+  } = usePaginatedSearch<ApiKey>({
+    items: apiKeys,
+    searchFields: ['name'],
+    pageSize: 20,
+  });
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [newKeyName, setNewKeyName] = useState("");
   const [generatedKey, setGeneratedKey] = useState<string | null>(null);
@@ -239,10 +257,13 @@ export default function ApiKeys() {
               {language === 'ar' ? 'إدارة مفاتيح الوصول للقراءة فقط' : 'Manage read-only access keys'}
             </CardDescription>
           </div>
-          <Button onClick={() => setIsDialogOpen(true)}>
+          <div className="flex gap-2 items-center">
+            <SearchInput value={search} onChange={handleSearch} />
+            <Button onClick={() => setIsDialogOpen(true)}>
             <Plus className="h-4 w-4 me-2" />
             {language === 'ar' ? 'إنشاء مفتاح جديد' : 'Create New Key'}
           </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <Table dir="rtl">
@@ -256,10 +277,10 @@ export default function ApiKeys() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {apiKeys.length === 0 ? (
+              {paginated.length === 0 ? (
                 <TableEmptyRow colSpan={5} message={language === 'ar' ? 'لا توجد مفاتيح API' : 'No API keys yet'} />
               ) : (
-                apiKeys.map((key) => (
+                paginated.map((key) => (
                   <TableRow key={key.id}>
                     <TableCell className="font-medium text-start">{key.name}</TableCell>
                     <TableCell className="text-start">
@@ -302,6 +323,13 @@ export default function ApiKeys() {
               )}
             </TableBody>
           </Table>
+          <PaginationControls
+            page={page}
+            hasPrevious={hasPrevious}
+            hasNext={hasNext}
+            onPrevious={onPrevious}
+            onNext={onNext}
+          />
         </CardContent>
       </Card>
 

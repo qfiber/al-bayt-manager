@@ -4,24 +4,27 @@ import { apiKeys } from '../db/schema/index.js';
 import { eq, and } from 'drizzle-orm';
 import { AppError } from '../middleware/error-handler.js';
 
-export async function listApiKeys(userId: string) {
+export async function listApiKeys(userId: string, organizationId?: string) {
+  const conditions = [eq(apiKeys.userId, userId)];
+  if (organizationId) conditions.push(eq(apiKeys.organizationId, organizationId));
+
   return db.select({
     id: apiKeys.id,
     name: apiKeys.name,
     isActive: apiKeys.isActive,
     lastUsedAt: apiKeys.lastUsedAt,
     createdAt: apiKeys.createdAt,
-  }).from(apiKeys).where(eq(apiKeys.userId, userId));
+  }).from(apiKeys).where(and(...conditions));
 }
 
-export async function createApiKey(userId: string, name: string) {
+export async function createApiKey(userId: string, name: string, organizationId?: string) {
   // Generate a random API key
   const rawKey = `abm_${crypto.randomBytes(32).toString('hex')}`;
   const keyHash = crypto.createHash('sha256').update(rawKey).digest('hex');
 
   const [key] = await db
     .insert(apiKeys)
-    .values({ userId, name, keyHash })
+    .values({ userId, name, keyHash, ...(organizationId ? { organizationId } : {}) })
     .returning({ id: apiKeys.id, name: apiKeys.name, createdAt: apiKeys.createdAt });
 
   // Return the raw key only once

@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import { db } from '../config/database.js';
-import { users, profiles, userRoles, refreshTokens, totpFactors } from '../db/schema/index.js';
+import { users, profiles, userRoles, refreshTokens, totpFactors, organizationMembers, organizations } from '../db/schema/index.js';
 import { eq, and } from 'drizzle-orm';
 import { hashPassword, comparePassword } from '../utils/bcrypt.js';
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../utils/jwt.js';
@@ -41,6 +41,41 @@ async function getUserRole(userId: string): Promise<string> {
   return role?.role || 'user';
 }
 
+async function getUserOrgMembership(userId: string): Promise<{ organizationId: string; role: string } | null> {
+  const [membership] = await db
+    .select({
+      organizationId: organizationMembers.organizationId,
+      role: organizationMembers.role,
+    })
+    .from(organizationMembers)
+    .where(eq(organizationMembers.userId, userId))
+    .limit(1);
+  return membership || null;
+}
+
+async function getIsSuperAdmin(userId: string): Promise<boolean> {
+  const [user] = await db
+    .select({ isSuperAdmin: users.isSuperAdmin })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  return user?.isSuperAdmin || false;
+}
+
+async function buildTokenPayload(userId: string, email: string) {
+  const isSuperAdmin = await getIsSuperAdmin(userId);
+  const orgMembership = await getUserOrgMembership(userId);
+  // Fall back to legacy role if no org membership yet (migration period)
+  const role = orgMembership?.role || await getUserRole(userId);
+  return {
+    userId,
+    email,
+    role,
+    organizationId: orgMembership?.organizationId,
+    isSuperAdmin,
+  };
+}
+
 export async function signIn(email: string, password: string) {
   const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
   if (!user) throw new AppError(401, 'Invalid credentials');
@@ -61,8 +96,8 @@ export async function signIn(email: string, password: string) {
     return { requires2FA: true, sessionToken };
   }
 
-  const role = await getUserRole(user.id);
-  const accessToken = signAccessToken({ userId: user.id, email: user.email, role });
+  const payload = await buildTokenPayload(user.id, user.email);
+  const accessToken = signAccessToken(payload);
   const refreshToken = await createRefreshToken(user.id);
 
   return { accessToken, refreshToken, requires2FA: false };
@@ -95,8 +130,8 @@ export async function verifyTotpLogin(sessionToken: string, code: string) {
   const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   if (!user) throw new AppError(404, 'User not found');
 
-  const role = await getUserRole(user.id);
-  const accessToken = signAccessToken({ userId: user.id, email: user.email, role });
+  const payload = await buildTokenPayload(user.id, user.email);
+  const accessToken = signAccessToken(payload);
   const refreshToken = await createRefreshToken(user.id);
 
   return { accessToken, refreshToken, userId };
@@ -154,8 +189,8 @@ export async function refreshTokensService(token: string) {
   const [user] = await db.select().from(users).where(eq(users.id, payload.userId)).limit(1);
   if (!user) throw new AppError(401, 'User not found');
 
-  const role = await getUserRole(user.id);
-  const accessToken = signAccessToken({ userId: user.id, email: user.email, role });
+  const tokenPayload = await buildTokenPayload(user.id, user.email);
+  const accessToken = signAccessToken(tokenPayload);
   const newRefreshToken = await createRefreshToken(user.id);
 
   return { accessToken, refreshToken: newRefreshToken };
@@ -171,7 +206,15 @@ export async function getMe(userId: string) {
   if (!user) throw new AppError(404, 'User not found');
 
   const [profile] = await db.select().from(profiles).where(eq(profiles.id, userId)).limit(1);
-  const role = await getUserRole(userId);
+
+  const orgMembership = await getUserOrgMembership(userId);
+  const role = orgMembership?.role || await getUserRole(userId);
+
+  let organizationName: string | null = null;
+  if (orgMembership?.organizationId) {
+    const [org] = await db.select({ name: organizations.name }).from(organizations).where(eq(organizations.id, orgMembership.organizationId)).limit(1);
+    organizationName = org?.name || null;
+  }
 
   const factors = await db
     .select({ id: totpFactors.id, status: totpFactors.status, friendlyName: totpFactors.friendlyName })
@@ -188,6 +231,9 @@ export async function getMe(userId: string) {
     emailNotificationsEnabled: profile?.emailNotificationsEnabled ?? true,
     smsNotificationsEnabled: profile?.smsNotificationsEnabled ?? true,
     role,
+    isSuperAdmin: user.isSuperAdmin,
+    organizationId: orgMembership?.organizationId || null,
+    organizationName,
     totpFactors: factors,
   };
 }
@@ -300,8 +346,8 @@ export async function reissueTokens(userId: string) {
   const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   if (!user) throw new AppError(404, 'User not found');
 
-  const role = await getUserRole(userId);
-  const accessToken = signAccessToken({ userId: user.id, email: user.email, role });
+  const payload = await buildTokenPayload(user.id, user.email);
+  const accessToken = signAccessToken(payload);
   const refreshToken = await createRefreshToken(user.id);
 
   return { accessToken, refreshToken };
@@ -310,7 +356,7 @@ export async function reissueTokens(userId: string) {
 /**
  * Admin: create user with specified role
  */
-export async function adminCreateUser(email: string, password: string, name: string, role: string, phone?: string) {
+export async function adminCreateUser(email: string, password: string, name: string, role: string, phone?: string, organizationId?: string) {
   const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
   if (existing) throw new AppError(409, 'Email already registered');
 
@@ -328,10 +374,22 @@ export async function adminCreateUser(email: string, password: string, name: str
       phone,
     });
 
+    // Legacy role table (kept for backward compat)
+    const legacyRole = role === 'org_admin' ? 'admin' : role;
     await tx.insert(userRoles).values({
       userId: user.id,
-      role: role as any,
+      role: legacyRole as any,
     });
+
+    // New org membership
+    if (organizationId) {
+      const orgRole = role === 'admin' ? 'org_admin' : role;
+      await tx.insert(organizationMembers).values({
+        userId: user.id,
+        organizationId,
+        role: orgRole as any,
+      });
+    }
 
     return { id: user.id, email: user.email };
   });

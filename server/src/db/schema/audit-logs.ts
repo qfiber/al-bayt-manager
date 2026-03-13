@@ -1,8 +1,10 @@
 import { pgTable, uuid, varchar, jsonb, timestamp } from 'drizzle-orm/pg-core';
 import { auditActionTypeEnum } from './enums.js';
+import { organizations } from './organizations.js';
 
 export const auditLogs = pgTable('audit_logs', {
   id: uuid('id').defaultRandom().primaryKey(),
+  organizationId: uuid('organization_id').references(() => organizations.id, { onDelete: 'cascade' }),
   userId: uuid('user_id'),
   userEmail: varchar('user_email', { length: 255 }),
   actionType: auditActionTypeEnum('action_type').notNull(),

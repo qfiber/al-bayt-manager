@@ -3,6 +3,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { useBuildings } from '@/hooks/use-buildings';
+import { usePaginatedSearch } from '@/hooks/use-paginated-search';
+import { SearchInput } from '@/components/SearchInput';
+import { PaginationControls } from '@/components/PaginationControls';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -96,6 +99,8 @@ const UserManagement = () => {
   const [disable2FAUser, setDisable2FAUser] = useState<UserProfile | null>(null);
   const [isDisabling2FA, setIsDisabling2FA] = useState(false);
   const [users2FAStatus, setUsers2FAStatus] = useState<Map<string, boolean>>(new Map());
+
+  const { searchQuery, setSearchQuery, paginated, currentPage, totalPages, setCurrentPage } = usePaginatedSearch({ items: users, searchFields: ['name', 'email', 'phone'] });
 
   useEffect(() => {
     if (user && isAdmin) {
@@ -581,7 +586,10 @@ const UserManagement = () => {
 
         <Card>
           <CardHeader>
-            <CardTitle>{t('allUsers')}</CardTitle>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <CardTitle>{t('allUsers')}</CardTitle>
+              <SearchInput value={searchQuery} onChange={setSearchQuery} />
+            </div>
           </CardHeader>
           <CardContent>
             <Table>
@@ -595,10 +603,10 @@ const UserManagement = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {users.length === 0 ? (
+                {paginated.length === 0 ? (
                   <TableEmptyRow colSpan={5} message={t('noUsersFound')} />
                 ) : (
-                  users.map((userProfile) => (
+                  paginated.map((userProfile) => (
                     <TableRow key={userProfile.id}>
                       <TableCell className="font-medium text-start">{userProfile.name}</TableCell>
                       <TableCell className="text-start">{userProfile.phone || '-'}</TableCell>
@@ -709,6 +717,7 @@ const UserManagement = () => {
                 )}
               </TableBody>
             </Table>
+            <PaginationControls currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
           </CardContent>
         </Card>
 

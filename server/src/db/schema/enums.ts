@@ -2,6 +2,8 @@ import { pgEnum } from 'drizzle-orm/pg-core';
 
 export const appRoleEnum = pgEnum('app_role', ['admin', 'user', 'moderator']);
 
+export const orgRoleEnum = pgEnum('org_role', ['org_admin', 'moderator', 'user']);
+
 export const auditActionTypeEnum = pgEnum('audit_action_type', [
   'login',
   'logout',

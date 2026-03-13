@@ -1,7 +1,9 @@
 import { pgTable, uuid, varchar, text, jsonb, timestamp } from 'drizzle-orm/pg-core';
+import { organizations } from './organizations.js';
 
 export const emailLogs = pgTable('email_logs', {
   id: uuid('id').defaultRandom().primaryKey(),
+  organizationId: uuid('organization_id').references(() => organizations.id, { onDelete: 'cascade' }),
   templateIdentifier: varchar('template_identifier', { length: 255 }),
   recipientEmail: varchar('recipient_email', { length: 255 }).notNull(),
   userId: uuid('user_id'),

@@ -46,6 +46,7 @@ documentRoutes.get('/', requireAuth, requireRole('admin', 'moderator'), scopeToM
       scopeType,
       scopeId,
       allowedBuildingIds: req.allowedBuildingIds,
+      organizationId: req.organizationId,
     });
     res.json(result);
   } catch (err) { next(err); }

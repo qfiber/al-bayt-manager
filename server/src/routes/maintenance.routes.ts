@@ -33,6 +33,7 @@ maintenanceRoutes.get('/', requireAuth, requireRole('admin', 'moderator'), scope
       buildingId: buildingId as string | undefined,
       status: status as string | undefined,
       allowedBuildingIds: req.allowedBuildingIds,
+      organizationId: req.organizationId,
     });
     res.json(result);
   } catch (err) { next(err); }

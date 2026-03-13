@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useRequireAuth } from '@/hooks/use-require-auth';
@@ -17,6 +17,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Checkbox } from '@/components/ui/checkbox';
 import { BuildingFilter } from '@/components/BuildingFilter';
 import { TableEmptyRow } from '@/components/TableEmptyRow';
+import { SearchInput } from '@/components/SearchInput';
+import { PaginationControls } from '@/components/PaginationControls';
 import { toast } from 'sonner';
 import { formatDate } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -88,6 +90,28 @@ const Meetings = () => {
   const [meetings, setMeetings] = useState<MeetingRow[]>([]);
   const [users, setUsers] = useState<UserOption[]>([]);
   const [selectedBuildingFilter, setSelectedBuildingFilter] = useState<string>('all');
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 20;
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return meetings;
+    const q = search.toLowerCase();
+    return meetings.filter(row =>
+      row.meeting.title.toLowerCase().includes(q) ||
+      row.buildingName.toLowerCase().includes(q) ||
+      (row.meeting.location && row.meeting.location.toLowerCase().includes(q))
+    );
+  }, [meetings, search]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const paginated = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  const handleSearch = (value: string) => {
+    setSearch(value);
+    setPage(1);
+  };
 
   // Form state
   const [editingMeetingId, setEditingMeetingId] = useState<string | null>(null);
@@ -683,6 +707,7 @@ const Meetings = () => {
             <h1 className="text-3xl font-bold">{t('meetings')}</h1>
           </div>
           <div className="flex gap-2 flex-wrap items-center">
+            <SearchInput value={search} onChange={handleSearch} />
             <BuildingFilter buildings={buildings} value={selectedBuildingFilter} onChange={setSelectedBuildingFilter} />
             <Button onClick={openCreateForm} className="w-full sm:w-auto">
               <Plus className="w-4 h-4 me-2" />
@@ -709,10 +734,10 @@ const Meetings = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {meetings.length === 0 ? (
+                  {paginated.length === 0 ? (
                     <TableEmptyRow colSpan={6} message={t('noMeetingsFound')} />
                   ) : (
-                    meetings.map((row) => (
+                    paginated.map((row) => (
                       <TableRow
                         key={row.meeting.id}
                         className="cursor-pointer hover:bg-muted/50"
@@ -769,6 +794,13 @@ const Meetings = () => {
                 </TableBody>
               </Table>
             </div>
+            <PaginationControls
+              page={safePage}
+              hasPrevious={safePage > 1}
+              hasNext={safePage < totalPages}
+              onPrevious={() => setPage(p => Math.max(1, p - 1))}
+              onNext={() => setPage(p => Math.min(totalPages, p + 1))}
+            />
           </CardContent>
         </Card>
       </div>

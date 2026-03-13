@@ -18,7 +18,9 @@ import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { useToast } from '@/hooks/use-toast';
-import { Home, Plus, Pencil, Trash2, Eye, XCircle, Calendar as CalendarIcon, Eraser, Package, Car } from 'lucide-react';
+import { SearchInput } from '@/components/SearchInput';
+import { downloadCsv } from '@/lib/csv-export';
+import { Home, Plus, Pencil, Trash2, Eye, XCircle, Calendar as CalendarIcon, Eraser, Package, Car, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 
@@ -70,6 +72,7 @@ const Apartments = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingApartment, setEditingApartment] = useState<Apartment | null>(null);
   const [selectedBuildingFilter, setSelectedBuildingFilter] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState('');
   const [terminateDialogOpen, setTerminateDialogOpen] = useState(false);
   const [apartmentToTerminate, setApartmentToTerminate] = useState<Apartment | null>(null);
   const [calculatedTerminationCredit, setCalculatedTerminationCredit] = useState(0);
@@ -574,9 +577,10 @@ const Apartments = () => {
     : buildings.filter(b => b.id === selectedBuildingFilter);
 
   const getApartmentsForBuilding = (buildingId: string) => {
-    // Return only regular apartments + orphan storage/parking (no parent set)
+    const q = searchQuery.toLowerCase();
     return apartmentItems
       .filter(a => a.apartment.buildingId === buildingId && !a.apartment.parentApartmentId)
+      .filter(a => !q || a.apartment.apartmentNumber.toLowerCase().includes(q) || a.ownerName?.toLowerCase().includes(q) || a.beneficiaryName?.toLowerCase().includes(q))
       .map(a => a.apartment);
   };
 
@@ -598,7 +602,28 @@ const Apartments = () => {
             <h1 className="text-3xl font-bold">{t('apartments')}</h1>
           </div>
           <div className="flex gap-2 flex-wrap items-center">
+            <SearchInput value={searchQuery} onChange={setSearchQuery} />
             <BuildingFilter buildings={buildings} value={selectedBuildingFilter} onChange={setSelectedBuildingFilter} />
+            <Button
+              variant="outline"
+              onClick={() => {
+                const rows = apartmentItems.map(item => [
+                  item.buildingName,
+                  item.apartment.apartmentNumber,
+                  item.apartment.floor != null ? String(item.apartment.floor) : '',
+                  item.apartment.status,
+                  item.apartment.apartmentType || 'regular',
+                  item.apartment.cachedBalance,
+                  item.apartment.subscriptionAmount || '0',
+                  item.ownerName || '',
+                  item.beneficiaryName || '',
+                ]);
+                downloadCsv('apartments.csv', ['Building', 'Apartment #', 'Floor', 'Status', 'Type', 'Balance', 'Subscription', 'Owner', 'Beneficiary'], rows);
+              }}
+            >
+              <Download className="w-4 h-4 me-2" />
+              {t('exportCsv')}
+            </Button>
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
                 <Button onClick={() => resetForm()} className="w-full sm:w-auto">

@@ -96,8 +96,12 @@ export async function ensureDefaultSmsTemplates() {
 
 // ─── Template CRUD ───
 
-export async function listSmsTemplates() {
-  const templates = await db.select().from(smsTemplates).orderBy(smsTemplates.name);
+export async function listSmsTemplates(organizationId?: string) {
+  let query = db.select().from(smsTemplates);
+  if (organizationId) {
+    query = query.where(eq(smsTemplates.organizationId, organizationId)) as any;
+  }
+  const templates = await query.orderBy(smsTemplates.name);
   const translations = await db.select().from(smsTemplateTranslations);
 
   return templates.map((t) => ({

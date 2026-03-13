@@ -20,6 +20,9 @@ const createBuildingSchema = z.object({
   ]).transform((v) => String(v)).optional(),
   logoUrl: z.string().max(500).optional(),
   ntfyTopicUrl: z.string().max(500).nullable().optional(),
+  generateApartments: z.boolean().optional(),
+  uniformApartmentsPerFloor: z.number().int().min(1).max(100).optional(),
+  apartmentsPerFloor: z.record(z.string(), z.number().int().min(0).max(100)).optional(),
 });
 
 const updateBuildingSchema = createBuildingSchema.partial();
@@ -28,7 +31,7 @@ const idParams = z.object({ id: z.string().uuid() });
 
 buildingRoutes.get('/', requireAuth, scopeToModeratorBuildings, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const result = await buildingService.listBuildings(req.allowedBuildingIds);
+    const result = await buildingService.listBuildings(req.organizationId, req.allowedBuildingIds);
     res.json(result);
   } catch (err) { next(err); }
 });
@@ -42,7 +45,7 @@ buildingRoutes.get('/:id', requireAuth, requireRole('admin', 'moderator'), valid
 
 buildingRoutes.post('/', requireAuth, requireRole('admin'), validate(createBuildingSchema), auditLog('create', 'buildings'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const result = await buildingService.createBuilding(req.body);
+    const result = await buildingService.createBuilding({ ...req.body, organizationId: req.organizationId });
     res.status(201).json(result);
   } catch (err) { next(err); }
 });
@@ -51,6 +54,13 @@ buildingRoutes.put('/:id', requireAuth, requireRole('admin'), validate({ params:
   try {
     const result = await buildingService.updateBuilding(req.params.id as string, req.body);
     res.json(result);
+  } catch (err) { next(err); }
+});
+
+buildingRoutes.post('/:id/clone', requireAuth, requireRole('admin'), validate({ params: idParams }), auditLog('create', 'buildings'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const result = await buildingService.cloneBuilding(req.params.id as string);
+    res.status(201).json(result);
   } catch (err) { next(err); }
 });
 

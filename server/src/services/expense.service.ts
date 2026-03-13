@@ -12,6 +12,7 @@ type TxOrDb = NodePgDatabase<any> | typeof db;
 export async function listExpenses(filters?: {
   buildingId?: string;
   allowedBuildingIds?: string[];
+  organizationId?: string;
 }) {
   let query = db
     .select({
@@ -23,6 +24,7 @@ export async function listExpenses(filters?: {
 
   // Always exclude auto-generated child expenses (they have a parentExpenseId)
   const conditions: any[] = [isNull(expenses.parentExpenseId)];
+  if (filters?.organizationId) conditions.push(eq(buildings.organizationId, filters.organizationId));
   if (filters?.buildingId) conditions.push(eq(expenses.buildingId, filters.buildingId));
   if (filters?.allowedBuildingIds?.length) {
     conditions.push(inArray(expenses.buildingId, filters.allowedBuildingIds));

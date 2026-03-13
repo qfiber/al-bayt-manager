@@ -8,6 +8,7 @@ export async function listDocuments(filters?: {
   scopeType?: string;
   scopeId?: string;
   allowedBuildingIds?: string[];
+  organizationId?: string;
 }) {
   const conditions: any[] = [];
 
@@ -16,6 +17,27 @@ export async function listDocuments(filters?: {
   }
   if (filters?.scopeId) {
     conditions.push(eq(documents.scopeId, filters.scopeId));
+  }
+
+  // Organization scoping: only show documents belonging to buildings in the org
+  if (filters?.organizationId) {
+    const orgBuildingIds = db
+      .select({ id: buildings.id })
+      .from(buildings)
+      .where(eq(buildings.organizationId, filters.organizationId));
+
+    const orgApartmentIds = db
+      .select({ id: apartments.id })
+      .from(apartments)
+      .where(inArray(apartments.buildingId, orgBuildingIds));
+
+    conditions.push(
+      sql`(
+        (${documents.scopeType} = 'building' AND ${documents.scopeId} IN (${orgBuildingIds}))
+        OR (${documents.scopeType} = 'apartment' AND ${documents.scopeId} IN (${orgApartmentIds}))
+        OR ${documents.scopeType} = 'user'
+      )`,
+    );
   }
 
   // For building scope, enforce moderator access (parameterized to prevent SQL injection)

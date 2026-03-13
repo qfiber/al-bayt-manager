@@ -46,7 +46,7 @@ const listApartmentQuerySchema = z.object({
 apartmentRoutes.get('/', requireAuth, scopeToModeratorBuildings, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const query = listApartmentQuerySchema.parse(req.query);
-    const result = await apartmentService.listApartments(query.buildingId, req.allowedBuildingIds);
+    const result = await apartmentService.listApartments(query.buildingId, req.allowedBuildingIds, req.organizationId);
     res.json(result);
   } catch (err) { next(err); }
 });

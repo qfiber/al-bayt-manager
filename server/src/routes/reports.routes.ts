@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { requireAuth } from '../middleware/auth.js';
 import { requireRole } from '../middleware/roles.js';
 import { scopeToModeratorBuildings } from '../middleware/building-scope.js';
+import { requireOrgScope } from '../middleware/org-scope.js';
 import * as reportService from '../services/report.service.js';
 
 export const reportRoutes = Router();
@@ -18,54 +19,61 @@ const monthlyTrendsSchema = z.object({
   months: z.coerce.number().int().min(1).max(60).default(12),
 });
 
-reportRoutes.get('/summary', requireAuth, requireRole('admin', 'moderator'), scopeToModeratorBuildings, async (req: Request, res: Response, next: NextFunction) => {
+reportRoutes.get('/summary', requireAuth, requireRole('admin', 'moderator'), requireOrgScope, scopeToModeratorBuildings, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { startDate, endDate } = dateRangeSchema.parse(req.query);
-    const result = await reportService.getSummary(req.allowedBuildingIds, startDate, endDate);
+    const effectiveBuildingIds = await reportService.resolveOrgBuildingIds(req.organizationId, req.allowedBuildingIds);
+    const result = await reportService.getSummary(effectiveBuildingIds, startDate, endDate);
     res.json(result);
   } catch (err) { next(err); }
 });
 
-reportRoutes.get('/buildings', requireAuth, requireRole('admin', 'moderator'), scopeToModeratorBuildings, async (req: Request, res: Response, next: NextFunction) => {
+reportRoutes.get('/buildings', requireAuth, requireRole('admin', 'moderator'), requireOrgScope, scopeToModeratorBuildings, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const result = await reportService.getBuildingReports(req.allowedBuildingIds);
+    const effectiveBuildingIds = await reportService.resolveOrgBuildingIds(req.organizationId, req.allowedBuildingIds);
+    const result = await reportService.getBuildingReports(effectiveBuildingIds);
     res.json(result);
   } catch (err) { next(err); }
 });
 
-reportRoutes.get('/monthly-trends', requireAuth, requireRole('admin', 'moderator'), scopeToModeratorBuildings, async (req: Request, res: Response, next: NextFunction) => {
+reportRoutes.get('/monthly-trends', requireAuth, requireRole('admin', 'moderator'), requireOrgScope, scopeToModeratorBuildings, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { months } = monthlyTrendsSchema.parse(req.query);
-    const result = await reportService.getMonthlyTrends(req.allowedBuildingIds, months);
+    const effectiveBuildingIds = await reportService.resolveOrgBuildingIds(req.organizationId, req.allowedBuildingIds);
+    const result = await reportService.getMonthlyTrends(effectiveBuildingIds, months);
     res.json(result);
   } catch (err) { next(err); }
 });
 
-reportRoutes.get('/expenses-by-category', requireAuth, requireRole('admin', 'moderator'), scopeToModeratorBuildings, async (req: Request, res: Response, next: NextFunction) => {
+reportRoutes.get('/expenses-by-category', requireAuth, requireRole('admin', 'moderator'), requireOrgScope, scopeToModeratorBuildings, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { startDate, endDate } = dateRangeSchema.parse(req.query);
-    const result = await reportService.getExpensesByCategory(req.allowedBuildingIds, startDate, endDate);
+    const effectiveBuildingIds = await reportService.resolveOrgBuildingIds(req.organizationId, req.allowedBuildingIds);
+    const result = await reportService.getExpensesByCategory(effectiveBuildingIds, startDate, endDate);
     res.json(result);
   } catch (err) { next(err); }
 });
 
-reportRoutes.get('/reconciliation', requireAuth, requireRole('admin'), async (req: Request, res: Response, next: NextFunction) => {
+reportRoutes.get('/reconciliation', requireAuth, requireRole('admin'), requireOrgScope, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const result = await reportService.getReconciliation();
+    const effectiveBuildingIds = await reportService.resolveOrgBuildingIds(req.organizationId);
+    const result = await reportService.getReconciliation(effectiveBuildingIds);
     res.json(result);
   } catch (err) { next(err); }
 });
 
-reportRoutes.get('/portfolio', requireAuth, requireRole('admin', 'moderator'), scopeToModeratorBuildings, async (req: Request, res: Response, next: NextFunction) => {
+reportRoutes.get('/portfolio', requireAuth, requireRole('admin', 'moderator'), requireOrgScope, scopeToModeratorBuildings, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const result = await reportService.getPortfolioOverview(req.allowedBuildingIds);
+    const effectiveBuildingIds = await reportService.resolveOrgBuildingIds(req.organizationId, req.allowedBuildingIds);
+    const result = await reportService.getPortfolioOverview(effectiveBuildingIds);
     res.json(result);
   } catch (err) { next(err); }
 });
 
-reportRoutes.get('/portfolio/expenses', requireAuth, requireRole('admin', 'moderator'), scopeToModeratorBuildings, async (req: Request, res: Response, next: NextFunction) => {
+reportRoutes.get('/portfolio/expenses', requireAuth, requireRole('admin', 'moderator'), requireOrgScope, scopeToModeratorBuildings, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const result = await reportService.getExpenseBreakdownByBuilding(req.allowedBuildingIds);
+    const effectiveBuildingIds = await reportService.resolveOrgBuildingIds(req.organizationId, req.allowedBuildingIds);
+    const result = await reportService.getExpenseBreakdownByBuilding(effectiveBuildingIds);
     res.json(result);
   } catch (err) { next(err); }
 });

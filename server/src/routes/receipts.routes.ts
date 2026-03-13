@@ -35,6 +35,7 @@ receiptRoutes.get('/invoices', requireAuth, requireRole('admin', 'moderator'), s
       buildingId,
       month,
       allowedBuildingIds: req.allowedBuildingIds,
+      organizationId: req.organizationId,
     });
     res.json(result);
   } catch (err) { next(err); }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useCurrency } from '@/contexts/PublicSettingsContext';
@@ -16,10 +16,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Switch } from '@/components/ui/switch';
 import { BuildingFilter } from '@/components/BuildingFilter';
+import { SearchInput } from '@/components/SearchInput';
+import { PaginationControls } from '@/components/PaginationControls';
 import { TableEmptyRow } from '@/components/TableEmptyRow';
 import { useToast } from '@/hooks/use-toast';
-import { FileText, Plus, Pencil, Trash2, Calendar as CalendarIcon, ArrowLeft, Repeat, Receipt } from 'lucide-react';
+import { downloadCsv } from '@/lib/csv-export';
+import { FileText, Plus, Pencil, Trash2, Calendar as CalendarIcon, ArrowLeft, Repeat, Receipt, Copy, Download } from 'lucide-react';
 import { formatDate, cn } from '@/lib/utils';
 import { format } from 'date-fns';
 
@@ -58,6 +62,9 @@ const Expenses = () => {
   const [expenseRows, setExpenseRows] = useState<ExpenseRow[]>([]);
   const [apartments, setApartments] = useState<ApartmentOption[]>([]);
   const [selectedBuildingFilter, setSelectedBuildingFilter] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 20;
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [expenseMode, setExpenseMode] = useState<'one-time' | 'recurring' | null>(null);
@@ -65,6 +72,8 @@ const Expenses = () => {
   const [recurringStartDate, setRecurringStartDate] = useState<Date | undefined>();
   const [recurringEndDate, setRecurringEndDate] = useState<Date | undefined>();
   const [openPopover, setOpenPopover] = useState<string | null>(null);
+  const [batchMode, setBatchMode] = useState(false);
+  const [batchBuildingIds, setBatchBuildingIds] = useState<string[]>([]);
   const [formData, setFormData] = useState({
     building_id: '',
     description: '',
@@ -124,8 +133,7 @@ const Expenses = () => {
     } else {
       try {
         const isRecurring = expenseMode === 'recurring';
-        const payload: any = {
-          buildingId: formData.building_id,
+        const commonData = {
           description: formData.description,
           amount: parseFloat(formData.amount),
           expenseDate: dbDate,
@@ -136,22 +144,38 @@ const Expenses = () => {
           recurringEndDate: isRecurring && recurringEndDate ? format(recurringEndDate, 'yyyy-MM-dd') : undefined,
         };
 
-        if (formData.apply_to === 'apartment' && formData.apartment_id) {
-          payload.apartmentId = formData.apartment_id;
-        }
-
-        await api.post('/expenses', payload);
-
-        if (formData.apply_to === 'apartment' && formData.apartment_id) {
+        if (batchMode && batchBuildingIds.length > 0) {
+          await api.post('/expenses/batch', {
+            ...commonData,
+            buildingIds: batchBuildingIds,
+          });
           toast({
             title: t('success'),
-            description: t('expenseAppliedToApartment')
+            description: t('batchExpenseCreatedSuccess'),
           });
         } else {
-          toast({
-            title: t('success'),
-            description: t('expenseCreatedSuccessfully')
-          });
+          const payload: any = {
+            ...commonData,
+            buildingId: formData.building_id,
+          };
+
+          if (formData.apply_to === 'apartment' && formData.apartment_id) {
+            payload.apartmentId = formData.apartment_id;
+          }
+
+          await api.post('/expenses', payload);
+
+          if (formData.apply_to === 'apartment' && formData.apartment_id) {
+            toast({
+              title: t('success'),
+              description: t('expenseAppliedToApartment')
+            });
+          } else {
+            toast({
+              title: t('success'),
+              description: t('expenseCreatedSuccessfully')
+            });
+          }
         }
 
         fetchExpenses();
@@ -191,13 +215,30 @@ const Expenses = () => {
     setIsDialogOpen(true);
   };
 
+  const handleCloneExpense = (expense: Expense) => {
+    setEditingExpense(null);
+    setExpenseMode(expense.isRecurring ? 'recurring' : 'one-time');
+    setExpenseDate(new Date(expense.expenseDate + 'T00:00:00'));
+    setRecurringStartDate(expense.recurringStartDate ? new Date(expense.recurringStartDate + 'T00:00:00') : undefined);
+    setRecurringEndDate(expense.recurringEndDate ? new Date(expense.recurringEndDate + 'T00:00:00') : undefined);
+    setFormData({
+      building_id: expense.buildingId,
+      description: expense.description,
+      amount: expense.amount.toString(),
+      category: expense.category || '',
+      apply_to: 'building',
+      apartment_id: '',
+    });
+    setIsDialogOpen(true);
+  };
+
   const resetForm = () => {
     setFormData({
       building_id: '',
       description: '',
       amount: '',
       category: '',
-  
+
       apply_to: 'building',
       apartment_id: '',
     });
@@ -207,12 +248,38 @@ const Expenses = () => {
     setRecurringEndDate(undefined);
     setOpenPopover(null);
     setEditingExpense(null);
+    setBatchMode(false);
+    setBatchBuildingIds([]);
     setIsDialogOpen(false);
   };
 
   const getBuildingName = (buildingId: string) => {
     return buildings.find(b => b.id === buildingId)?.name || t('unknown');
   };
+
+  const filteredRows = useMemo(() => {
+    let rows = selectedBuildingFilter === 'all'
+      ? expenseRows
+      : expenseRows.filter(r => r.expense.buildingId === selectedBuildingFilter);
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      rows = rows.filter(r =>
+        r.buildingName.toLowerCase().includes(q) ||
+        r.expense.description.toLowerCase().includes(q) ||
+        (r.expense.category && r.expense.category.toLowerCase().includes(q))
+      );
+    }
+
+    return rows;
+  }, [expenseRows, selectedBuildingFilter, searchQuery]);
+
+  const paginatedRows = useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return filteredRows.slice(start, start + PAGE_SIZE);
+  }, [filteredRows, currentPage]);
+
+  const totalPages = Math.ceil(filteredRows.length / PAGE_SIZE);
 
   if (!user || (!isAdmin && !isModerator)) return null;
 
@@ -225,7 +292,8 @@ const Expenses = () => {
             <h1 className="text-3xl font-bold">{t('expenses')}</h1>
           </div>
           <div className="flex gap-2 flex-wrap items-center">
-            <BuildingFilter buildings={buildings} value={selectedBuildingFilter} onChange={setSelectedBuildingFilter} />
+            <SearchInput value={searchQuery} onChange={(v) => { setSearchQuery(v); setCurrentPage(1); }} />
+            <BuildingFilter buildings={buildings} value={selectedBuildingFilter} onChange={(v) => { setSelectedBuildingFilter(v); setCurrentPage(1); }} />
             <Button
               onClick={() => {
                 setEditingExpense(null);
@@ -249,6 +317,24 @@ const Expenses = () => {
             >
               <Plus className="w-4 h-4 me-2" />
               {t('addExpense')}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                const rows = expenseRows.map(r => [
+                  r.buildingName || getBuildingName(r.expense.buildingId),
+                  r.expense.description,
+                  r.expense.category || '',
+                  String(r.expense.amount),
+                  formatDate(r.expense.expenseDate),
+                  r.expense.isRecurring ? (r.expense.recurringType || 'recurring') : '',
+                ]);
+                downloadCsv('expenses.csv', ['Building', 'Description', 'Category', 'Amount', 'Date', 'Recurring'], rows);
+              }}
+              className="w-full sm:w-auto"
+            >
+              <Download className="w-4 h-4 me-2" />
+              {t('exportCsv')}
             </Button>
           </div>
         </div>
@@ -306,24 +392,84 @@ const Expenses = () => {
                 )}
 
                 {/* Building */}
-                <div>
-                  <Label>{t('building')}</Label>
-                  <Select
-                    value={formData.building_id}
-                    onValueChange={(value) => setFormData({ ...formData, building_id: value, apartment_id: '' })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={t('selectBuilding')} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {buildings.map((building) => (
-                        <SelectItem key={building.id} value={building.id}>
-                          {building.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                {!editingExpense && (
+                  <div className="flex items-center gap-2">
+                    <Label className="text-sm">{t('batchExpense')}</Label>
+                    <Switch
+                      checked={batchMode}
+                      onCheckedChange={(checked) => {
+                        setBatchMode(checked);
+                        if (checked) {
+                          setFormData({ ...formData, building_id: '', apartment_id: '', apply_to: 'building' });
+                        } else {
+                          setBatchBuildingIds([]);
+                        }
+                      }}
+                    />
+                  </div>
+                )}
+                {batchMode && !editingExpense ? (
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <Label>{t('selectBuildings')}</Label>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          if (batchBuildingIds.length === buildings.length) {
+                            setBatchBuildingIds([]);
+                          } else {
+                            setBatchBuildingIds(buildings.map(b => b.id));
+                          }
+                        }}
+                      >
+                        {batchBuildingIds.length === buildings.length ? t('deselectAll') : t('selectAll')}
+                      </Button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto">
+                      {buildings.map((building) => {
+                        const isSelected = batchBuildingIds.includes(building.id);
+                        return (
+                          <div
+                            key={building.id}
+                            onClick={() => {
+                              setBatchBuildingIds(prev =>
+                                isSelected ? prev.filter(id => id !== building.id) : [...prev, building.id]
+                              );
+                            }}
+                            className={`p-2 rounded border text-sm text-center cursor-pointer transition-colors ${
+                              isSelected
+                                ? 'bg-primary text-primary-foreground border-primary'
+                                : 'bg-background hover:bg-accent border-border'
+                            }`}
+                          >
+                            {building.name}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <Label>{t('building')}</Label>
+                    <Select
+                      value={formData.building_id}
+                      onValueChange={(value) => setFormData({ ...formData, building_id: value, apartment_id: '' })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={t('selectBuilding')} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {buildings.map((building) => (
+                          <SelectItem key={building.id} value={building.id}>
+                            {building.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
 
                 {/* Description */}
                 <div>
@@ -443,8 +589,8 @@ const Expenses = () => {
                   </>
                 )}
 
-                {/* Apply to (create mode only, after building selected) */}
-                {!editingExpense && formData.building_id && (
+                {/* Apply to (create mode only, single building, after building selected) */}
+                {!editingExpense && !batchMode && formData.building_id && (
                   <div className="space-y-3 border-t pt-4">
                     <Label>{t('applyTo')}</Label>
                     <RadioGroup
@@ -518,14 +664,10 @@ const Expenses = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {(() => {
-                  const filtered = selectedBuildingFilter === 'all'
-                    ? expenseRows
-                    : expenseRows.filter(r => r.expense.buildingId === selectedBuildingFilter);
-                  return filtered.length === 0 ? (
+                {paginatedRows.length === 0 ? (
                   <TableEmptyRow colSpan={7} message={t('noExpensesFound')} />
                 ) : (
-                  filtered.map((row) => (
+                  paginatedRows.map((row) => (
                     <TableRow key={row.expense.id}>
                       <TableCell className="font-medium text-start">{row.buildingName || getBuildingName(row.expense.buildingId)}</TableCell>
                       <TableCell className="text-start">{row.expense.description}</TableCell>
@@ -543,6 +685,9 @@ const Expenses = () => {
                       </TableCell>
                       <TableCell className="text-start">
                         <div className="flex justify-end gap-2">
+                          <Button size="sm" variant="outline" onClick={() => handleCloneExpense(row.expense)} title={t('cloneExpense')}>
+                            <Copy className="w-4 h-4" />
+                          </Button>
                           <Button size="sm" variant="outline" onClick={() => handleEdit(row.expense)}>
                             <Pencil className="w-4 h-4" />
                           </Button>
@@ -555,10 +700,16 @@ const Expenses = () => {
                       </TableCell>
                     </TableRow>
                   ))
-                );
-                })()}
+                )}
               </TableBody>
             </Table>
+            <PaginationControls
+              page={currentPage}
+              hasPrevious={currentPage > 1}
+              hasNext={currentPage < totalPages}
+              onPrevious={() => setCurrentPage(p => p - 1)}
+              onNext={() => setCurrentPage(p => p + 1)}
+            />
           </CardContent>
         </Card>
       </div>

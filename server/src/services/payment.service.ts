@@ -12,6 +12,7 @@ export async function listPayments(filters?: {
   buildingId?: string;
   apartmentId?: string;
   allowedBuildingIds?: string[];
+  organizationId?: string;
 }) {
   let query = db
     .select({
@@ -25,6 +26,7 @@ export async function listPayments(filters?: {
     .innerJoin(buildings, eq(apartments.buildingId, buildings.id));
 
   const conditions: any[] = [];
+  if (filters?.organizationId) conditions.push(eq(buildings.organizationId, filters.organizationId));
   if (filters?.buildingId) conditions.push(eq(apartments.buildingId, filters.buildingId));
   if (filters?.apartmentId) conditions.push(eq(payments.apartmentId, filters.apartmentId));
   if (filters?.allowedBuildingIds?.length) {

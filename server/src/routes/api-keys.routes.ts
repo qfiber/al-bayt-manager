@@ -14,14 +14,14 @@ const updateSchema = z.object({ name: z.string().min(1).max(100).optional(), isA
 
 apiKeyRoutes.get('/', requireAuth, requireRole('admin'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const result = await apiKeyService.listApiKeys(req.user!.userId);
+    const result = await apiKeyService.listApiKeys(req.user!.userId, req.organizationId);
     res.json(result);
   } catch (err) { next(err); }
 });
 
 apiKeyRoutes.post('/', requireAuth, requireRole('admin'), validate(createSchema), auditLog('api_key_created', 'api_keys'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const result = await apiKeyService.createApiKey(req.user!.userId, req.body.name);
+    const result = await apiKeyService.createApiKey(req.user!.userId, req.body.name, req.organizationId);
     res.status(201).json(result);
   } catch (err) { next(err); }
 });

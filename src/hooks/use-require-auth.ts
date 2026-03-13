@@ -10,7 +10,7 @@ export function useRequireAuth(role?: 'admin' | 'admin-or-moderator'): void {
     if (loading) return;
 
     if (!user) {
-      navigate('/auth');
+      navigate('/login');
       return;
     }
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useCurrency } from '@/contexts/PublicSettingsContext';
@@ -16,6 +16,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { TableEmptyRow } from '@/components/TableEmptyRow';
+import { SearchInput } from '@/components/SearchInput';
+import { PaginationControls } from '@/components/PaginationControls';
 import { useToast } from '@/hooks/use-toast';
 import { Wrench, Plus, Pencil, Trash2 } from 'lucide-react';
 
@@ -44,6 +46,30 @@ const MaintenanceJobs = () => {
   const { toast } = useToast();
 
   const [jobs, setJobs] = useState<JobRow[]>([]);
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 20;
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return jobs;
+    const q = search.toLowerCase();
+    return jobs.filter(row =>
+      row.job.title.toLowerCase().includes(q) ||
+      row.buildingName.toLowerCase().includes(q) ||
+      (row.job.description && row.job.description.toLowerCase().includes(q)) ||
+      row.job.status.toLowerCase().includes(q)
+    );
+  }, [jobs, search]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const paginated = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  const handleSearch = (value: string) => {
+    setSearch(value);
+    setPage(1);
+  };
+
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingJob, setEditingJob] = useState<JobRow | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -160,13 +186,15 @@ const MaintenanceJobs = () => {
             <Wrench className="w-8 h-8 text-primary" />
             <h1 className="text-3xl font-bold">{t('maintenanceJobs')}</h1>
           </div>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button onClick={() => resetForm()} className="w-full sm:w-auto">
-                <Plus className="w-4 h-4 me-2" />
-                {t('addMaintenanceJob')}
-              </Button>
-            </DialogTrigger>
+          <div className="flex gap-2 flex-wrap items-center">
+            <SearchInput value={search} onChange={handleSearch} />
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <Button onClick={() => resetForm()} className="w-full sm:w-auto">
+                  <Plus className="w-4 h-4 me-2" />
+                  {t('addMaintenanceJob')}
+                </Button>
+              </DialogTrigger>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>{editingJob ? t('editMaintenanceJob') : t('addMaintenanceJob')}</DialogTitle>
@@ -248,6 +276,7 @@ const MaintenanceJobs = () => {
               </form>
             </DialogContent>
           </Dialog>
+          </div>
         </div>
 
         <Card>
@@ -268,10 +297,10 @@ const MaintenanceJobs = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {jobs.length === 0 ? (
+                  {paginated.length === 0 ? (
                     <TableEmptyRow colSpan={6} message={t('noMaintenanceJobs')} />
                   ) : (
-                    jobs.map((row) => (
+                    paginated.map((row) => (
                       <TableRow key={row.job.id}>
                         <TableCell className="text-start">{row.buildingName}</TableCell>
                         <TableCell className="text-start max-w-[200px] truncate">{row.job.title}</TableCell>
@@ -314,6 +343,13 @@ const MaintenanceJobs = () => {
                 </TableBody>
               </Table>
             </div>
+            <PaginationControls
+              page={safePage}
+              hasPrevious={safePage > 1}
+              hasNext={safePage < totalPages}
+              onPrevious={() => setPage(p => Math.max(1, p - 1))}
+              onNext={() => setPage(p => Math.min(totalPages, p + 1))}
+            />
           </CardContent>
         </Card>
       </div>

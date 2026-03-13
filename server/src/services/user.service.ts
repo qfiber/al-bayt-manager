@@ -1,12 +1,28 @@
 import { db } from '../config/database.js';
 import {
   users, profiles, userRoles, userApartments, apartments,
-  moderatorBuildings, totpFactors, buildings,
+  moderatorBuildings, totpFactors, buildings, organizationMembers,
 } from '../db/schema/index.js';
 import { eq, and, inArray } from 'drizzle-orm';
 import { AppError } from '../middleware/error-handler.js';
 
-export async function listUsers() {
+export async function listUsers(organizationId?: string) {
+  // If organizationId is provided, only return users who are members of that org
+  let userIds: string[] | undefined;
+  if (organizationId) {
+    const orgMembers = await db
+      .select({ userId: organizationMembers.userId })
+      .from(organizationMembers)
+      .where(eq(organizationMembers.organizationId, organizationId));
+    userIds = orgMembers.map((m) => m.userId);
+    if (userIds.length === 0) return [];
+  }
+
+  const conditions: any[] = [];
+  if (userIds) {
+    conditions.push(inArray(users.id, userIds));
+  }
+
   const result = await db
     .select({
       id: users.id,
@@ -18,10 +34,15 @@ export async function listUsers() {
       createdAt: users.createdAt,
     })
     .from(users)
-    .leftJoin(profiles, eq(users.id, profiles.id));
+    .leftJoin(profiles, eq(users.id, profiles.id))
+    .where(conditions.length ? and(...conditions) : undefined);
 
-  // Get roles for all users
-  const roles = await db.select().from(userRoles);
+  // Get roles for matching users
+  const roleConditions: any[] = [];
+  if (userIds) {
+    roleConditions.push(inArray(userRoles.userId, userIds));
+  }
+  const roles = await db.select().from(userRoles).where(roleConditions.length ? and(...roleConditions) : undefined);
   const roleMap = new Map<string, string>();
   for (const r of roles) {
     roleMap.set(r.userId, r.role);
@@ -213,11 +234,28 @@ export async function updateBuildingAssignments(userId: string, buildingIds: str
   return { success: true };
 }
 
-export async function get2FAStatuses() {
+export async function get2FAStatuses(organizationId?: string) {
+  // If organizationId is provided, only return users who are members of that org
+  let userIds: string[] | undefined;
+  if (organizationId) {
+    const orgMembers = await db
+      .select({ userId: organizationMembers.userId })
+      .from(organizationMembers)
+      .where(eq(organizationMembers.organizationId, organizationId));
+    userIds = orgMembers.map((m) => m.userId);
+    if (userIds.length === 0) return [];
+  }
+
+  const conditions: any[] = [];
+  if (userIds) {
+    conditions.push(inArray(users.id, userIds));
+  }
+
   const allUsers = await db
     .select({ id: users.id, email: users.email, name: profiles.name })
     .from(users)
-    .leftJoin(profiles, eq(users.id, profiles.id));
+    .leftJoin(profiles, eq(users.id, profiles.id))
+    .where(conditions.length ? and(...conditions) : undefined);
 
   const factors = await db
     .select({ userId: totpFactors.userId, status: totpFactors.status })

@@ -26,7 +26,7 @@ const batchRemindersSchema = z.object({
 bulkRoutes.post('/payments', requireAuth, requireRole('admin', 'moderator'), scopeToModeratorBuildings, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = batchPaymentsSchema.parse(req.body);
-    const result = await bulkService.batchCreatePayments(data, req.user!.userId);
+    const result = await bulkService.batchCreatePayments(data, req.user!.userId, req.organizationId);
     res.json(result);
   } catch (err) { next(err); }
 });
@@ -34,7 +34,7 @@ bulkRoutes.post('/payments', requireAuth, requireRole('admin', 'moderator'), sco
 bulkRoutes.post('/invoices', requireAuth, requireRole('admin', 'moderator'), scopeToModeratorBuildings, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = batchInvoicesSchema.parse(req.body);
-    const result = await bulkService.batchGenerateInvoices(data);
+    const result = await bulkService.batchGenerateInvoices(data, req.organizationId);
     res.json(result);
   } catch (err) { next(err); }
 });
@@ -42,7 +42,7 @@ bulkRoutes.post('/invoices', requireAuth, requireRole('admin', 'moderator'), sco
 bulkRoutes.post('/reminders', requireAuth, requireRole('admin', 'moderator'), scopeToModeratorBuildings, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = batchRemindersSchema.parse(req.body);
-    const result = await bulkService.batchSendReminders(data, req.user!.userId);
+    const result = await bulkService.batchSendReminders(data, req.user!.userId, req.organizationId);
     res.json(result);
   } catch (err) { next(err); }
 });

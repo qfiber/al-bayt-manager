@@ -184,12 +184,14 @@ export async function listSmsLogs(filters?: {
   endDate?: string;
   limit?: number;
   offset?: number;
+  organizationId?: string;
 }) {
   const { limit = 100, offset = 0 } = filters || {};
 
   let query = db.select().from(smsLogs);
 
   const conditions: any[] = [];
+  if (filters?.organizationId) conditions.push(eq(smsLogs.organizationId, filters.organizationId));
   if (filters?.status) conditions.push(eq(smsLogs.status, filters.status));
   if (filters?.templateIdentifier) conditions.push(eq(smsLogs.templateIdentifier, filters.templateIdentifier));
   if (filters?.startDate) conditions.push(gte(smsLogs.createdAt, new Date(filters.startDate)));

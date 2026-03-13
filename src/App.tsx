@@ -33,6 +33,7 @@ import Documents from "./pages/Documents";
 import Portfolio from "./pages/Portfolio";
 import Meetings from "./pages/Meetings";
 import DebtCollection from "./pages/DebtCollection";
+import Organizations from "./pages/Organizations";
 import NotFound from "./pages/NotFound";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfUsage from "./pages/TermsOfUsage";
@@ -70,9 +71,10 @@ const App = () => (
             <Sonner />
             <CookieConsentBanner />
             <Routes>
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/" element={<Index />} />
               {/* Unauthenticated routes — no AppLayout */}
-              <Route path="/auth" element={<Auth />} />
+              <Route path="/login" element={<Auth />} />
+              <Route path="/auth" element={<Navigate to="/login" replace />} />
               <Route path="/register" element={<Register />} />
               <Route path="/setup-2fa" element={<Setup2FA />} />
               <Route path="/privacy-policy" element={<PrivacyPolicy />} />
@@ -100,6 +102,7 @@ const App = () => (
               <Route path="/portfolio" element={<AppLayout><Portfolio /></AppLayout>} />
               <Route path="/meetings" element={<AppLayout><Meetings /></AppLayout>} />
               <Route path="/debt-collection" element={<AppLayout><DebtCollection /></AppLayout>} />
+              <Route path="/organizations" element={<AppLayout><Organizations /></AppLayout>} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

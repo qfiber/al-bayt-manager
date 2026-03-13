@@ -7,7 +7,17 @@ export function requireRole(...roles: string[]) {
       next(new AppError(401, 'Authentication required'));
       return;
     }
-    if (!roles.includes(req.user.role)) {
+    // Super-admins bypass role checks
+    if (req.user.isSuperAdmin) {
+      next();
+      return;
+    }
+    // Map legacy role names for backward compatibility
+    const effectiveRoles = roles.flatMap(r => {
+      if (r === 'admin') return ['admin', 'org_admin'];
+      return [r];
+    });
+    if (!effectiveRoles.includes(req.user.role)) {
       next(new AppError(403, 'Insufficient permissions'));
       return;
     }

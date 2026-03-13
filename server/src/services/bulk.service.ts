@@ -11,7 +11,7 @@ export async function batchCreatePayments(data: {
   month: string;
   amount?: number;
   useSubscriptionAmount?: boolean;
-}, userId: string) {
+}, userId: string, _organizationId?: string) {
   const results = { created: 0, failed: [] as { apartmentId: string; error: string }[] };
 
   for (const apartmentId of data.apartmentIds) {
@@ -45,7 +45,7 @@ export async function batchCreatePayments(data: {
 export async function batchGenerateInvoices(data: {
   buildingIds: string[];
   month: string;
-}) {
+}, _organizationId?: string) {
   const results = { created: 0, skipped: 0, failed: [] as { apartmentId: string; error: string }[] };
 
   // Find occupied apartments in the specified buildings
@@ -76,7 +76,7 @@ export async function batchGenerateInvoices(data: {
 
 export async function batchSendReminders(data: {
   apartmentIds: string[];
-}, userId: string) {
+}, userId: string, _organizationId?: string) {
   const results = { sent: 0, failed: [] as { apartmentId: string; error: string }[] };
 
   for (const apartmentId of data.apartmentIds) {

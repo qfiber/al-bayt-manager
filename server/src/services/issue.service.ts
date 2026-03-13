@@ -9,6 +9,7 @@ export async function listIssues(filters?: {
   status?: string;
   category?: string;
   allowedBuildingIds?: string[];
+  organizationId?: string;
 }) {
   let query = db
     .select({
@@ -21,6 +22,7 @@ export async function listIssues(filters?: {
     .innerJoin(profiles, eq(issueReports.reporterId, profiles.id));
 
   const conditions: any[] = [];
+  if (filters?.organizationId) conditions.push(eq(buildings.organizationId, filters.organizationId));
   if (filters?.buildingId) conditions.push(eq(issueReports.buildingId, filters.buildingId));
   if (filters?.status) conditions.push(eq(issueReports.status, filters.status as any));
   if (filters?.category) conditions.push(eq(issueReports.category, filters.category as any));
@@ -161,16 +163,22 @@ export async function getUserBuildingIds(userId: string): Promise<string[]> {
 /**
  * Count open issues, optionally filtered by building IDs.
  */
-export async function countOpenIssues(buildingIds?: string[]): Promise<number> {
+export async function countOpenIssues(buildingIds?: string[], organizationId?: string): Promise<number> {
   const conditions: any[] = [eq(issueReports.status, 'open')];
   if (buildingIds?.length) {
     conditions.push(inArray(issueReports.buildingId, buildingIds));
   }
 
-  const [result] = await db
+  let query = db
     .select({ count: sql<number>`count(*)::int` })
-    .from(issueReports)
-    .where(and(...conditions));
+    .from(issueReports);
+
+  if (organizationId) {
+    query = query.innerJoin(buildings, eq(issueReports.buildingId, buildings.id)) as any;
+    conditions.push(eq(buildings.organizationId, organizationId));
+  }
+
+  const [result] = await (query as any).where(and(...conditions));
 
   return result.count;
 }

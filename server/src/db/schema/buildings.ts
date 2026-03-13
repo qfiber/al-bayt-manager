@@ -1,7 +1,9 @@
 import { pgTable, uuid, varchar, integer, numeric, timestamp } from 'drizzle-orm/pg-core';
+import { organizations } from './organizations.js';
 
 export const buildings = pgTable('buildings', {
   id: uuid('id').defaultRandom().primaryKey(),
+  organizationId: uuid('organization_id').references(() => organizations.id, { onDelete: 'cascade' }),
   name: varchar('name', { length: 255 }).notNull(),
   address: varchar('address', { length: 500 }),
   numberOfFloors: integer('number_of_floors'),

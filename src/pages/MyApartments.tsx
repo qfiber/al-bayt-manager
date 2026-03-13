@@ -10,7 +10,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Home, Download, Receipt, Clock } from 'lucide-react';
+import { Home, Download, Receipt, Clock, AlertTriangle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { formatDate } from '@/lib/utils';
 
 const MyApartments = () => {
@@ -19,6 +20,7 @@ const MyApartments = () => {
   const { t } = useLanguage();
   const { currencySymbol, formatCurrency } = useCurrency();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [apartments, setApartments] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -89,16 +91,22 @@ const MyApartments = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/10">
       <div className="container mx-auto px-3 py-4 sm:p-6">
-        <div className="flex items-center gap-3 mb-8">
-          <Home className="w-8 h-8 text-primary" />
-          <h1 className="text-3xl font-bold">My Apartments</h1>
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8">
+          <div className="flex items-center gap-3">
+            <Home className="w-8 h-8 text-primary" />
+            <h1 className="text-3xl font-bold">{t('myApartments')}</h1>
+          </div>
+          <Button variant="outline" onClick={() => navigate('/issues')}>
+            <AlertTriangle className="w-4 h-4 me-2" />
+            {t('reportIssue')}
+          </Button>
         </div>
 
         {apartments.length === 0 ? (
           <Card>
             <CardContent className="p-8 text-center">
               <p className="text-muted-foreground">
-                You don't have any apartments assigned to you yet. Please contact your administrator.
+                {t('noApartmentsAssigned')}
               </p>
             </CardContent>
           </Card>
@@ -113,28 +121,37 @@ const MyApartments = () => {
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Home className="w-5 h-5" />
-                      Apartment {apartment.apartmentNumber}
+                      {t('apartment')} {apartment.apartmentNumber}
                     </CardTitle>
                     <CardDescription>
                       {apartment.buildingName} - {apartment.buildingAddress}
                     </CardDescription>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.open(`/api/my-apartments/${apartment.id}/statement/download`)}
+                      className="mt-2 w-fit"
+                    >
+                      <Download className="w-4 h-4 me-2" />
+                      {t('downloadStatement')}
+                    </Button>
                   </CardHeader>
                   <CardContent className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                       <div className="space-y-1">
-                        <p className="text-sm text-muted-foreground">Status</p>
-                        <p className="font-medium capitalize">{apartment.status}</p>
+                        <p className="text-sm text-muted-foreground">{t('status')}</p>
+                        <p className="font-medium capitalize">{t(apartment.status as 'vacant' | 'occupied')}</p>
                       </div>
                       <div className="space-y-1">
-                        <p className="text-sm text-muted-foreground">Occupancy Start</p>
-                        <p className="font-medium">{apartment.occupancyStart ? formatDate(apartment.occupancyStart) : 'Not set'}</p>
+                        <p className="text-sm text-muted-foreground">{t('occupancyStart')}</p>
+                        <p className="font-medium">{apartment.occupancyStart ? formatDate(apartment.occupancyStart) : '-'}</p>
                       </div>
                       <div className="space-y-1">
-                        <p className="text-sm text-muted-foreground">Monthly Subscription</p>
+                        <p className="text-sm text-muted-foreground">{t('monthlySubscription').replace('{currency}', currencySymbol)}</p>
                         <p className="font-medium">{formatCurrency(subscriptionAmount)}</p>
                       </div>
                       <div className="space-y-1">
-                        <p className="text-sm text-muted-foreground">Subscription Status</p>
+                        <p className="text-sm text-muted-foreground">{t('subscriptionStatus')}</p>
                         <p className={`font-medium capitalize ${
                           apartment.subscriptionStatus === 'paid' ? 'text-green-600' :
                           apartment.subscriptionStatus === 'partial' ? 'text-yellow-600' :
@@ -240,7 +257,7 @@ const MyApartments = () => {
                                 <TableCell>
                                   {transaction.description}
                                   {transaction.isCanceled && (
-                                    <span className="ms-2 text-xs text-muted-foreground">(Canceled)</span>
+                                    <span className="ms-2 text-xs text-muted-foreground">({t('canceled')})</span>
                                   )}
                                 </TableCell>
                                 <TableCell>
@@ -251,7 +268,7 @@ const MyApartments = () => {
                                       ? 'bg-gray-100 text-gray-800'
                                       : 'bg-red-100 text-red-800'
                                   }`}>
-                                    {transaction.type === 'payment' ? 'Payment' : transaction.isCanceled ? 'Canceled Expense' : 'Expense'}
+                                    {transaction.type === 'payment' ? t('payment') : transaction.isCanceled ? t('canceled') : t('expense')}
                                   </span>
                                 </TableCell>
                                 <TableCell className={`text-start font-medium ${

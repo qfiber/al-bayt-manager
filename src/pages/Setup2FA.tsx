@@ -32,7 +32,7 @@ const Setup2FA = () => {
 
   useEffect(() => {
     if (!user) {
-      navigate('/auth');
+      navigate('/login');
       return;
     }
 

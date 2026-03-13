@@ -9,12 +9,14 @@ export async function listAuditLogs(filters?: {
   endDate?: string;
   limit?: number;
   offset?: number;
+  organizationId?: string;
 }) {
   const { limit = 100, offset = 0 } = filters || {};
 
   let query = db.select().from(auditLogs);
 
   const conditions: any[] = [];
+  if (filters?.organizationId) conditions.push(eq(auditLogs.organizationId, filters.organizationId));
   if (filters?.userId) conditions.push(eq(auditLogs.userId, filters.userId));
   if (filters?.actionType) conditions.push(eq(auditLogs.actionType, filters.actionType as any));
   if (filters?.startDate) conditions.push(gte(auditLogs.createdAt, new Date(filters.startDate)));
@@ -36,6 +38,7 @@ export async function logAuditEvent(data: {
   actionDetails?: any;
   ipAddress?: string;
   userAgent?: string;
+  organizationId?: string;
 }) {
   await db.insert(auditLogs).values({
     userId: data.userId,
@@ -46,5 +49,6 @@ export async function logAuditEvent(data: {
     actionDetails: data.actionDetails,
     ipAddress: data.ipAddress,
     userAgent: data.userAgent,
+    organizationId: data.organizationId,
   });
 }

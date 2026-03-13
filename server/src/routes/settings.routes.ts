@@ -37,23 +37,23 @@ const testSmsSchema = z.object({
 });
 
 // Public endpoint (no auth required) — must be before authenticated routes
-settingsRoutes.get('/public', async (_req: Request, res: Response, next: NextFunction) => {
+settingsRoutes.get('/public', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const result = await settingsService.getPublicSettings();
+    const result = await settingsService.getPublicSettings(req.organizationId);
     res.json(result);
   } catch (err) { next(err); }
 });
 
-settingsRoutes.get('/', requireAuth, requireRole('admin'), async (_req: Request, res: Response, next: NextFunction) => {
+settingsRoutes.get('/', requireAuth, requireRole('admin'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const result = await settingsService.getSettings();
+    const result = await settingsService.getSettings(req.organizationId);
     res.json(result);
   } catch (err) { next(err); }
 });
 
 settingsRoutes.put('/', requireAuth, requireRole('admin'), validate(updateSettingsSchema), auditLog('update', 'settings'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const result = await settingsService.updateSettings(req.body);
+    const result = await settingsService.updateSettings(req.organizationId, req.body);
     res.json(result);
   } catch (err) { next(err); }
 });

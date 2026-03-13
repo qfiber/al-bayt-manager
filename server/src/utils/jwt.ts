@@ -5,6 +5,8 @@ export interface TokenPayload {
   userId: string;
   email: string;
   role: string;
+  organizationId?: string;
+  isSuperAdmin?: boolean;
 }
 
 export function signAccessToken(payload: TokenPayload): string {

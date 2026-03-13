@@ -1,4 +1,6 @@
 export * from './enums.js';
+export * from './organizations.js';
+export * from './organization-members.js';
 export * from './users.js';
 export * from './refresh-tokens.js';
 export * from './totp-factors.js';

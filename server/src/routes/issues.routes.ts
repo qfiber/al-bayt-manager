@@ -43,6 +43,7 @@ issueRoutes.get('/', requireAuth, scopeToModeratorBuildings, async (req: Request
       status: status as string | undefined,
       category: category as string | undefined,
       allowedBuildingIds,
+      organizationId: req.organizationId,
     });
     res.json(result);
   } catch (err) { next(err); }
@@ -57,7 +58,7 @@ issueRoutes.get('/count/open', requireAuth, scopeToModeratorBuildings, async (re
       buildingIds = await issueService.getUserBuildingIds(req.user!.userId);
     }
 
-    const count = await issueService.countOpenIssues(buildingIds);
+    const count = await issueService.countOpenIssues(buildingIds, req.organizationId);
     res.json({ count });
   } catch (err) { next(err); }
 });

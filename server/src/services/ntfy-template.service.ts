@@ -64,8 +64,12 @@ export async function ensureDefaultNtfyTemplates() {
 
 // ─── Template CRUD ───
 
-export async function listNtfyTemplates() {
-  const templates = await db.select().from(ntfyTemplates).orderBy(ntfyTemplates.name);
+export async function listNtfyTemplates(organizationId?: string) {
+  let query = db.select().from(ntfyTemplates);
+  if (organizationId) {
+    query = query.where(eq(ntfyTemplates.organizationId, organizationId)) as any;
+  }
+  const templates = await query.orderBy(ntfyTemplates.name);
   const translations = await db.select().from(ntfyTemplateTranslations);
 
   return templates.map((t) => ({

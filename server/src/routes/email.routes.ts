@@ -62,9 +62,9 @@ const emailLogQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).default(0),
 });
 
-emailRoutes.get('/templates', requireAuth, requireRole('admin'), async (_req: Request, res: Response, next: NextFunction) => {
+emailRoutes.get('/templates', requireAuth, requireRole('admin'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const result = await emailService.listTemplates();
+    const result = await emailService.listTemplates(req.organizationId);
     res.json(result);
   } catch (err) { next(err); }
 });
@@ -100,16 +100,16 @@ emailRoutes.post('/send', requireAuth, requireRole('admin'), validate(sendEmailS
 emailRoutes.get('/logs', requireAuth, requireRole('admin'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const query = emailLogQuerySchema.parse(req.query);
-    const result = await emailService.listEmailLogs(query);
+    const result = await emailService.listEmailLogs({ ...query, organizationId: req.organizationId });
     res.json(result);
   } catch (err) { next(err); }
 });
 
 // ─── Ntfy Template Routes ───
 
-emailRoutes.get('/ntfy-templates', requireAuth, requireRole('admin'), async (_req: Request, res: Response, next: NextFunction) => {
+emailRoutes.get('/ntfy-templates', requireAuth, requireRole('admin'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const result = await ntfyTemplateService.listNtfyTemplates();
+    const result = await ntfyTemplateService.listNtfyTemplates(req.organizationId);
     res.json(result);
   } catch (err) { next(err); }
 });
@@ -137,9 +137,9 @@ emailRoutes.put('/ntfy-templates/:id/translations', requireAuth, requireRole('ad
 
 // ─── SMS Template Routes ───
 
-emailRoutes.get('/sms-templates', requireAuth, requireRole('admin'), async (_req: Request, res: Response, next: NextFunction) => {
+emailRoutes.get('/sms-templates', requireAuth, requireRole('admin'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const result = await smsTemplateService.listSmsTemplates();
+    const result = await smsTemplateService.listSmsTemplates(req.organizationId);
     res.json(result);
   } catch (err) { next(err); }
 });
@@ -183,7 +183,7 @@ const smsLogQuerySchema = z.object({
 emailRoutes.get('/sms-logs', requireAuth, requireRole('admin'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const query = smsLogQuerySchema.parse(req.query);
-    const result = await listSmsLogs(query);
+    const result = await listSmsLogs({ ...query, organizationId: req.organizationId });
     res.json(result);
   } catch (err) { next(err); }
 });

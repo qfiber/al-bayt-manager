@@ -19,7 +19,7 @@ async function getProfileName(profileId: string | null, txOrDb: any = db): Promi
   return profile?.name ?? null;
 }
 
-export async function listApartments(buildingId?: string, allowedBuildingIds?: string[]) {
+export async function listApartments(buildingId?: string, allowedBuildingIds?: string[], organizationId?: string) {
   let query = db
     .select({
       apartment: apartments,
@@ -39,6 +39,7 @@ export async function listApartments(buildingId?: string, allowedBuildingIds?: s
     );
 
   const conditions: any[] = [];
+  if (organizationId) conditions.push(eq(buildings.organizationId, organizationId));
   if (buildingId) conditions.push(eq(apartments.buildingId, buildingId));
   if (allowedBuildingIds && allowedBuildingIds.length > 0) {
     conditions.push(inArray(apartments.buildingId, allowedBuildingIds));

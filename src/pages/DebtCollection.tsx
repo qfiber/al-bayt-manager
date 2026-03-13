@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { TableEmptyRow } from '@/components/TableEmptyRow';
+import { SearchInput } from '@/components/SearchInput';
+import { PaginationControls } from '@/components/PaginationControls';
 import { useCurrency } from '@/contexts/PublicSettingsContext';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -71,10 +73,58 @@ const DebtCollection = () => {
   // Apartments in collection
   const [apartments, setApartments] = useState<ApartmentRow[]>([]);
   const [loadingApartments, setLoadingApartments] = useState(false);
+  const [aptSearch, setAptSearch] = useState('');
+  const [aptPage, setAptPage] = useState(1);
 
   // Collection log
   const [logEntries, setLogEntries] = useState<CollectionLogEntry[]>([]);
   const [loadingLog, setLoadingLog] = useState(false);
+  const [logSearch, setLogSearch] = useState('');
+  const [logPage, setLogPage] = useState(1);
+
+  const PAGE_SIZE = 20;
+
+  // Apartments filtering & pagination
+  const filteredApts = useMemo(() => {
+    if (!aptSearch.trim()) return apartments;
+    const q = aptSearch.toLowerCase();
+    return apartments.filter(row =>
+      row.apartment.apartmentNumber.toLowerCase().includes(q) ||
+      row.buildingName.toLowerCase().includes(q) ||
+      (row.stageName && row.stageName.toLowerCase().includes(q))
+    );
+  }, [apartments, aptSearch]);
+
+  const aptTotalPages = Math.max(1, Math.ceil(filteredApts.length / PAGE_SIZE));
+  const aptSafePage = Math.min(aptPage, aptTotalPages);
+  const paginatedApts = filteredApts.slice((aptSafePage - 1) * PAGE_SIZE, aptSafePage * PAGE_SIZE);
+
+  const handleAptSearch = (value: string) => {
+    setAptSearch(value);
+    setAptPage(1);
+  };
+
+  // Log filtering & pagination
+  const filteredLog = useMemo(() => {
+    if (!logSearch.trim()) return logEntries;
+    const q = logSearch.toLowerCase();
+    return logEntries.filter(entry =>
+      entry.apartmentNumber.toLowerCase().includes(q) ||
+      entry.buildingName.toLowerCase().includes(q) ||
+      entry.stageName.toLowerCase().includes(q) ||
+      entry.action.toLowerCase().includes(q) ||
+      (entry.details && entry.details.toLowerCase().includes(q))
+    );
+  }, [logEntries, logSearch]);
+
+  const logTotalPages = Math.max(1, Math.ceil(filteredLog.length / PAGE_SIZE));
+  const logSafePage = Math.min(logPage, logTotalPages);
+  const paginatedLog = filteredLog.slice((logSafePage - 1) * PAGE_SIZE, logSafePage * PAGE_SIZE);
+
+  const handleLogSearch = (value: string) => {
+    setLogSearch(value);
+    setLogPage(1);
+  };
 
   // Stages
   const [stages, setStages] = useState<CollectionStage[]>([]);
@@ -285,6 +335,9 @@ const DebtCollection = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
+            <div className="mb-4">
+              <SearchInput value={aptSearch} onChange={handleAptSearch} />
+            </div>
             {loadingApartments ? (
               <p className="text-center text-muted-foreground">{t('loading')}</p>
             ) : (
@@ -301,10 +354,10 @@ const DebtCollection = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {apartments.length === 0 ? (
+                    {paginatedApts.length === 0 ? (
                       <TableEmptyRow colSpan={6} message={t('noApartmentsInCollection')} />
                     ) : (
-                      apartments.map((row) => (
+                      paginatedApts.map((row) => (
                         <TableRow key={row.apartment.id}>
                           <TableCell className="text-start font-medium">
                             <div className="flex items-center gap-1">
@@ -342,6 +395,13 @@ const DebtCollection = () => {
                 </Table>
               </div>
             )}
+            <PaginationControls
+              page={aptSafePage}
+              hasPrevious={aptSafePage > 1}
+              hasNext={aptSafePage < aptTotalPages}
+              onPrevious={() => setAptPage(p => Math.max(1, p - 1))}
+              onNext={() => setAptPage(p => Math.min(aptTotalPages, p + 1))}
+            />
           </CardContent>
         </Card>
 
@@ -354,6 +414,9 @@ const DebtCollection = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
+            <div className="mb-4">
+              <SearchInput value={logSearch} onChange={handleLogSearch} />
+            </div>
             {loadingLog ? (
               <p className="text-center text-muted-foreground">{t('loading')}</p>
             ) : (
@@ -370,10 +433,10 @@ const DebtCollection = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {logEntries.length === 0 ? (
+                    {paginatedLog.length === 0 ? (
                       <TableEmptyRow colSpan={6} message={t('noCollectionLogEntries')} />
                     ) : (
-                      logEntries.map((entry) => (
+                      paginatedLog.map((entry) => (
                         <TableRow key={entry.id}>
                           <TableCell className="text-start">{formatDate(entry.createdAt)}</TableCell>
                           <TableCell className="text-start">{t('apt')} {entry.apartmentNumber}</TableCell>
@@ -392,6 +455,13 @@ const DebtCollection = () => {
                 </Table>
               </div>
             )}
+            <PaginationControls
+              page={logSafePage}
+              hasPrevious={logSafePage > 1}
+              hasNext={logSafePage < logTotalPages}
+              onPrevious={() => setLogPage(p => Math.max(1, p - 1))}
+              onNext={() => setLogPage(p => Math.min(logTotalPages, p + 1))}
+            />
           </CardContent>
         </Card>
 

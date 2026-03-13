@@ -20,7 +20,7 @@ const updateStageSchema = createStageSchema.partial();
 
 debtCollectionRoutes.get('/stages', requireAuth, requireRole('admin'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const result = await debtCollectionService.listStages();
+    const result = await debtCollectionService.listStages(req.organizationId);
     res.json(result);
   } catch (err) { next(err); }
 });
@@ -28,7 +28,7 @@ debtCollectionRoutes.get('/stages', requireAuth, requireRole('admin'), async (re
 debtCollectionRoutes.post('/stages', requireAuth, requireRole('admin'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = createStageSchema.parse(req.body);
-    const result = await debtCollectionService.createStage(data);
+    const result = await debtCollectionService.createStage({ ...data, organizationId: req.organizationId });
     res.status(201).json(result);
   } catch (err) { next(err); }
 });

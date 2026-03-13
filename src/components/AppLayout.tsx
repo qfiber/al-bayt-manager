@@ -104,6 +104,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
     { label: t('auditLogs'), path: '/audit-logs', icon: Shield },
     { label: t('notificationTemplates'), path: '/email-templates', icon: Bell },
     { label: t('emailLogs'), path: '/email-logs', icon: MailOpen },
+    ...(user?.isSuperAdmin ? [{ label: t('organizations'), path: '/organizations', icon: Building2 }] : []),
   ];
 
   const adminDropdownActive = adminDropdownLinks.some((l) => isActive(l.path));
@@ -197,6 +198,9 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
                   <div className="px-2 py-1.5 text-sm">
                     <div className="font-medium truncate">{user.name || user.email}</div>
                     <div className="text-xs text-muted-foreground truncate">{user.email}</div>
+                    {user.organizationName && (
+                      <div className="text-xs text-primary truncate mt-0.5">{user.organizationName}</div>
+                    )}
                   </div>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => navigate('/profile')}>
@@ -248,6 +252,9 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
                   <div className="px-2 py-1.5 text-sm">
                     <div className="font-medium truncate">{user.name || user.email}</div>
                     <div className="text-xs text-muted-foreground truncate">{user.email}</div>
+                    {user.organizationName && (
+                      <div className="text-xs text-primary truncate mt-0.5">{user.organizationName}</div>
+                    )}
                   </div>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => navigate('/profile')}>

@@ -8,6 +8,7 @@ export async function listJobs(filters?: {
   buildingId?: string;
   status?: string;
   allowedBuildingIds?: string[];
+  organizationId?: string;
 }) {
   let query = db
     .select({
@@ -18,6 +19,7 @@ export async function listJobs(filters?: {
     .innerJoin(buildings, eq(maintenanceJobs.buildingId, buildings.id));
 
   const conditions: any[] = [];
+  if (filters?.organizationId) conditions.push(eq(buildings.organizationId, filters.organizationId));
   if (filters?.buildingId) conditions.push(eq(maintenanceJobs.buildingId, filters.buildingId));
   if (filters?.status) conditions.push(eq(maintenanceJobs.status, filters.status as any));
   if (filters?.allowedBuildingIds?.length) {

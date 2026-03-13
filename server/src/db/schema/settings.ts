@@ -1,7 +1,9 @@
 import { pgTable, uuid, varchar, boolean, timestamp } from 'drizzle-orm/pg-core';
+import { organizations } from './organizations.js';
 
 export const settings = pgTable('settings', {
   id: uuid('id').defaultRandom().primaryKey(),
+  organizationId: uuid('organization_id').references(() => organizations.id, { onDelete: 'cascade' }),
   companyName: varchar('company_name', { length: 255 }),
   systemLanguage: varchar('system_language', { length: 10 }).default('ar').notNull(),
   logoUrl: varchar('logo_url', { length: 500 }),

@@ -10,21 +10,27 @@ function normalizeLogoUrl(url: string | null): string | null {
   return url.replace(/^\/api\/uploads\/logos\//, '/public-uploads/logos/');
 }
 
-/** Get or create the singleton settings row */
-async function getOrCreateSettings(): Promise<SettingsRow> {
-  const [existing] = await db.select().from(settings).limit(1);
+/** Get or create the settings row, optionally scoped by organization */
+async function getOrCreateSettings(organizationId?: string): Promise<SettingsRow> {
+  const baseQuery = db.select().from(settings);
+  const [existing] = organizationId
+    ? await baseQuery.where(eq(settings.organizationId, organizationId)).limit(1)
+    : await baseQuery.limit(1);
   if (existing) return existing;
 
   // Upsert to avoid race conditions on first access
   const [created] = await db
     .insert(settings)
-    .values({})
+    .values(organizationId ? { organizationId } : {})
     .onConflictDoNothing()
     .returning();
   if (created) return created;
 
   // Another request won the race — just read it
-  const [row] = await db.select().from(settings).limit(1);
+  const retryQuery = db.select().from(settings);
+  const [row] = organizationId
+    ? await retryQuery.where(eq(settings.organizationId, organizationId)).limit(1)
+    : await retryQuery.limit(1);
   return row;
 }
 
@@ -42,13 +48,13 @@ function maskSensitiveFields(row: SettingsRow): Record<string, unknown> {
   return masked;
 }
 
-export async function getSettings() {
-  const row = await getOrCreateSettings();
+export async function getSettings(organizationId?: string) {
+  const row = await getOrCreateSettings(organizationId);
   return maskSensitiveFields(row);
 }
 
-export async function getPublicSettings() {
-  const [result] = await db.select({
+export async function getPublicSettings(organizationId?: string) {
+  const baseQuery = db.select({
     companyName: settings.companyName,
     systemLanguage: settings.systemLanguage,
     logoUrl: settings.logoUrl,
@@ -57,7 +63,10 @@ export async function getPublicSettings() {
     registrationEnabled: settings.registrationEnabled,
     currencyCode: settings.currencyCode,
     currencySymbol: settings.currencySymbol,
-  }).from(settings).limit(1);
+  }).from(settings);
+  const [result] = organizationId
+    ? await baseQuery.where(eq(settings.organizationId, organizationId)).limit(1)
+    : await baseQuery.limit(1);
   if (!result) {
     return {
       companyName: null,
@@ -73,7 +82,7 @@ export async function getPublicSettings() {
   return { ...result, logoUrl: normalizeLogoUrl(result.logoUrl) };
 }
 
-export async function updateSettings(data: Partial<{
+export async function updateSettings(organizationId: string | undefined, data: Partial<{
   companyName: string | null;
   systemLanguage: string;
   logoUrl: string | null;
@@ -95,7 +104,7 @@ export async function updateSettings(data: Partial<{
   currencyCode: string;
   currencySymbol: string;
 }>) {
-  const existing = await getOrCreateSettings();
+  const existing = await getOrCreateSettings(organizationId);
 
   const updateData = { ...data };
 
@@ -119,6 +128,6 @@ export async function updateSettings(data: Partial<{
 }
 
 /** Internal: get raw settings without masking (for email service, etc.) */
-export async function getRawSettings() {
-  return getOrCreateSettings();
+export async function getRawSettings(organizationId?: string) {
+  return getOrCreateSettings(organizationId);
 }

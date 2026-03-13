@@ -3,8 +3,9 @@ import { meetings, meetingAttendees, meetingDecisions, buildings, profiles } fro
 import { eq, and, inArray, desc, sql } from 'drizzle-orm';
 import { AppError } from '../middleware/error-handler.js';
 
-export async function listMeetings(filters?: { buildingId?: string; allowedBuildingIds?: string[] }) {
+export async function listMeetings(filters?: { buildingId?: string; allowedBuildingIds?: string[]; organizationId?: string }) {
   const conditions: any[] = [];
+  if (filters?.organizationId) conditions.push(eq(buildings.organizationId, filters.organizationId));
   if (filters?.buildingId) conditions.push(eq(meetings.buildingId, filters.buildingId));
   if (filters?.allowedBuildingIds?.length) {
     conditions.push(inArray(meetings.buildingId, filters.allowedBuildingIds));

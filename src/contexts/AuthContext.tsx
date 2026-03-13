@@ -12,6 +12,9 @@ interface UserData {
   emailNotificationsEnabled?: boolean;
   smsNotificationsEnabled?: boolean;
   role: string;
+  isSuperAdmin?: boolean;
+  organizationId?: string;
+  organizationName?: string;
   totpFactors?: { id: string; status: string; friendlyName?: string }[];
 }
 
@@ -19,6 +22,7 @@ interface AuthContextType {
   user: UserData | null;
   isAdmin: boolean;
   isModerator: boolean;
+  isSuperAdmin: boolean;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{
     error?: any;
@@ -37,8 +41,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.role === 'admin' || user?.role === 'org_admin' || user?.isSuperAdmin === true;
   const isModerator = user?.role === 'moderator';
+  const isSuperAdmin = user?.isSuperAdmin === true;
 
   const fetchUser = useCallback(async () => {
     if (!auth.isAuthenticated()) {
@@ -103,11 +108,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signOut = async () => {
     await auth.logout();
     setUser(null);
-    navigate('/auth');
+    navigate('/login');
   };
 
   return (
-    <AuthContext.Provider value={{ user, isAdmin, isModerator, loading, signIn, signUp, signOut, refreshUser }}>
+    <AuthContext.Provider value={{ user, isAdmin, isModerator, isSuperAdmin, loading, signIn, signUp, signOut, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

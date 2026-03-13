@@ -8,6 +8,7 @@ import { ensureDefaultTemplates } from './services/email.service.js';
 import { ensureDefaultNtfyTemplates } from './services/ntfy-template.service.js';
 import { ensureDefaultSmsTemplates } from './services/sms-template.service.js';
 import { startSmsCron } from './services/sms-cron.service.js';
+import { startEmailCron } from './services/email-cron.service.js';
 
 async function main() {
   try {
@@ -32,6 +33,7 @@ async function main() {
     startSubscriptionCron();
     startDebtCollectionCron();
     startSmsCron();
+    startEmailCron();
   });
 }
 

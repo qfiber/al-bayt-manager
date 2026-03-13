@@ -1,8 +1,10 @@
 import { pgTable, uuid, varchar, boolean, timestamp } from 'drizzle-orm/pg-core';
 import { users } from './users.js';
+import { organizations } from './organizations.js';
 
 export const apiKeys = pgTable('api_keys', {
   id: uuid('id').defaultRandom().primaryKey(),
+  organizationId: uuid('organization_id').references(() => organizations.id, { onDelete: 'cascade' }),
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   name: varchar('name', { length: 255 }).notNull(),
   keyHash: varchar('key_hash', { length: 255 }).notNull().unique(),
