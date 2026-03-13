@@ -14,6 +14,9 @@ CREATE TABLE IF NOT EXISTS organizations (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Drop slug column if it exists from a previous migration attempt
+ALTER TABLE organizations DROP COLUMN IF EXISTS slug;
+
 -- Create organization_members table
 CREATE TABLE IF NOT EXISTS organization_members (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
