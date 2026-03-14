@@ -6,8 +6,7 @@ import { usePublicSettings } from '@/contexts/PublicSettingsContext';
 import { Button } from '@/components/ui/button';
 import {
   Building2, CreditCard, BarChart3, Users, Wrench, FileText,
-  ArrowRight, Check, Menu, X, Shield, Globe, Clock, Zap,
-  ChevronDown, Mail, Phone, MapPin,
+  ArrowRight, Menu, X, Shield, Globe, Clock, Zap, Mail,
 } from 'lucide-react';
 
 const LandingPage = () => {

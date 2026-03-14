@@ -101,6 +101,9 @@ const App = () => (
               <Route path="/privacy-policy" element={<PrivacyPolicy />} />
               <Route path="/terms" element={<TermsOfUsage />} />
               <Route path="/accessibility" element={<Accessibility />} />
+              <Route path="/pricing" element={<Pricing />} />
+              <Route path="/faq" element={<FAQ />} />
+              <Route path="/contact" element={<Contact />} />
               {/* Authenticated routes — wrapped in AppLayout */}
               <Route path="/dashboard" element={<AppLayout><Dashboard /></AppLayout>} />
               <Route path="/buildings" element={<AppLayout><Buildings /></AppLayout>} />
