@@ -12,7 +12,14 @@ interface HypConfig {
 }
 
 async function getHypConfig(organizationId?: string): Promise<HypConfig> {
-  const config = await getRawSettings(organizationId);
+  // Try org-specific settings first, then fall back to global settings
+  let config = organizationId ? await getRawSettings(organizationId) : await getRawSettings();
+
+  if (!config?.hypEnabled && organizationId) {
+    // Org doesn't have HYP — try global/platform settings (for SaaS billing)
+    config = await getRawSettings();
+  }
+
   if (!config?.hypEnabled) throw new AppError(400, 'HYP is not configured');
 
   const masof = config.hypMasof || HYP_TEST_MASOF;

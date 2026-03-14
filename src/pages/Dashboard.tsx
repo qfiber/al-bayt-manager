@@ -711,7 +711,8 @@ const Dashboard = () => {
                       disabled={subscription?.subscription?.planId === plan.id && subscription?.subscription?.billingCycle === cycle}
                       onClick={async () => {
                         try {
-                          // Try HYP first (Israeli landlords)
+                          // SaaS payments: HYP (primary) → CardCom (fallback)
+                          // Stripe is for tenant payments only, not SaaS billing
                           try {
                             const result = await api.post('/subscriptions/hyp-checkout', { planId: plan.id, billingCycle: cycle });
                             if (result.url) {
@@ -719,25 +720,21 @@ const Dashboard = () => {
                               return;
                             }
                           } catch {
-                            // HYP not configured — try Stripe
+                            // HYP not configured — try CardCom
                           }
 
-                          // Try Stripe checkout (for international landlords)
                           try {
-                            const result = await api.post('/subscriptions/stripe-checkout', { planId: plan.id, billingCycle: cycle });
+                            const result = await api.post('/subscriptions/cardcom-checkout', { planId: plan.id, billingCycle: cycle });
                             if (result.url) {
                               window.location.href = result.url;
                               return;
                             }
                           } catch {
-                            // Stripe not configured — fall back to direct plan change
+                            // CardCom not configured either
                           }
 
-                          // Direct plan change (for orgs where admin assigns manually)
-                          await api.post('/subscriptions/change-plan', { planId: plan.id, billingCycle: cycle });
-                          toast.success(t('saveSuccess'));
-                          setShowUpgradeDialog(false);
-                          api.get('/subscriptions/current').then(setSubscription).catch(() => {});
+                          // No Israeli payment gateway worked
+                          toast.error(t('noPaymentGatewayConfigured'));
                         } catch {
                           toast.error(t('error'));
                         }

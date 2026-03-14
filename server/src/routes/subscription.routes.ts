@@ -93,7 +93,8 @@ const changePlanSchema = z.object({
   billingCycle: z.enum(['monthly', 'semi_annual', 'yearly']),
 });
 
-subscriptionRoutes.post('/change-plan', requireAuth, requireOrgScope, requireRole('admin'), validate(changePlanSchema), async (req: Request, res: Response, next: NextFunction) => {
+// Super-admin only — direct plan assignment without payment
+subscriptionRoutes.post('/change-plan', requireAuth, requireSuperAdmin, validate(changePlanSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!req.organizationId) { res.status(400).json({ error: 'No org context' }); return; }
     const { planId, billingCycle } = req.body;
