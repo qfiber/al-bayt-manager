@@ -1,7 +1,8 @@
 import cron from 'node-cron';
 import { db } from '../config/database.js';
 import { logger } from '../config/logger.js';
-import { settings, apartments, buildings, userApartments, profiles } from '../db/schema/index.js';
+import { apartments, buildings, userApartments, profiles } from '../db/schema/index.js';
+import { getRawSettings } from './settings.service.js';
 import { eq, and, lt, inArray } from 'drizzle-orm';
 import { sendSms } from './sms.service.js';
 import { resolveSmsTemplate } from './sms-template.service.js';
@@ -39,7 +40,7 @@ async function sendMonthlyReminders() {
   logger.info('SMS cron: Sending monthly subscription reminders');
 
   try {
-    const [config] = await db.select().from(settings).limit(1);
+    const config = await getRawSettings();
     if (!config?.smsEnabled) {
       logger.info('SMS cron: SMS is disabled, skipping');
       return;
@@ -104,7 +105,7 @@ async function sendOverdueReminders() {
   logger.info('SMS cron: Sending overdue payment reminders');
 
   try {
-    const [config] = await db.select().from(settings).limit(1);
+    const config = await getRawSettings();
     if (!config?.smsEnabled) {
       logger.info('SMS cron: SMS is disabled, skipping');
       return;

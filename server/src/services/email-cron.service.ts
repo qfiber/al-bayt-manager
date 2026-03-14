@@ -1,9 +1,10 @@
 import cron from 'node-cron';
 import { db } from '../config/database.js';
 import { logger } from '../config/logger.js';
-import { settings, apartments } from '../db/schema/index.js';
+import { apartments } from '../db/schema/index.js';
 import { eq, and, lt } from 'drizzle-orm';
 import * as notificationService from './notification.service.js';
+import { getRawSettings } from './settings.service.js';
 
 /**
  * 1st of each month: Send email payment reminders to all occupied apartments with active subscriptions.
@@ -12,7 +13,7 @@ async function sendMonthlyEmailReminders() {
   logger.info('Email cron: Sending monthly payment reminders');
 
   try {
-    const [config] = await db.select().from(settings).limit(1);
+    const config = await getRawSettings();
     if (!config?.resendApiKey) {
       logger.info('Email cron: Email is not configured, skipping');
       return;
@@ -56,7 +57,7 @@ async function sendOverdueEmailReminders() {
   logger.info('Email cron: Sending overdue payment reminders');
 
   try {
-    const [config] = await db.select().from(settings).limit(1);
+    const config = await getRawSettings();
     if (!config?.resendApiKey) {
       logger.info('Email cron: Email is not configured, skipping');
       return;

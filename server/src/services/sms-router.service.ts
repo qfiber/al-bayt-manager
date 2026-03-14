@@ -1,9 +1,7 @@
-import { db } from '../config/database.js';
-import { settings } from '../db/schema/index.js';
-import { eq } from 'drizzle-orm';
 import { sendSms as send019Sms } from './sms.service.js';
 import { sendTwilioSms } from './twilio-sms.service.js';
 import { logger } from '../config/logger.js';
+import { getRawSettings } from './settings.service.js';
 
 export async function sendSmsByRegion(
   to: string,
@@ -11,12 +9,7 @@ export async function sendSmsByRegion(
   organizationId?: string,
   options?: { templateIdentifier?: string; userId?: string; languageUsed?: string },
 ) {
-  let config;
-  if (organizationId) {
-    [config] = await db.select().from(settings).where(eq(settings.organizationId, organizationId)).limit(1);
-  } else {
-    [config] = await db.select().from(settings).limit(1);
-  }
+  const config = await getRawSettings(organizationId);
 
   const region = config?.region || 'IL';
 
