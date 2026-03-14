@@ -78,6 +78,16 @@ subscriptionRoutes.post('/assign', requireAuth, requireSuperAdmin, validate(assi
   } catch (err) { next(err); }
 });
 
+// Super-admin: assign trial to an org
+subscriptionRoutes.post('/assign-trial', requireAuth, requireSuperAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { organizationId, planId } = req.body;
+    if (!organizationId) { res.status(400).json({ error: 'Missing organizationId' }); return; }
+    const result = await subService.startTrial(organizationId, planId);
+    res.json(result);
+  } catch (err) { next(err); }
+});
+
 subscriptionRoutes.post('/cancel', requireAuth, requireOrgScope, requireRole('admin'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!req.organizationId) { res.status(400).json({ error: 'No org context' }); return; }
@@ -150,6 +160,7 @@ subscriptionRoutes.post('/stripe-webhook', async (req: Request, res: Response, n
 // ---- HYP subscription (Israeli landlord self-service) ----
 
 // HYP checkout for SaaS subscription
+// Israeli cards → HK recurring, International → one-time payment
 subscriptionRoutes.post('/hyp-checkout', requireAuth, requireOrgScope, requireRole('admin'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!req.organizationId) { res.status(400).json({ error: 'No org context' }); return; }
@@ -162,26 +173,70 @@ subscriptionRoutes.post('/hyp-checkout', requireAuth, requireOrgScope, requireRo
 
     const country = (req.headers['cf-ipcountry'] as string || '').toUpperCase();
     const locale = country === 'IL' ? 'he' : 'en';
+    const isIsrael = country === 'IL';
 
     const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const successUrl = `${baseUrl}/api/subscriptions/hyp-success?orgId=${req.organizationId}&planId=${planId}&billingCycle=${billingCycle}`;
+    const errorUrl = `${baseUrl}/dashboard?subscription=failed`;
 
-    // For recurring, use HK module
-    const monthsInCycle = billingCycle === 'yearly' ? 12 : billingCycle === 'semi_annual' ? 6 : 1;
+    if (isIsrael) {
+      // Israeli cards: use HK recurring billing
+      const monthsInCycle = billingCycle === 'yearly' ? 12 : billingCycle === 'semi_annual' ? 6 : 1;
+      const { createRecurringPayment } = await import('../services/hyp.service.js');
+      const result = await createRecurringPayment(req.organizationId, {
+        amount,
+        order: `sub|${req.organizationId}|${planId}|${billingCycle}`,
+        description: `${plan.name} Plan Subscription`,
+        successUrl, errorUrl,
+        installmentCount: 12,
+        frequencyMonths: monthsInCycle,
+        locale, currency: 1,
+      });
+      res.json({ url: result.url });
+    } else {
+      // International cards: one-time payment (no HK)
+      const { createPaymentUrl } = await import('../services/hyp.service.js');
+      const result = await createPaymentUrl(req.organizationId, {
+        amount,
+        order: `sub|${req.organizationId}|${planId}|${billingCycle}`,
+        description: `${plan.name} Plan Subscription`,
+        successUrl, errorUrl,
+        locale, currency: 2, // USD for international
+        sendInvoice: true,
+        invoiceDescription: `${plan.name} Plan - ${billingCycle}`,
+      });
+      res.json({ url: result.url });
+    }
+  } catch (err) { next(err); }
+});
 
-    const { createRecurringPayment } = await import('../services/hyp.service.js');
-    const result = await createRecurringPayment(req.organizationId, {
+// Super-admin: generate a payment link for a specific org (manual invoicing)
+subscriptionRoutes.post('/generate-payment-link', requireAuth, requireSuperAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { organizationId, planId, billingCycle } = req.body;
+
+    const plan = await subService.getPlan(planId);
+    let amount = parseFloat(plan.monthlyPrice);
+    if (billingCycle === 'semi_annual' && plan.semiAnnualPrice) amount = parseFloat(plan.semiAnnualPrice);
+    if (billingCycle === 'yearly' && plan.yearlyPrice) amount = parseFloat(plan.yearlyPrice);
+
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const successUrl = `${baseUrl}/api/subscriptions/hyp-success?orgId=${organizationId}&planId=${planId}&billingCycle=${billingCycle}`;
+    const errorUrl = `${baseUrl}/dashboard?subscription=failed`;
+
+    const { createPaymentUrl } = await import('../services/hyp.service.js');
+    const result = await createPaymentUrl(organizationId, {
       amount,
-      order: `sub|${req.organizationId}|${planId}|${billingCycle}`,
+      order: `sub|${organizationId}|${planId}|${billingCycle}`,
       description: `${plan.name} Plan Subscription`,
-      successUrl: `${baseUrl}/api/subscriptions/hyp-success?orgId=${req.organizationId}&planId=${planId}&billingCycle=${billingCycle}`,
-      errorUrl: `${baseUrl}/dashboard?subscription=failed`,
-      installmentCount: 12, // 12 recurring charges
-      frequencyMonths: monthsInCycle,
-      locale,
-      currency: 1, // ILS
+      successUrl, errorUrl,
+      locale: 'en',
+      currency: 2,
+      sendInvoice: true,
+      invoiceDescription: `${plan.name} Plan - ${billingCycle}`,
     });
 
-    res.json({ url: result.url });
+    res.json({ url: result.url, amount });
   } catch (err) { next(err); }
 });
 

@@ -34,5 +34,117 @@ export function startSubscriptionBillingCron() {
     }
   });
 
-  logger.info('Subscription billing cron scheduled: trial check (daily), invoicing (1st of month), backup (daily 03:00)');
+  // Send automated payment links 3 days before trial/subscription expires
+  cron.schedule('0 9 * * *', async () => {
+    try {
+      const count = await sendPaymentReminders();
+      logger.info({ count }, 'Sent payment reminder links');
+    } catch (err) {
+      logger.error(err, 'Failed to send payment reminders');
+    }
+  });
+
+  logger.info('Subscription billing cron scheduled: trial check (daily), invoicing (1st of month), payment reminders (daily 09:00), backup (daily 03:00)');
+}
+
+async function sendPaymentReminders() {
+  const { db } = await import('../config/database.js');
+  const { organizationSubscriptions, subscriptionPlans, organizations, organizationMembers, users } = await import('../db/schema/index.js');
+  const { eq, and, lte, gte, or } = await import('drizzle-orm');
+
+  const now = new Date();
+  const threeDaysFromNow = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+
+  // Find subscriptions expiring within 3 days (trial or active)
+  const expiringSubs = await db
+    .select({
+      sub: organizationSubscriptions,
+      planName: subscriptionPlans.name,
+      planId: subscriptionPlans.id,
+      orgName: organizations.name,
+      orgId: organizations.id,
+    })
+    .from(organizationSubscriptions)
+    .innerJoin(organizations, eq(organizationSubscriptions.organizationId, organizations.id))
+    .leftJoin(subscriptionPlans, eq(organizationSubscriptions.planId, subscriptionPlans.id))
+    .where(and(
+      or(eq(organizationSubscriptions.status, 'trial'), eq(organizationSubscriptions.status, 'active')),
+      or(
+        and(eq(organizationSubscriptions.status, 'trial'), lte(organizationSubscriptions.trialEndDate, threeDaysFromNow), gte(organizationSubscriptions.trialEndDate, now)),
+        and(eq(organizationSubscriptions.status, 'active'), lte(organizationSubscriptions.currentPeriodEnd, threeDaysFromNow), gte(organizationSubscriptions.currentPeriodEnd, now)),
+      ),
+    ));
+
+  let sent = 0;
+
+  for (const { sub, planName, planId, orgName, orgId } of expiringSubs) {
+    // Get org admins' emails
+    const admins = await db
+      .select({ email: users.email })
+      .from(organizationMembers)
+      .innerJoin(users, eq(organizationMembers.userId, users.id))
+      .where(and(eq(organizationMembers.organizationId, orgId), eq(organizationMembers.role, 'org_admin')));
+
+    if (admins.length === 0 || !planId) continue;
+
+    // Generate payment link
+    try {
+      const { createPaymentUrl } = await import('./hyp.service.js');
+      const plan = await (await import('./subscription.plan.service.js')).getPlan(planId);
+      const amount = parseFloat(plan.monthlyPrice);
+      if (amount <= 0) continue;
+
+      // Use SITE_URL or fallback
+      const siteUrl = process.env.CORS_ORIGIN || 'https://albayt.cloud';
+      const successUrl = `${siteUrl}/api/subscriptions/hyp-success?orgId=${orgId}&planId=${planId}&billingCycle=${sub.billingCycle}`;
+      const errorUrl = `${siteUrl}/dashboard?subscription=failed`;
+
+      const result = await createPaymentUrl(orgId, {
+        amount,
+        order: `sub|${orgId}|${planId}|${sub.billingCycle}`,
+        description: `${planName} Plan Renewal`,
+        successUrl, errorUrl,
+        locale: 'he',
+        currency: 1,
+        sendInvoice: true,
+        invoiceDescription: `${planName} Plan - ${sub.billingCycle}`,
+      });
+
+      // Send email with payment link
+      const { getRawSettings } = await import('./settings.service.js');
+      const config = await getRawSettings();
+      if (config?.resendApiKey) {
+        const { Resend } = await import('resend');
+        const resend = new Resend(config.resendApiKey);
+
+        for (const admin of admins) {
+          await resend.emails.send({
+            from: config.smtpFromEmail || 'noreply@albayt.cloud',
+            to: admin.email,
+            subject: sub.status === 'trial' ? `Your trial is ending soon — ${orgName}` : `Subscription renewal — ${orgName}`,
+            html: `
+              <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
+                <h2>${sub.status === 'trial' ? 'Your trial is ending soon' : 'Time to renew your subscription'}</h2>
+                <p>Dear ${orgName} team,</p>
+                <p>${sub.status === 'trial' ? 'Your free trial expires in 3 days.' : 'Your subscription is due for renewal.'}</p>
+                <div style="background:#f4f4f4;padding:15px;border-radius:8px;margin:15px 0;">
+                  <p><strong>Plan:</strong> ${planName}</p>
+                  <p><strong>Amount:</strong> ₪${amount.toFixed(2)}</p>
+                </div>
+                <a href="${result.url}" style="display:inline-block;background:#3b82f6;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;">
+                  Pay Now →
+                </a>
+                <p style="color:#666;font-size:12px;margin-top:20px;">${config.companyName || 'Al-Bayt Manager'}</p>
+              </div>
+            `,
+          }).catch(() => {});
+          sent++;
+        }
+      }
+    } catch (err) {
+      logger.error({ err, orgId }, 'Failed to send payment reminder for org');
+    }
+  }
+
+  return sent;
 }

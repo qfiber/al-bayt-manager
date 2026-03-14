@@ -459,16 +459,37 @@ const Organizations = () => {
                   </SelectContent>
                 </Select>
               </div>
-              <Button className="w-full" onClick={async () => {
-                try {
-                  await api.post('/subscriptions/assign', { organizationId: planOrgId, planId: selectedPlanId, billingCycle: selectedCycle });
-                  toast({ title: t('success'), description: t('planAssigned') });
-                  setPlanDialogOpen(false);
-                  fetchOrgs();
-                } catch (err: any) {
-                  toast({ title: t('error'), description: err.message, variant: 'destructive' });
-                }
-              }}>{t('assignPlan')}</Button>
+              <div className="grid grid-cols-3 gap-2">
+                <Button onClick={async () => {
+                  try {
+                    await api.post('/subscriptions/assign', { organizationId: planOrgId, planId: selectedPlanId, billingCycle: selectedCycle });
+                    toast({ title: t('success'), description: t('planAssigned') });
+                    setPlanDialogOpen(false);
+                    fetchOrgs();
+                  } catch (err: any) {
+                    toast({ title: t('error'), description: err.message, variant: 'destructive' });
+                  }
+                }}>{t('assignPlan')}</Button>
+                <Button variant="outline" onClick={async () => {
+                  try {
+                    await api.post('/subscriptions/assign-trial', { organizationId: planOrgId, planId: selectedPlanId });
+                    toast({ title: t('success'), description: t('trialAssigned') });
+                    setPlanDialogOpen(false);
+                    fetchOrgs();
+                  } catch (err: any) {
+                    toast({ title: t('error'), description: err.message, variant: 'destructive' });
+                  }
+                }}>{t('assignTrial')}</Button>
+                <Button variant="outline" onClick={async () => {
+                  try {
+                    const result = await api.post('/subscriptions/generate-payment-link', { organizationId: planOrgId, planId: selectedPlanId, billingCycle: selectedCycle });
+                    await navigator.clipboard.writeText(result.url);
+                    toast({ title: t('success'), description: t('paymentLinkCopied') });
+                  } catch (err: any) {
+                    toast({ title: t('error'), description: err.message, variant: 'destructive' });
+                  }
+                }}>{t('generatePaymentLink')}</Button>
+              </div>
             </div>
           </DialogContent>
         </Dialog>
