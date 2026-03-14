@@ -131,6 +131,22 @@ organizationRoutes.delete('/:id/members/:userId', requireAuth, requireSuperAdmin
   } catch (err) { next(err); }
 });
 
+// Suspend or reactivate an organization
+organizationRoutes.post('/:id/toggle-status', requireAuth, requireSuperAdmin, validate({ params: idParams }), auditLog('update', 'organizations'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const [org] = await db.select().from(organizations).where(eq(organizations.id, req.params.id as string)).limit(1);
+    if (!org) { res.status(404).json({ error: 'Organization not found' }); return; }
+
+    const newStatus = !org.isActive;
+    const [updated] = await db.update(organizations)
+      .set({ isActive: newStatus, updatedAt: new Date() })
+      .where(eq(organizations.id, req.params.id as string))
+      .returning();
+
+    res.json(updated);
+  } catch (err) { next(err); }
+});
+
 // Impersonate a user (login as them) — super-admin only
 organizationRoutes.post('/impersonate/:userId', requireAuth, requireSuperAdmin, auditLog('login', 'users'), async (req: Request, res: Response, next: NextFunction) => {
   try {

@@ -41,6 +41,8 @@ import Invoices from "./pages/Invoices";
 import Leases from "./pages/Leases";
 import Inspections from "./pages/Inspections";
 import MyInspections from "./pages/MyInspections";
+import BuildingHandbook from "./pages/BuildingHandbook";
+import SubscriptionPlans from "./pages/SubscriptionPlans";
 import NotFound from "./pages/NotFound";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfUsage from "./pages/TermsOfUsage";
@@ -126,6 +128,8 @@ const App = () => (
               <Route path="/super-admin" element={<AppLayout><SuperAdminDashboard /></AppLayout>} />
               <Route path="/landlords" element={<AppLayout><Landlords /></AppLayout>} />
               <Route path="/messages" element={<AppLayout><Messages /></AppLayout>} />
+              <Route path="/handbook" element={<AppLayout><BuildingHandbook /></AppLayout>} />
+              <Route path="/subscription-plans" element={<AppLayout><SubscriptionPlans /></AppLayout>} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

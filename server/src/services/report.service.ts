@@ -285,13 +285,53 @@ export async function getPortfolioOverview(allowedBuildingIds?: string[]) {
 
   const paymentMap = new Map(paymentsByBuilding.map(p => [p.buildingId, parseFloat(p.totalPayments)]));
 
+  // All-time revenue per building (all non-canceled payments)
+  const allTimePaymentConditions: any[] = [eq(payments.isCanceled, false)];
+  if (allowedBuildingIds?.length) {
+    allTimePaymentConditions.push(inArray(apartments.buildingId, allowedBuildingIds));
+  }
+  const allTimeRevenue = await db
+    .select({
+      buildingId: apartments.buildingId,
+      totalRevenue: sql<string>`COALESCE(SUM(${payments.amount}::numeric), 0)`,
+    })
+    .from(payments)
+    .innerJoin(apartments, eq(payments.apartmentId, apartments.id))
+    .where(and(...allTimePaymentConditions))
+    .groupBy(apartments.buildingId);
+  const revenueMap = new Map(allTimeRevenue.map(r => [r.buildingId, parseFloat(r.totalRevenue)]));
+
+  // All-time expenses per building (all non-canceled apartment_expenses)
+  const allTimeExpenseConditions: any[] = [eq(apartmentExpenses.isCanceled, false)];
+  if (allowedBuildingIds?.length) {
+    allTimeExpenseConditions.push(inArray(apartments.buildingId, allowedBuildingIds));
+  }
+  const allTimeExpenses = await db
+    .select({
+      buildingId: apartments.buildingId,
+      totalExpenses: sql<string>`COALESCE(SUM(${apartmentExpenses.amount}::numeric), 0)`,
+    })
+    .from(apartmentExpenses)
+    .innerJoin(apartments, eq(apartmentExpenses.apartmentId, apartments.id))
+    .where(and(...allTimeExpenseConditions))
+    .groupBy(apartments.buildingId);
+  const expenseMap = new Map(allTimeExpenses.map(e => [e.buildingId, parseFloat(e.totalExpenses)]));
+
   const perBuilding = buildingStats.map(b => {
     const total = b.totalApartments || 0;
     const occupied = b.occupiedApartments || 0;
+    const revenue = revenueMap.get(b.buildingId) || 0;
+    const expensesTotal = expenseMap.get(b.buildingId) || 0;
+    const netIncome = Math.round((revenue - expensesTotal) * 100) / 100;
+    const profitMargin = revenue > 0 ? Math.round((netIncome / revenue) * 100 * 10) / 10 : 0;
     return {
       ...b,
       occupancyRate: total > 0 ? Math.round((occupied / total) * 100 * 10) / 10 : 0,
       totalPaymentsThisMonth: paymentMap.get(b.buildingId) || 0,
+      totalRevenue: Math.round(revenue * 100) / 100,
+      totalExpenses: Math.round(expensesTotal * 100) / 100,
+      netIncome,
+      profitMargin,
     };
   });
 

@@ -34,6 +34,7 @@ import {
   ScrollText,
   ClipboardCheck,
   MessageSquare,
+  BookOpen,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -108,6 +109,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
     ? [
         { label: t('superAdminDashboard'), path: '/super-admin', icon: Shield },
         { label: t('organizations'), path: '/organizations', icon: Building2 },
+        { label: t('subscriptionPlans'), path: '/subscription-plans', icon: CreditCard },
         { label: t('landlords'), path: '/landlords', icon: Users },
         { label: t('auditLogs'), path: '/audit-logs', icon: Shield },
       ]
@@ -154,6 +156,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
         { label: t('invoices'), path: '/invoices', icon: FileText },
         { label: t('leases'), path: '/leases', icon: ScrollText },
         { label: t('inspections'), path: '/inspections', icon: ClipboardCheck },
+        { label: t('buildingHandbook'), path: '/handbook', icon: BookOpen },
         { label: t('users'), path: '/users', icon: Users },
         { label: t('settings'), path: '/settings', icon: Settings },
         { label: t('apiKeys'), path: '/api-keys', icon: Key },

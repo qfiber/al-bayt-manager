@@ -154,6 +154,7 @@ const Dashboard = () => {
   const [selectedInfoId, setSelectedInfoId] = useState<string | undefined>();
   const [dataLoading, setDataLoading] = useState(true);
   const [expiringLeases, setExpiringLeases] = useState<any[]>([]);
+  const [enhancedMetrics, setEnhancedMetrics] = useState<any>(null);
 
   // Tenant dashboard state
   const [tenantApartments, setTenantApartments] = useState<any[]>([]);
@@ -196,6 +197,8 @@ const Dashboard = () => {
 
           // Fetch expiring leases
           api.get('/leases/expiring?days=30').then(setExpiringLeases).catch(() => {});
+          // Fetch enhanced dashboard metrics
+          api.get('/reports/dashboard-metrics').then(setEnhancedMetrics).catch(() => {});
         }
 
         // Tenant: fetch apartment details inline
@@ -258,6 +261,31 @@ const Dashboard = () => {
 
     return Array.from(map.values()).sort((a, b) => a.month.localeCompare(b.month));
   }, [trends]);
+
+  // Monthly comparison: this month vs last month
+  const monthlyComparison = useMemo(() => {
+    if (!chartData || chartData.length < 2) return null;
+    const current = chartData[chartData.length - 1];
+    const previous = chartData[chartData.length - 2];
+
+    const currRevenue = current.income;
+    const prevRevenue = previous.income;
+    const currExpenses = current.expenses;
+    const prevExpenses = previous.expenses;
+
+    const revenueChange = prevRevenue > 0 ? ((currRevenue - prevRevenue) / prevRevenue * 100) : 0;
+    const expenseChange = prevExpenses > 0 ? ((currExpenses - prevExpenses) / prevExpenses * 100) : 0;
+    const currNet = currRevenue - currExpenses;
+    const prevNet = prevRevenue - prevExpenses;
+
+    return {
+      currentMonth: current.month,
+      previousMonth: previous.month,
+      revenue: { current: currRevenue, previous: prevRevenue, change: Math.round(revenueChange) },
+      expenses: { current: currExpenses, previous: prevExpenses, change: Math.round(expenseChange) },
+      net: { current: currNet, previous: prevNet },
+    };
+  }, [chartData]);
 
   // Buildings with outstanding debt
   const outstandingBuildings = useMemo(
@@ -606,7 +634,7 @@ const Dashboard = () => {
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
           {/* Total Buildings */}
           <Card>
             <CardContent className="p-4 sm:pt-6">
@@ -635,6 +663,11 @@ const Dashboard = () => {
                   <p className="text-[10px] sm:text-xs text-muted-foreground">
                     {occupiedApartments} / {totalApartments}
                   </p>
+                  {enhancedMetrics && (
+                    <p className="text-[10px] sm:text-xs text-muted-foreground">
+                      {t('collectionRate')}: {enhancedMetrics.collectionRate}%
+                    </p>
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -671,6 +704,25 @@ const Dashboard = () => {
               </div>
             </CardContent>
           </Card>
+
+          {/* Net Income */}
+          {enhancedMetrics && (
+            <Card className={parseFloat(enhancedMetrics.netIncome) < 0 ? 'border-red-200 bg-red-50/30' : ''}>
+              <CardContent className="p-4 sm:pt-6">
+                <div className="flex items-start gap-2.5 sm:gap-3">
+                  <div className={`p-2 sm:p-2.5 rounded-lg shrink-0 ${parseFloat(enhancedMetrics.netIncome) >= 0 ? 'bg-green-50 text-green-600' : 'bg-red-100 text-red-600'}`}>
+                    <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[11px] sm:text-xs text-muted-foreground leading-tight">{t('netIncome')}</p>
+                    <p className={`text-xl sm:text-2xl font-bold tabular-nums mt-0.5 ${parseFloat(enhancedMetrics.netIncome) < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                      {formatCurrency(parseFloat(enhancedMetrics.netIncome))}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       )}
 
@@ -803,6 +855,117 @@ const Dashboard = () => {
             )}
           </CardContent>
         </Card>
+      </div>
+
+      {/* Monthly Comparison */}
+      {monthlyComparison && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">{t('monthlyComparison')}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm">{t('revenue')}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm tabular-nums">{formatCurrency(monthlyComparison.revenue.current)}</span>
+                  <span className={`text-xs font-medium ${monthlyComparison.revenue.change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {monthlyComparison.revenue.change >= 0 ? '\u2191' : '\u2193'} {Math.abs(monthlyComparison.revenue.change)}%
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm">{t('expenses')}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm tabular-nums">{formatCurrency(monthlyComparison.expenses.current)}</span>
+                  <span className={`text-xs font-medium ${monthlyComparison.expenses.change <= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {monthlyComparison.expenses.change >= 0 ? '\u2191' : '\u2193'} {Math.abs(monthlyComparison.expenses.change)}%
+                  </span>
+                </div>
+              </div>
+              <div className="border-t pt-3 flex items-center justify-between">
+                <span className="text-sm font-medium">{t('netIncome')}</span>
+                <span className={`text-sm font-bold tabular-nums ${monthlyComparison.net.current >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {formatCurrency(monthlyComparison.net.current)}
+                </span>
+              </div>
+              <p className="text-[10px] text-muted-foreground">{t('comparedTo')} {monthlyComparison.previousMonth}</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Top Debtors & Debt Aging */}
+      {enhancedMetrics && (enhancedMetrics.topDebtors?.length > 0 || enhancedMetrics.debtAging) && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {enhancedMetrics.topDebtors?.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">{t('topDebtors')}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2 max-h-[260px] overflow-y-auto">
+                  {enhancedMetrics.topDebtors.map((d: any, i: number) => (
+                    <div key={d.id} className="flex items-center justify-between py-1.5 border-b last:border-0">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-xs font-bold text-muted-foreground w-5">{i + 1}.</span>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium truncate">{d.building_name}</p>
+                          <p className="text-xs text-muted-foreground">{t('apartment')} {d.apartment_number}</p>
+                        </div>
+                      </div>
+                      <span className="text-sm font-bold tabular-nums text-red-600 shrink-0">
+                        {formatCurrency(Math.abs(parseFloat(d.balance)))}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {enhancedMetrics.debtAging && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">{t('debtAging')}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {[
+                    { label: '< 30 ' + t('days'), count: enhancedMetrics.debtAging.under30, color: 'bg-yellow-500' },
+                    { label: '30-60 ' + t('days'), count: enhancedMetrics.debtAging.days30to60, color: 'bg-orange-500' },
+                    { label: '60-90 ' + t('days'), count: enhancedMetrics.debtAging.days60to90, color: 'bg-red-400' },
+                    { label: '90+ ' + t('days'), count: enhancedMetrics.debtAging.over90, color: 'bg-red-600' },
+                  ].map((item) => (
+                    <div key={item.label} className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-3 h-3 rounded-full ${item.color}`} />
+                        <span className="text-sm">{item.label}</span>
+                      </div>
+                      <span className="text-sm font-bold tabular-nums">{item.count}</span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
+
+      {/* Quick Actions */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <Button variant="outline" className="h-auto py-3 flex flex-col items-center gap-1.5" onClick={() => navigate('/payments')}>
+          <CreditCard className="h-5 w-5 text-primary" />
+          <span className="text-xs">{t('recordPayment')}</span>
+        </Button>
+        <Button variant="outline" className="h-auto py-3 flex flex-col items-center gap-1.5" onClick={() => navigate('/expenses')}>
+          <Receipt className="h-5 w-5 text-primary" />
+          <span className="text-xs">{t('addExpense')}</span>
+        </Button>
+        <Button variant="outline" className="h-auto py-3 flex flex-col items-center gap-1.5" onClick={() => navigate('/debt-collection')}>
+          <AlertCircle className="h-5 w-5 text-red-500" />
+          <span className="text-xs">{t('viewDebtors')}</span>
+        </Button>
       </div>
 
       {/* Issues & Maintenance Quick Nav */}

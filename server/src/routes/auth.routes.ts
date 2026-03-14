@@ -404,6 +404,141 @@ authRoutes.get('/my-data/export', requireAuth, async (req: Request, res: Respons
   } catch (err) { next(err); }
 });
 
+// Check if account can be deleted
+authRoutes.get('/can-delete-account', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId;
+
+    // Check if user has active leases
+    const { leases } = await import('../db/schema/index.js');
+    const { userApartments: userAptTable } = await import('../db/schema/index.js');
+    const { inArray } = await import('drizzle-orm');
+
+    const assignments = await db.select({ apartmentId: userAptTable.apartmentId })
+      .from(userAptTable)
+      .where(eq(userAptTable.userId, userId));
+
+    if (assignments.length > 0) {
+      const aptIds = assignments.map(a => a.apartmentId);
+      const activeLeases = await db.select({ id: leases.id })
+        .from(leases)
+        .where(and(
+          inArray(leases.apartmentId, aptIds),
+          eq(leases.status, 'active'),
+        ));
+
+      if (activeLeases.length > 0) {
+        res.json({ canDelete: false, reason: 'active_leases', leaseCount: activeLeases.length });
+        return;
+      }
+    }
+
+    // Check if user has apartment assignments (still a tenant)
+    if (assignments.length > 0) {
+      res.json({ canDelete: false, reason: 'assigned_apartments', apartmentCount: assignments.length });
+      return;
+    }
+
+    res.json({ canDelete: true });
+  } catch (err) { next(err); }
+});
+
+// Request account deletion
+authRoutes.post('/delete-account', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId;
+
+    // Re-verify they can delete
+    const { leases } = await import('../db/schema/index.js');
+    const { userApartments: userAptTable } = await import('../db/schema/index.js');
+    const { inArray } = await import('drizzle-orm');
+
+    const assignments = await db.select({ apartmentId: userAptTable.apartmentId })
+      .from(userAptTable)
+      .where(eq(userAptTable.userId, userId));
+
+    if (assignments.length > 0) {
+      const aptIds = assignments.map(a => a.apartmentId);
+      const activeLeases = await db.select({ id: leases.id })
+        .from(leases)
+        .where(and(
+          inArray(leases.apartmentId, aptIds),
+          eq(leases.status, 'active'),
+        ));
+
+      if (activeLeases.length > 0) {
+        res.status(400).json({ error: 'Cannot delete account with active leases' });
+        return;
+      }
+    }
+
+    if (assignments.length > 0) {
+      res.status(400).json({ error: 'Cannot delete account while assigned to apartments. Contact your administrator.' });
+      return;
+    }
+
+    // Check not a super admin
+    const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+    if (user?.isSuperAdmin) {
+      res.status(400).json({ error: 'Super admin accounts cannot be self-deleted' });
+      return;
+    }
+
+    // Check not the only org_admin in any org
+    const memberships = await db.select().from(organizationMembers).where(eq(organizationMembers.userId, userId));
+
+    for (const membership of memberships) {
+      if (membership.role === 'org_admin') {
+        const { sql } = await import('drizzle-orm');
+        const [adminCount] = await db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(organizationMembers)
+          .where(and(
+            eq(organizationMembers.organizationId, membership.organizationId),
+            eq(organizationMembers.role, 'org_admin'),
+          ));
+        if (adminCount.count <= 1) {
+          res.status(400).json({ error: 'Cannot delete account: you are the only admin of an organization. Transfer ownership first.' });
+          return;
+        }
+      }
+    }
+
+    // Send notification to org admins before deleting
+    try {
+      for (const membership of memberships) {
+        // Notify org admins
+        const orgAdmins = await db
+          .select({ email: users.email })
+          .from(organizationMembers)
+          .innerJoin(users, eq(organizationMembers.userId, users.id))
+          .where(and(
+            eq(organizationMembers.organizationId, membership.organizationId),
+            eq(organizationMembers.role, 'org_admin'),
+          ));
+
+        // Log audit
+        logAuditEvent({
+          userId,
+          userEmail: user?.email,
+          actionType: 'delete',
+          tableName: 'users',
+          recordId: userId,
+          actionDetails: { action: 'self_deletion', notifiedAdmins: orgAdmins.map(a => a.email) },
+        }).catch(() => {});
+      }
+    } catch { /* don't fail on notification errors */ }
+
+    // Delete the user (cascades delete profile, roles, memberships, etc.)
+    await db.delete(users).where(eq(users.id, userId));
+
+    // Clear auth cookies
+    clearAuthCookies(res);
+
+    res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
 authRoutes.put('/profile', requireAuth, validate(updateProfileSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await authService.updateProfile(req.user!.userId, req.body);

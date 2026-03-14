@@ -15,6 +15,7 @@ interface UserData {
   isSuperAdmin?: boolean;
   organizationId?: string;
   organizationName?: string;
+  emailConfirmed?: boolean;
   onlinePaymentsEnabled?: boolean;
   totpFactors?: { id: string; status: string; friendlyName?: string }[];
 }

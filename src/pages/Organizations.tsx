@@ -17,7 +17,7 @@ import { SearchInput } from '@/components/SearchInput';
 import { PaginationControls } from '@/components/PaginationControls';
 import { usePaginatedSearch } from '@/hooks/use-paginated-search';
 import { useToast } from '@/hooks/use-toast';
-import { Building2, Plus, Pencil, Trash2, Users, UserPlus, LogIn } from 'lucide-react';
+import { Building2, Plus, Pencil, Trash2, Users, UserPlus, LogIn, X, Check, CreditCard } from 'lucide-react';
 
 interface Organization {
   id: string;
@@ -57,13 +57,23 @@ const Organizations = () => {
   const [members, setMembers] = useState<OrgMember[]>([]);
   const [addMemberForm, setAddMemberForm] = useState({ email: '', role: 'org_admin' });
 
+  // Plan assignment
+  const [plans, setPlans] = useState<any[]>([]);
+  const [planDialogOpen, setPlanDialogOpen] = useState(false);
+  const [planOrgId, setPlanOrgId] = useState('');
+  const [selectedPlanId, setSelectedPlanId] = useState('');
+  const [selectedCycle, setSelectedCycle] = useState('monthly');
+
   const { search, setSearch, paginated, page, hasPrevious, hasNext, onPrevious, onNext } = usePaginatedSearch({
     items: orgs,
     searchFields: ['name'] as (keyof Organization)[],
   });
 
   useEffect(() => {
-    if (user && isSuperAdmin) fetchOrgs();
+    if (user && isSuperAdmin) {
+      fetchOrgs();
+      api.get('/subscriptions/plans').then(setPlans).catch(() => {});
+    }
   }, [user, isSuperAdmin]);
 
   const fetchOrgs = async () => {
@@ -302,6 +312,9 @@ const Organizations = () => {
                       </TableCell>
                       <TableCell className="text-start">
                         <div className="flex justify-end gap-2">
+                          <Button size="sm" variant="outline" onClick={() => { setPlanOrgId(org.id); setPlanDialogOpen(true); }} title={t('changePlan')}>
+                            <CreditCard className="w-4 h-4" />
+                          </Button>
                           <Button size="sm" variant="outline" onClick={() => {
                             setAddMemberForm({ email: '', role: 'org_admin' });
                             showMembers(org);
@@ -310,6 +323,22 @@ const Organizations = () => {
                           </Button>
                           <Button size="sm" variant="outline" onClick={() => showMembers(org)} title={t('members')}>
                             <Users className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant={org.isActive ? 'outline' : 'default'}
+                            onClick={async () => {
+                              try {
+                                await api.post(`/organizations/${org.id}/toggle-status`);
+                                toast({ title: t('success'), description: org.isActive ? t('organizationSuspended') : t('organizationReactivated') });
+                                fetchOrgs();
+                              } catch (err: any) {
+                                toast({ title: t('error'), description: err.message, variant: 'destructive' });
+                              }
+                            }}
+                            title={org.isActive ? t('suspend') : t('reactivate')}
+                          >
+                            {org.isActive ? <X className="w-4 h-4" /> : <Check className="w-4 h-4" />}
                           </Button>
                           <Button size="sm" variant="outline" onClick={() => handleEdit(org)}>
                             <Pencil className="w-4 h-4" />
@@ -398,6 +427,47 @@ const Organizations = () => {
                   )}
                 </TableBody>
               </Table>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Plan Assignment Dialog */}
+        <Dialog open={planDialogOpen} onOpenChange={setPlanDialogOpen}>
+          <DialogContent>
+            <DialogHeader><DialogTitle>{t('assignPlan')}</DialogTitle></DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label>{t('plan')}</Label>
+                <Select value={selectedPlanId} onValueChange={setSelectedPlanId}>
+                  <SelectTrigger><SelectValue placeholder={t('selectPlan')} /></SelectTrigger>
+                  <SelectContent>
+                    {plans.filter(p => p.isActive).map(p => (
+                      <SelectItem key={p.id} value={p.id}>{p.name} — {p.maxBuildings} {t('buildings')}, {p.maxApartmentsPerBuilding} {t('maxApartmentsPerBuilding')}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>{t('billingCycle')}</Label>
+                <Select value={selectedCycle} onValueChange={setSelectedCycle}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="monthly">{t('monthly')}</SelectItem>
+                    <SelectItem value="semi_annual">{t('semiAnnual')}</SelectItem>
+                    <SelectItem value="yearly">{t('yearly')}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button className="w-full" onClick={async () => {
+                try {
+                  await api.post('/subscriptions/assign', { organizationId: planOrgId, planId: selectedPlanId, billingCycle: selectedCycle });
+                  toast({ title: t('success'), description: t('planAssigned') });
+                  setPlanDialogOpen(false);
+                  fetchOrgs();
+                } catch (err: any) {
+                  toast({ title: t('error'), description: err.message, variant: 'destructive' });
+                }
+              }}>{t('assignPlan')}</Button>
             </div>
           </DialogContent>
         </Dialog>

@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { formatDate } from '@/lib/utils';
 import {
   Building2, Users, Home, TrendingUp, Shield, Plus, Settings, ArrowRight,
-  Activity, ShieldAlert, Clock, CheckCircle, XCircle,
+  Activity, ShieldAlert, Clock, CheckCircle, XCircle, Download,
 } from 'lucide-react';
 import {
   ResponsiveContainer, LineChart, Line, BarChart, Bar,
@@ -56,6 +56,8 @@ const SuperAdminDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [extended, setExtended] = useState<any>(null);
   const [trends, setTrends] = useState<any[]>([]);
+  const [impersonationLog, setImpersonationLog] = useState<any[]>([]);
+  const [subMetrics, setSubMetrics] = useState<any>(null);
 
   useEffect(() => {
     if (user && isSuperAdmin) {
@@ -73,6 +75,12 @@ const SuperAdminDashboard = () => {
         .catch(() => {});
       api.get('/super-admin/trends')
         .then(setTrends)
+        .catch(() => {});
+      api.get('/super-admin/impersonation-log')
+        .then(setImpersonationLog)
+        .catch(() => {});
+      api.get('/subscriptions/metrics')
+        .then(setSubMetrics)
         .catch(() => {});
     }
   }, [user, isSuperAdmin, data]);
@@ -196,6 +204,44 @@ const SuperAdminDashboard = () => {
             </CardContent>
           </Card>
         </div>
+      )}
+
+      {/* Subscription Metrics */}
+      {subMetrics && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">{t('subscriptionMetrics')}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+              <div className="text-center">
+                <p className="text-2xl font-bold text-blue-600">{subMetrics.trial_count}</p>
+                <p className="text-xs text-muted-foreground">{t('onTrial')}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl font-bold text-green-600">{subMetrics.active_count}</p>
+                <p className="text-xs text-muted-foreground">{t('activeSubscribers')}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl font-bold text-amber-600">{subMetrics.past_due_count}</p>
+                <p className="text-xs text-muted-foreground">{t('pastDue')}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl font-bold text-red-600">{subMetrics.cancelled_count}</p>
+                <p className="text-xs text-muted-foreground">{t('cancelled')}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl font-bold text-primary">{formatCurrency(parseFloat(subMetrics.mrr || '0'))}</p>
+                <p className="text-xs text-muted-foreground">{t('mrr')}</p>
+              </div>
+            </div>
+            {parseInt(subMetrics.expired_trials) > 0 && (
+              <div className="mt-3 p-2 bg-amber-50 rounded text-xs text-amber-700">
+                {t('expiredTrialsWarning').replace('{count}', subMetrics.expired_trials)}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       )}
 
       {/* Charts Row */}
@@ -449,8 +495,31 @@ const SuperAdminDashboard = () => {
         </Card>
       )}
 
+      {/* Impersonation History */}
+      {impersonationLog.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">{t('impersonationHistory')}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2 max-h-[200px] overflow-y-auto">
+              {impersonationLog.slice(0, 10).map((log: any) => (
+                <div key={log.id} className="flex items-center justify-between text-sm py-1.5 border-b last:border-0">
+                  <div>
+                    <span className="font-medium">{log.admin_email}</span>
+                    <span className="text-muted-foreground"> → </span>
+                    <span>{log.target_email || log.target_user_id}</span>
+                  </div>
+                  <span className="text-xs text-muted-foreground shrink-0">{formatDate(log.created_at)}</span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Quick Actions */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate('/organizations')}>
           <CardContent className="p-6 flex items-center gap-4">
             <div className="p-3 rounded-lg bg-violet-50 text-violet-600">
@@ -484,6 +553,17 @@ const SuperAdminDashboard = () => {
             </div>
           </CardContent>
         </Card>
+        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => window.open('/api/super-admin/export/organizations')}>
+          <CardContent className="p-6 flex items-center gap-4">
+            <div className="p-3 rounded-lg bg-emerald-50 text-emerald-600">
+              <Download className="h-6 w-6" />
+            </div>
+            <div>
+              <p className="font-semibold">{t('exportOrganizations')}</p>
+              <p className="text-xs text-muted-foreground">{t('exportOrgsDesc')}</p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Organization Details */}
@@ -501,6 +581,7 @@ const SuperAdminDashboard = () => {
                   <TableHead className="text-xs">{t('buildings')}</TableHead>
                   <TableHead className="text-xs">{t('apartments')}</TableHead>
                   <TableHead className="text-xs">{t('systemRevenue')}</TableHead>
+                  <TableHead className="text-xs">{t('lastActivity')}</TableHead>
                   <TableHead className="text-xs">{t('status')}</TableHead>
                 </TableRow>
               </TableHeader>
@@ -512,6 +593,7 @@ const SuperAdminDashboard = () => {
                     <TableCell className="tabular-nums text-sm">{org.building_count}</TableCell>
                     <TableCell className="tabular-nums text-sm">{org.apartment_count}</TableCell>
                     <TableCell className="tabular-nums text-sm font-medium">{formatCurrency(parseFloat(org.total_revenue || '0'))}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{org.last_activity_at ? formatDate(org.last_activity_at) : '-'}</TableCell>
                     <TableCell>
                       <Badge variant={org.is_active ? 'default' : 'secondary'} className="text-[10px]">
                         {org.is_active ? t('active') : t('inactive')}

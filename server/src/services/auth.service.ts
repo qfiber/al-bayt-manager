@@ -185,6 +185,12 @@ export async function signUp(email: string, password: string, name: string, phon
         userId: user.id,
         role: 'admin',
       });
+
+      // Start trial subscription
+      try {
+        const { startTrial } = await import('./subscription.plan.service.js');
+        await startTrial(org.id);
+      } catch { /* don't fail registration if trial creation fails */ }
     } else {
       await tx.insert(userRoles).values({
         userId: user.id,
@@ -274,6 +280,7 @@ export async function getMe(userId: string) {
   return {
     id: user.id,
     email: user.email,
+    emailConfirmed: user.emailConfirmed,
     name: profile?.name,
     phone: profile?.phone,
     preferredLanguage: profile?.preferredLanguage,

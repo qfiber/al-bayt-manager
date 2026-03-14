@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   User,
   Lock,
@@ -37,7 +38,7 @@ import { formatDate } from '@/lib/utils';
 const Profile = () => {
   useRequireAuth();
   const { user, refreshUser } = useAuth();
-  const { t } = useLanguage();
+  const { t, language, setLanguage } = useLanguage();
   const { currencySymbol, formatCurrency } = useCurrency();
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -81,6 +82,11 @@ const Profile = () => {
   const [disable2FACode, setDisable2FACode] = useState('');
   const [showDisable2FA, setShowDisable2FA] = useState(false);
 
+  // Account deletion state
+  const [canDelete, setCanDelete] = useState<{ canDelete: boolean; reason?: string; leaseCount?: number; apartmentCount?: number } | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
   // Apartments & issues
   const [apartments, setApartments] = useState<any[]>([]);
   const [issues, setIssues] = useState<IssueRow[]>([]);
@@ -99,6 +105,7 @@ const Profile = () => {
   useEffect(() => {
     if (user) {
       api.get('/auth/2fa/factors').then(setFactors).catch(() => {});
+      api.get('/auth/can-delete-account').then(setCanDelete).catch(() => {});
     }
   }, [user]);
 
@@ -435,7 +442,19 @@ const Profile = () => {
                 <Mail className="h-3.5 w-3.5" />
                 {t('email')}
               </Label>
-              <p className="font-medium">{user.email}</p>
+              <div className="flex items-center gap-2">
+                <p className="font-medium">{user.email}</p>
+                {user.emailConfirmed ? (
+                  <Badge variant="default" className="bg-green-600 text-[10px] gap-1">
+                    <Check className="w-3 h-3" />
+                    {t('verified')}
+                  </Badge>
+                ) : (
+                  <Badge variant="secondary" className="text-[10px]">
+                    {t('unverified')}
+                  </Badge>
+                )}
+              </div>
             </div>
 
             {apartments.length > 0 && (
@@ -550,6 +569,35 @@ const Profile = () => {
               disabled={savingNotif}
             />
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Language Preference */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm">{t('languagePreference')}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Select
+            value={user?.preferredLanguage || language}
+            onValueChange={async (val) => {
+              try {
+                await api.put('/auth/profile', { preferredLanguage: val });
+                setLanguage(val as any);
+                await refreshUser();
+                toast.success(t('profileUpdated'));
+              } catch {
+                toast.error(t('error'));
+              }
+            }}
+          >
+            <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ar">العربية</SelectItem>
+              <SelectItem value="he">עברית</SelectItem>
+              <SelectItem value="en">English</SelectItem>
+            </SelectContent>
+          </Select>
         </CardContent>
       </Card>
 
@@ -904,6 +952,63 @@ const Profile = () => {
             <Download className="w-4 h-4 me-2" />
             {t('downloadMyData')}
           </Button>
+        </CardContent>
+      </Card>
+
+      {/* Delete Account */}
+      <Card className="border-destructive/50">
+        <CardHeader>
+          <CardTitle className="text-sm text-destructive">{t('deleteAccount')}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {canDelete?.canDelete ? (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">{t('deleteAccountWarning')}</p>
+              {!showDeleteConfirm ? (
+                <Button variant="destructive" size="sm" onClick={() => setShowDeleteConfirm(true)}>
+                  {t('deleteMyAccount')}
+                </Button>
+              ) : (
+                <div className="space-y-2 border border-destructive/50 rounded-lg p-3">
+                  <p className="text-sm font-medium text-destructive">{t('deleteAccountConfirm')}</p>
+                  <div className="flex gap-2">
+                    <Button variant="destructive" size="sm" disabled={deleteLoading} onClick={async () => {
+                      setDeleteLoading(true);
+                      try {
+                        await api.post('/auth/delete-account');
+                        window.location.href = '/';
+                      } catch (err: any) {
+                        toast.error(err.message || t('error'));
+                      } finally {
+                        setDeleteLoading(false);
+                      }
+                    }}>
+                      {deleteLoading ? t('loading') : t('confirmDelete')}
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => setShowDeleteConfirm(false)}>
+                      {t('cancel')}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : canDelete?.reason === 'active_leases' ? (
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
+              <p className="text-sm text-muted-foreground">
+                {t('cannotDeleteActiveLeases').replace('{count}', String(canDelete.leaseCount || 0))}
+              </p>
+            </div>
+          ) : canDelete?.reason === 'assigned_apartments' ? (
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
+              <p className="text-sm text-muted-foreground">
+                {t('cannotDeleteAssignedApartments').replace('{count}', String(canDelete.apartmentCount || 0))}
+              </p>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">{t('loading')}</p>
+          )}
         </CardContent>
       </Card>
 

@@ -40,12 +40,16 @@ const MyApartments = () => {
   const [issueLoading, setIssueLoading] = useState(false);
   const [myLeases, setMyLeases] = useState<any[]>([]);
   const [myMeetings, setMyMeetings] = useState<any>(null);
+  const [myPaymentPlans, setMyPaymentPlans] = useState<any[]>([]);
+  const [handbook, setHandbook] = useState<any[]>([]);
 
   useEffect(() => {
     if (user) {
       fetchMyApartments();
       api.get('/my-apartments/leases').then(setMyLeases).catch(() => {});
       api.get('/my-apartments/meetings').then(setMyMeetings).catch(() => {});
+      api.get('/payment-plans/my-plans').then(setMyPaymentPlans).catch(() => {});
+      api.get('/handbook/my-handbook').then(setHandbook).catch(() => {});
     }
   }, [user]);
 
@@ -441,6 +445,62 @@ const MyApartments = () => {
                         </div>
                       )}
                     </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Payment Plans */}
+        {myPaymentPlans.length > 0 && (
+          <Card className="mt-6">
+            <CardHeader><CardTitle className="text-lg">{t('myPaymentPlans')}</CardTitle></CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {myPaymentPlans.map((item: any) => {
+                  const plan = item.plan;
+                  const progress = Math.round((plan.paidInstallments / plan.installments) * 100);
+                  return (
+                    <div key={plan.id} className="border rounded-lg p-4">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h4 className="font-medium">{item.buildingName} — {t('apartment')} {item.apartmentNumber}</h4>
+                          <p className="text-sm text-muted-foreground">{plan.installments} {t('installments')} × {formatCurrency(parseFloat(plan.amountPerInstallment))}</p>
+                        </div>
+                        <Badge variant={plan.status === 'active' ? 'default' : plan.status === 'completed' ? 'outline' : 'secondary'}>{plan.status}</Badge>
+                      </div>
+                      <div className="mt-3">
+                        <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                          <span>{plan.paidInstallments}/{plan.installments} {t('paid')}</span>
+                          <span>{progress}%</span>
+                        </div>
+                        <div className="w-full bg-muted rounded-full h-2">
+                          <div className="bg-primary rounded-full h-2 transition-all" style={{ width: `${progress}%` }} />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Building Handbook */}
+        {handbook.length > 0 && (
+          <Card className="mt-6">
+            <CardHeader><CardTitle className="text-lg">{t('buildingHandbook')}</CardTitle></CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {handbook.map((item: any) => (
+                  <div key={item.entry.id} className="border rounded-lg p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Badge variant="outline" className="text-[10px]">{item.entry.category}</Badge>
+                      {item.buildingName && <span className="text-xs text-muted-foreground">{item.buildingName}</span>}
+                    </div>
+                    <h4 className="font-medium">{item.entry.title}</h4>
+                    <p className="text-sm mt-1 whitespace-pre-wrap">{item.entry.content}</p>
                   </div>
                 ))}
               </div>

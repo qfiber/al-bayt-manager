@@ -1,7 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { db } from '../config/database.js';
 import { logger } from '../config/logger.js';
-import { auditLogs } from '../db/schema/index.js';
+import { auditLogs, organizations } from '../db/schema/index.js';
+import { eq } from 'drizzle-orm';
 
 type AuditAction = 'login' | 'logout' | 'signup' | 'create' | 'update' | 'delete' | 'role_change' | 'password_change' | 'api_key_created' | 'api_key_deleted' | 'failed_login' | 'account_locked' | 'rate_limited' | 'unauthorized_access';
 
@@ -45,6 +46,14 @@ export function auditLog(actionType: AuditAction, tableName: string) {
             userAgent: req.headers['user-agent']?.slice(0, 500),
           })
           .catch((err) => logger.error(err, 'Audit log error'));
+
+        // Update org last activity
+        if (req.organizationId) {
+          db.update(organizations)
+            .set({ lastActivityAt: new Date() })
+            .where(eq(organizations.id, req.organizationId))
+            .catch(() => {});
+        }
       }
       return originalJson(body);
     };

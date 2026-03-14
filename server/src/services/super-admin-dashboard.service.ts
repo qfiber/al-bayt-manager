@@ -29,7 +29,7 @@ export async function getDashboardData() {
     // 7. Revenue by org (top 10)
     db.execute(sql`SELECT o.id, o.name, COALESCE(SUM(p.amount::numeric), 0)::text AS revenue FROM organizations o LEFT JOIN buildings b ON b.organization_id = o.id LEFT JOIN apartments a ON a.building_id = b.id LEFT JOIN payments p ON p.apartment_id = a.id AND p.is_canceled = false GROUP BY o.id, o.name ORDER BY revenue DESC LIMIT 10`),
     // 8. Recent orgs with counts
-    db.execute(sql`SELECT o.id, o.name, o.is_active, o.created_at, (SELECT count(*)::int FROM organization_members om WHERE om.organization_id = o.id) AS member_count, (SELECT count(*)::int FROM buildings b WHERE b.organization_id = o.id) AS building_count FROM organizations o ORDER BY o.created_at DESC LIMIT 10`),
+    db.execute(sql`SELECT o.id, o.name, o.is_active, o.created_at, o.last_activity_at, (SELECT count(*)::int FROM organization_members om WHERE om.organization_id = o.id) AS member_count, (SELECT count(*)::int FROM buildings b WHERE b.organization_id = o.id) AS building_count FROM organizations o ORDER BY o.created_at DESC LIMIT 10`),
     // 9. Recent audit logs
     db.execute(sql`SELECT id, organization_id, user_email, action_type, table_name, created_at FROM audit_logs ORDER BY created_at DESC LIMIT 10`),
     // 10. System health
@@ -59,6 +59,7 @@ export async function getDashboardData() {
       name: r.name,
       isActive: r.is_active,
       createdAt: r.created_at,
+      lastActivityAt: r.last_activity_at,
       memberCount: r.member_count,
       buildingCount: r.building_count,
     })),

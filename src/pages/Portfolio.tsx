@@ -32,6 +32,10 @@ interface PortfolioBuilding {
   totalCredit: number;
   netBalance: number;
   paymentsThisMonth: number;
+  totalRevenue: number;
+  totalExpenses: number;
+  netIncome: number;
+  profitMargin: number;
 }
 
 interface PortfolioSummary {
@@ -48,7 +52,7 @@ interface ExpenseBreakdown {
   [category: string]: string | number;
 }
 
-type SortField = 'buildingName' | 'totalApartments' | 'occupiedApartments' | 'occupancyRate' | 'totalDebt' | 'totalCredit' | 'netBalance' | 'paymentsThisMonth';
+type SortField = 'buildingName' | 'totalApartments' | 'occupiedApartments' | 'occupancyRate' | 'totalDebt' | 'totalCredit' | 'netBalance' | 'paymentsThisMonth' | 'totalRevenue' | 'totalExpenses' | 'netIncome' | 'profitMargin';
 type SortDirection = 'asc' | 'desc';
 
 const Portfolio = () => {
@@ -217,7 +221,7 @@ const Portfolio = () => {
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
-              <Table className="min-w-[900px]">
+              <Table className="min-w-[1300px]">
                 <TableHeader>
                   <TableRow>
                     <TableHead
@@ -268,11 +272,35 @@ const Portfolio = () => {
                     >
                       {t('paymentsThisMonth')}{renderSortIndicator('paymentsThisMonth')}
                     </TableHead>
+                    <TableHead
+                      className="text-start cursor-pointer select-none hover:text-primary"
+                      onClick={() => handleSort('totalRevenue')}
+                    >
+                      {t('totalRevenue')}{renderSortIndicator('totalRevenue')}
+                    </TableHead>
+                    <TableHead
+                      className="text-start cursor-pointer select-none hover:text-primary"
+                      onClick={() => handleSort('totalExpenses')}
+                    >
+                      {t('totalExpenses')}{renderSortIndicator('totalExpenses')}
+                    </TableHead>
+                    <TableHead
+                      className="text-start cursor-pointer select-none hover:text-primary"
+                      onClick={() => handleSort('netIncome')}
+                    >
+                      {t('netIncome')}{renderSortIndicator('netIncome')}
+                    </TableHead>
+                    <TableHead
+                      className="text-start cursor-pointer select-none hover:text-primary"
+                      onClick={() => handleSort('profitMargin')}
+                    >
+                      {t('profitMargin')}{renderSortIndicator('profitMargin')}
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {sortedBuildings.length === 0 ? (
-                    <TableEmptyRow colSpan={8} message={t('noBuildingData')} />
+                    <TableEmptyRow colSpan={12} message={t('noBuildingData')} />
                   ) : (
                     sortedBuildings.map((b) => (
                       <TableRow key={b.buildingId}>
@@ -286,6 +314,14 @@ const Portfolio = () => {
                           {formatCurrency(b.netBalance)}
                         </TableCell>
                         <TableCell className="text-start">{formatCurrency(b.paymentsThisMonth)}</TableCell>
+                        <TableCell className="text-start">{formatCurrency(b.totalRevenue)}</TableCell>
+                        <TableCell className="text-start">{formatCurrency(b.totalExpenses)}</TableCell>
+                        <TableCell className={`text-start font-medium ${b.netIncome >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {formatCurrency(b.netIncome)}
+                        </TableCell>
+                        <TableCell className={`text-start font-medium ${b.profitMargin >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {b.profitMargin.toFixed(1)}%
+                        </TableCell>
                       </TableRow>
                     ))
                   )}
