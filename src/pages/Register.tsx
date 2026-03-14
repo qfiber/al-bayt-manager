@@ -14,6 +14,7 @@ import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { LegalFooter } from '@/components/LegalFooter';
 import { CaptchaField } from '@/components/CaptchaField';
 import { getBaseDomain } from '@/lib/subdomain';
+import { AuthHeader } from '@/components/AuthHeader';
 
 
 const Register = () => {
@@ -157,7 +158,8 @@ const Register = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-secondary/10 p-4">
-      <div className="w-full max-w-md">
+      <AuthHeader />
+      <div className="w-full max-w-md pt-14">
         <div className="flex justify-end mb-2">
           <LanguageSwitcher />
         </div>

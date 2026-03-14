@@ -8,6 +8,7 @@ import { LanguageProvider, useLanguage } from "./contexts/LanguageContext";
 import { AuthProvider } from "./contexts/AuthContext";
 import { PublicSettingsProvider } from "./contexts/PublicSettingsContext";
 import { AppLayout } from "./components/AppLayout";
+import { MarketingLayout } from "./components/MarketingLayout";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Register from "./pages/Register";
@@ -98,9 +99,9 @@ const App = () => (
               <Route path="/auth" element={<Navigate to="/login" replace />} />
               <Route path="/register" element={<Register />} />
               <Route path="/setup-2fa" element={<Setup2FA />} />
-              <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-              <Route path="/terms" element={<TermsOfUsage />} />
-              <Route path="/accessibility" element={<Accessibility />} />
+              <Route path="/privacy-policy" element={<MarketingLayout><PrivacyPolicy /></MarketingLayout>} />
+              <Route path="/terms" element={<MarketingLayout><TermsOfUsage /></MarketingLayout>} />
+              <Route path="/accessibility" element={<MarketingLayout><Accessibility /></MarketingLayout>} />
               <Route path="/pricing" element={<Pricing />} />
               <Route path="/faq" element={<FAQ />} />
               <Route path="/contact" element={<Contact />} />

@@ -5,6 +5,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { usePublicSettings } from '@/contexts/PublicSettingsContext';
 import { api, auth } from '@/lib/api';
 import { type PowProgress } from '@/lib/pow';
+import { AuthHeader } from '@/components/AuthHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -209,7 +210,8 @@ const Auth = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-secondary/10 p-4">
-      <div className="w-full max-w-md">
+      <AuthHeader />
+      <div className="w-full max-w-md pt-14">
         <div className="flex justify-end mb-2">
           <LanguageSwitcher />
         </div>
