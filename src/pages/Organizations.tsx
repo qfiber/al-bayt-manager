@@ -3,6 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { api } from '@/lib/api';
+import { getBaseDomain } from '@/lib/subdomain';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -298,7 +299,7 @@ const Organizations = () => {
                     <TableRow key={org.id}>
                       <TableCell className="font-medium text-start">{org.name}</TableCell>
                       <TableCell className="text-start text-muted-foreground text-sm">
-                        {org.subdomain ? `${org.subdomain}.domain.com` : '-'}
+                        {org.subdomain ? `${org.subdomain}.${getBaseDomain()}` : '-'}
                       </TableCell>
                       <TableCell className="text-start">
                         {org.defaultLanguage === 'ar' ? 'العربية' : org.defaultLanguage === 'he' ? 'עברית' : 'English'}

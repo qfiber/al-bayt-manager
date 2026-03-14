@@ -13,6 +13,7 @@ import { Building, ShieldX, Mail } from 'lucide-react';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { LegalFooter } from '@/components/LegalFooter';
 import { CaptchaField } from '@/components/CaptchaField';
+import { getBaseDomain } from '@/lib/subdomain';
 
 
 const Register = () => {
@@ -278,7 +279,7 @@ const Register = () => {
                             className="flex-1"
                             dir="ltr"
                           />
-                          <span className="text-xs text-muted-foreground shrink-0">.{window.location.hostname.split('.').slice(-2).join('.')}</span>
+                          <span className="text-xs text-muted-foreground shrink-0">.{getBaseDomain()}</span>
                         </div>
                         <p className="text-xs text-muted-foreground">{t('subdomainRegisterHelp')}</p>
                       </div>
