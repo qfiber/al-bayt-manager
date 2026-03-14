@@ -94,6 +94,14 @@ export async function handleStripeWebhook(
         month,
         amount: amountPaid,
       }, 'system');
+
+      // Auto-generate invoice
+      try {
+        const { createInvoice } = await import('./receipt.service.js');
+        await createInvoice(apartmentId, month);
+      } catch {
+        // Don't fail payment if invoice generation fails
+      }
     }
   }
 }
@@ -162,6 +170,14 @@ export async function handleCardcomCallback(data: Record<string, string>): Promi
         month,
         amount,
       }, 'system');
+
+      // Auto-generate invoice
+      try {
+        const { createInvoice } = await import('./receipt.service.js');
+        await createInvoice(apartmentId, month);
+      } catch {
+        // Don't fail payment if invoice generation fails
+      }
     }
   } catch {
     // Log error but don't throw — CardCom expects 200
@@ -279,6 +295,14 @@ export async function capturePaypalOrder(
         const { apartmentId, month } = JSON.parse(customId);
         const amount = parseFloat(captureData.purchase_units[0].payments.captures[0].amount.value);
         await paymentService.createPayment({ apartmentId, month, amount }, 'system');
+
+        // Auto-generate invoice
+        try {
+          const { createInvoice } = await import('./receipt.service.js');
+          await createInvoice(apartmentId, month);
+        } catch {
+          // Don't fail payment if invoice generation fails
+        }
       } catch { /* ignore parse errors */ }
     }
   }

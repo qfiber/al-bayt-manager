@@ -36,8 +36,11 @@ import DebtCollection from "./pages/DebtCollection";
 import Organizations from "./pages/Organizations";
 import SuperAdminDashboard from "./pages/SuperAdminDashboard";
 import Landlords from "./pages/Landlords";
+import Messages from "./pages/Messages";
 import Invoices from "./pages/Invoices";
 import Leases from "./pages/Leases";
+import Inspections from "./pages/Inspections";
+import MyInspections from "./pages/MyInspections";
 import NotFound from "./pages/NotFound";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfUsage from "./pages/TermsOfUsage";
@@ -118,8 +121,11 @@ const App = () => (
               <Route path="/organizations" element={<AppLayout><Organizations /></AppLayout>} />
               <Route path="/invoices" element={<AppLayout><Invoices /></AppLayout>} />
               <Route path="/leases" element={<AppLayout><Leases /></AppLayout>} />
+              <Route path="/inspections" element={<AppLayout><Inspections /></AppLayout>} />
+              <Route path="/my-inspections" element={<AppLayout><MyInspections /></AppLayout>} />
               <Route path="/super-admin" element={<AppLayout><SuperAdminDashboard /></AppLayout>} />
               <Route path="/landlords" element={<AppLayout><Landlords /></AppLayout>} />
+              <Route path="/messages" element={<AppLayout><Messages /></AppLayout>} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

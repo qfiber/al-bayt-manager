@@ -75,12 +75,22 @@ export async function addMember(organizationId: string, userId: string, role: 'o
     .limit(1);
   if (existing) throw new AppError(409, 'User is already a member of this organization');
 
-  const [member] = await db.insert(organizationMembers).values({
-    userId,
-    organizationId,
-    role,
-  }).returning();
-  return member;
+  return await db.transaction(async (tx) => {
+    const [member] = await tx.insert(organizationMembers).values({
+      userId,
+      organizationId,
+      role,
+    }).returning();
+
+    // Sync legacy user_roles table
+    const legacyRole = role === 'org_admin' ? 'admin' : role;
+    const { userRoles } = await import('../db/schema/index.js');
+    // Delete existing role and insert new one
+    await tx.delete(userRoles).where(eq(userRoles.userId, userId));
+    await tx.insert(userRoles).values({ userId, role: legacyRole as any });
+
+    return member;
+  });
 }
 
 export async function removeMember(organizationId: string, userId: string) {

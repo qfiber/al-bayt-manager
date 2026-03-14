@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { validate } from '../middleware/validate.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireRole } from '../middleware/roles.js';
+import { requireOrgScope } from '../middleware/org-scope.js';
 import { auditLog } from '../middleware/audit.js';
 import * as inspectionService from '../services/inspection.service.js';
 
@@ -32,7 +33,7 @@ const updateInspectionSchema = z.object({
 });
 
 // List inspections
-inspectionRoutes.get('/', requireAuth, requireRole('admin', 'moderator'), async (req: Request, res: Response, next: NextFunction) => {
+inspectionRoutes.get('/', requireAuth, requireRole('admin', 'moderator'), requireOrgScope, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await inspectionService.listInspections(req.organizationId);
     res.json(result);
@@ -40,7 +41,7 @@ inspectionRoutes.get('/', requireAuth, requireRole('admin', 'moderator'), async 
 });
 
 // Create inspection (and optionally notify tenants)
-inspectionRoutes.post('/', requireAuth, requireRole('admin'), validate(createInspectionSchema), auditLog('create', 'inspections'), async (req: Request, res: Response, next: NextFunction) => {
+inspectionRoutes.post('/', requireAuth, requireRole('admin'), requireOrgScope, validate(createInspectionSchema), auditLog('create', 'inspections'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const inspection = await inspectionService.createInspection({
       ...req.body,
@@ -72,7 +73,7 @@ inspectionRoutes.post('/', requireAuth, requireRole('admin'), validate(createIns
 });
 
 // Download ICS calendar file
-inspectionRoutes.get('/:id/calendar', requireAuth, validate({ params: idParams }), async (req: Request, res: Response, next: NextFunction) => {
+inspectionRoutes.get('/:id/calendar', requireAuth, requireOrgScope, validate({ params: idParams }), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { db } = await import('../config/database.js');
     const { inspections } = await import('../db/schema/index.js');
@@ -99,7 +100,7 @@ inspectionRoutes.get('/:id/calendar', requireAuth, validate({ params: idParams }
 });
 
 // Update inspection
-inspectionRoutes.put('/:id', requireAuth, requireRole('admin'), validate({ params: idParams, body: updateInspectionSchema }), auditLog('update', 'inspections'), async (req: Request, res: Response, next: NextFunction) => {
+inspectionRoutes.put('/:id', requireAuth, requireRole('admin'), requireOrgScope, validate({ params: idParams, body: updateInspectionSchema }), auditLog('update', 'inspections'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await inspectionService.updateInspection(req.params.id as string, req.body, req.organizationId);
     res.json(result);
@@ -107,7 +108,7 @@ inspectionRoutes.put('/:id', requireAuth, requireRole('admin'), validate({ param
 });
 
 // Delete inspection
-inspectionRoutes.delete('/:id', requireAuth, requireRole('admin'), validate({ params: idParams }), auditLog('delete', 'inspections'), async (req: Request, res: Response, next: NextFunction) => {
+inspectionRoutes.delete('/:id', requireAuth, requireRole('admin'), requireOrgScope, validate({ params: idParams }), auditLog('delete', 'inspections'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await inspectionService.deleteInspection(req.params.id as string, req.organizationId);
     res.json(result);

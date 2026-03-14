@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../middleware/auth.js';
 import { requireRole } from '../middleware/roles.js';
+import { requireOrgScope } from '../middleware/org-scope.js';
 import * as debtCollectionService from '../services/debt-collection.service.js';
 
 export const debtCollectionRoutes = Router();
@@ -18,14 +19,14 @@ const createStageSchema = z.object({
 
 const updateStageSchema = createStageSchema.partial();
 
-debtCollectionRoutes.get('/stages', requireAuth, requireRole('admin'), async (req: Request, res: Response, next: NextFunction) => {
+debtCollectionRoutes.get('/stages', requireAuth, requireRole('admin'), requireOrgScope, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await debtCollectionService.listStages(req.organizationId);
     res.json(result);
   } catch (err) { next(err); }
 });
 
-debtCollectionRoutes.post('/stages', requireAuth, requireRole('admin'), async (req: Request, res: Response, next: NextFunction) => {
+debtCollectionRoutes.post('/stages', requireAuth, requireRole('admin'), requireOrgScope, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = createStageSchema.parse(req.body);
     const result = await debtCollectionService.createStage({ ...data, organizationId: req.organizationId });
@@ -33,7 +34,7 @@ debtCollectionRoutes.post('/stages', requireAuth, requireRole('admin'), async (r
   } catch (err) { next(err); }
 });
 
-debtCollectionRoutes.put('/stages/:id', requireAuth, requireRole('admin'), async (req: Request, res: Response, next: NextFunction) => {
+debtCollectionRoutes.put('/stages/:id', requireAuth, requireRole('admin'), requireOrgScope, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = updateStageSchema.parse(req.body);
     const result = await debtCollectionService.updateStage(req.params.id as string, data);
@@ -41,14 +42,14 @@ debtCollectionRoutes.put('/stages/:id', requireAuth, requireRole('admin'), async
   } catch (err) { next(err); }
 });
 
-debtCollectionRoutes.delete('/stages/:id', requireAuth, requireRole('admin'), async (req: Request, res: Response, next: NextFunction) => {
+debtCollectionRoutes.delete('/stages/:id', requireAuth, requireRole('admin'), requireOrgScope, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await debtCollectionService.deleteStage(req.params.id as string);
     res.json(result);
   } catch (err) { next(err); }
 });
 
-debtCollectionRoutes.get('/log', requireAuth, requireRole('admin', 'moderator'), async (req: Request, res: Response, next: NextFunction) => {
+debtCollectionRoutes.get('/log', requireAuth, requireRole('admin', 'moderator'), requireOrgScope, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { apartmentId, limit, offset } = req.query as any;
     const result = await debtCollectionService.getCollectionLog({
@@ -60,7 +61,7 @@ debtCollectionRoutes.get('/log', requireAuth, requireRole('admin', 'moderator'),
   } catch (err) { next(err); }
 });
 
-debtCollectionRoutes.post('/process', requireAuth, requireRole('admin'), async (req: Request, res: Response, next: NextFunction) => {
+debtCollectionRoutes.post('/process', requireAuth, requireRole('admin'), requireOrgScope, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await debtCollectionService.processCollections();
     res.json(result);

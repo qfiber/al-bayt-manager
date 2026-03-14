@@ -153,6 +153,7 @@ const Dashboard = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedInfoId, setSelectedInfoId] = useState<string | undefined>();
   const [dataLoading, setDataLoading] = useState(true);
+  const [expiringLeases, setExpiringLeases] = useState<any[]>([]);
 
   // Tenant dashboard state
   const [tenantApartments, setTenantApartments] = useState<any[]>([]);
@@ -192,6 +193,9 @@ const Dashboard = () => {
           setTrends(getValue(results[3]));
           setBuildingsReport(getValue(results[4]) || []);
           setAuditLogs(getValue(results[5]) || []);
+
+          // Fetch expiring leases
+          api.get('/leases/expiring?days=30').then(setExpiringLeases).catch(() => {});
         }
 
         // Tenant: fetch apartment details inline
@@ -668,6 +672,31 @@ const Dashboard = () => {
             </CardContent>
           </Card>
         </div>
+      )}
+
+      {/* Expiring Leases Alert */}
+      {expiringLeases.length > 0 && (
+        <Card className="border-amber-200 bg-amber-50/30">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 text-amber-600" />
+              {t('expiringLeases')} ({expiringLeases.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {expiringLeases.slice(0, 5).map((item: any) => (
+                <div key={item.lease.id} className="flex items-center justify-between text-sm py-1 border-b last:border-0">
+                  <div>
+                    <span className="font-medium">{item.buildingName}</span>
+                    <span className="text-muted-foreground"> — {item.apartmentNumber}</span>
+                  </div>
+                  <span className="text-amber-600 text-xs">{t('expires')} {formatDate(item.lease.endDate)}</span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Chart + Outstanding */}

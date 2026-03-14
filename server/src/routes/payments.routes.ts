@@ -4,6 +4,7 @@ import { validate } from '../middleware/validate.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireRole } from '../middleware/roles.js';
 import { scopeToModeratorBuildings } from '../middleware/building-scope.js';
+import { requireOrgScope } from '../middleware/org-scope.js';
 import { auditLog } from '../middleware/audit.js';
 import * as paymentService from '../services/payment.service.js';
 import * as apartmentService from '../services/apartment.service.js';
@@ -36,7 +37,7 @@ const listQuerySchema = z.object({
   apartmentId: z.string().uuid().optional(),
 });
 
-paymentRoutes.get('/', requireAuth, requireRole('admin', 'moderator'), scopeToModeratorBuildings, async (req: Request, res: Response, next: NextFunction) => {
+paymentRoutes.get('/', requireAuth, requireRole('admin', 'moderator'), requireOrgScope, scopeToModeratorBuildings, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const query = listQuerySchema.parse(req.query);
     const result = await paymentService.listPayments({
@@ -49,7 +50,7 @@ paymentRoutes.get('/', requireAuth, requireRole('admin', 'moderator'), scopeToMo
   } catch (err) { next(err); }
 });
 
-paymentRoutes.get('/:id', requireAuth, requireRole('admin', 'moderator'), scopeToModeratorBuildings, validate({ params: idParams }), async (req: Request, res: Response, next: NextFunction) => {
+paymentRoutes.get('/:id', requireAuth, requireRole('admin', 'moderator'), requireOrgScope, scopeToModeratorBuildings, validate({ params: idParams }), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await paymentService.getPayment(req.params.id as string);
     // Moderators: verify payment belongs to their assigned buildings
@@ -64,7 +65,7 @@ paymentRoutes.get('/:id', requireAuth, requireRole('admin', 'moderator'), scopeT
   } catch (err) { next(err); }
 });
 
-paymentRoutes.post('/', requireAuth, requireRole('admin', 'moderator'), scopeToModeratorBuildings, validate(createPaymentSchema), auditLog('create', 'payments'), async (req: Request, res: Response, next: NextFunction) => {
+paymentRoutes.post('/', requireAuth, requireRole('admin', 'moderator'), requireOrgScope, scopeToModeratorBuildings, validate(createPaymentSchema), auditLog('create', 'payments'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     // Moderators can only create payments for apartments in their assigned buildings
     if (req.allowedBuildingIds) {
@@ -79,7 +80,7 @@ paymentRoutes.post('/', requireAuth, requireRole('admin', 'moderator'), scopeToM
   } catch (err) { next(err); }
 });
 
-paymentRoutes.put('/:id', requireAuth, requireRole('admin', 'moderator'), scopeToModeratorBuildings, validate({ params: idParams, body: updatePaymentSchema }), auditLog('update', 'payments'), async (req: Request, res: Response, next: NextFunction) => {
+paymentRoutes.put('/:id', requireAuth, requireRole('admin', 'moderator'), requireOrgScope, scopeToModeratorBuildings, validate({ params: idParams, body: updatePaymentSchema }), auditLog('update', 'payments'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     // Moderators: verify payment belongs to their assigned buildings
     if (req.allowedBuildingIds) {
@@ -95,7 +96,7 @@ paymentRoutes.put('/:id', requireAuth, requireRole('admin', 'moderator'), scopeT
   } catch (err) { next(err); }
 });
 
-paymentRoutes.post('/:id/cancel', requireAuth, requireRole('admin', 'moderator'), scopeToModeratorBuildings, validate({ params: idParams }), auditLog('update', 'payments'), async (req: Request, res: Response, next: NextFunction) => {
+paymentRoutes.post('/:id/cancel', requireAuth, requireRole('admin', 'moderator'), requireOrgScope, scopeToModeratorBuildings, validate({ params: idParams }), auditLog('update', 'payments'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     // Moderators can only cancel payments for apartments in their assigned buildings
     if (req.allowedBuildingIds) {

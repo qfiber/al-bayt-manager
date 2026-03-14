@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../middleware/auth.js';
 import { requireRole } from '../middleware/roles.js';
+import { requireOrgScope } from '../middleware/org-scope.js';
 import * as auditService from '../services/audit.service.js';
 
 export const auditLogRoutes = Router();
@@ -17,7 +18,7 @@ const auditQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).default(0),
 });
 
-auditLogRoutes.get('/', requireAuth, requireRole('admin', 'moderator'), async (req: Request, res: Response, next: NextFunction) => {
+auditLogRoutes.get('/', requireAuth, requireRole('admin', 'moderator'), requireOrgScope, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const query = auditQuerySchema.parse(req.query);
     const result = await auditService.listAuditLogs({ ...query, organizationId: req.organizationId });

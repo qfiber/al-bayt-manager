@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useCurrency } from '@/contexts/PublicSettingsContext';
@@ -29,6 +30,7 @@ import {
   Package,
   Car,
   Download,
+  Shield,
 } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
 
@@ -37,6 +39,7 @@ const Profile = () => {
   const { user, refreshUser } = useAuth();
   const { t } = useLanguage();
   const { currencySymbol, formatCurrency } = useCurrency();
+  const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Name edit state
@@ -72,6 +75,12 @@ const Profile = () => {
   const [smsNotificationsEnabled, setSmsNotificationsEnabled] = useState(true);
   const [savingNotif, setSavingNotif] = useState(false);
 
+  // 2FA state
+  const [factors, setFactors] = useState<{ id: string; status: string; friendlyName?: string; createdAt?: string }[]>([]);
+  const [disabling2FA, setDisabling2FA] = useState(false);
+  const [disable2FACode, setDisable2FACode] = useState('');
+  const [showDisable2FA, setShowDisable2FA] = useState(false);
+
   // Apartments & issues
   const [apartments, setApartments] = useState<any[]>([]);
   const [issues, setIssues] = useState<IssueRow[]>([]);
@@ -84,6 +93,12 @@ const Profile = () => {
       setEmailNotificationsEnabled(user.emailNotificationsEnabled ?? true);
       setSmsNotificationsEnabled(user.smsNotificationsEnabled ?? true);
       fetchData();
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (user) {
+      api.get('/auth/2fa/factors').then(setFactors).catch(() => {});
     }
   }, [user]);
 
@@ -679,6 +694,78 @@ const Profile = () => {
                 </Button>
               </div>
             </form>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Two-Factor Authentication */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="w-5 h-5" />
+            {t('twoFactorAuth')}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {factors.filter(f => f.status === 'verified').length > 0 ? (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Badge variant="default" className="bg-green-600">{t('enabled')}</Badge>
+                <span className="text-sm text-muted-foreground">{t('twoFactorEnabled')}</span>
+              </div>
+              {!showDisable2FA ? (
+                <Button variant="outline" size="sm" onClick={() => setShowDisable2FA(true)} className="text-destructive">
+                  {t('disable2FA')}
+                </Button>
+              ) : (
+                <div className="space-y-2 border rounded-lg p-3">
+                  <Label>{t('enterCurrentCode')}</Label>
+                  <Input
+                    value={disable2FACode}
+                    onChange={(e) => setDisable2FACode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="000000"
+                    maxLength={6}
+                    className="w-32"
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      disabled={disabling2FA || disable2FACode.length !== 6}
+                      onClick={async () => {
+                        setDisabling2FA(true);
+                        try {
+                          const verifiedFactor = factors.find(f => f.status === 'verified');
+                          if (!verifiedFactor) return;
+                          await api.post('/auth/2fa/unenroll', { factorId: verifiedFactor.id, code: disable2FACode });
+                          toast.success(t('twoFactorDisabled'));
+                          setFactors(prev => prev.filter(f => f.id !== verifiedFactor.id));
+                          setShowDisable2FA(false);
+                          setDisable2FACode('');
+                        } catch (err: any) {
+                          toast.error(err.message || t('error'));
+                        } finally {
+                          setDisabling2FA(false);
+                        }
+                      }}
+                    >
+                      {disabling2FA ? t('loading') : t('confirm')}
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => { setShowDisable2FA(false); setDisable2FACode(''); }}>
+                      {t('cancel')}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">{t('twoFactorNotEnabled')}</p>
+              <Button variant="outline" size="sm" onClick={() => navigate('/setup-2fa')}>
+                <Shield className="w-4 h-4 me-2" />
+                {t('setup2FA')}
+              </Button>
+            </div>
           )}
         </CardContent>
       </Card>

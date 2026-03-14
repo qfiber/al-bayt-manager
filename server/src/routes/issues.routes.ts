@@ -4,6 +4,7 @@ import { validate } from '../middleware/validate.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireRole } from '../middleware/roles.js';
 import { scopeToModeratorBuildings } from '../middleware/building-scope.js';
+import { requireOrgScope } from '../middleware/org-scope.js';
 import { auditLog } from '../middleware/audit.js';
 import * as issueService from '../services/issue.service.js';
 
@@ -24,7 +25,7 @@ const createIssueSchema = z.object({
 const idParams = z.object({ id: z.string().uuid() });
 
 // GET /issues - List issues (scoped by role)
-issueRoutes.get('/', requireAuth, scopeToModeratorBuildings, async (req: Request, res: Response, next: NextFunction) => {
+issueRoutes.get('/', requireAuth, requireOrgScope, scopeToModeratorBuildings, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { buildingId, status, category } = req.query;
     let allowedBuildingIds = req.allowedBuildingIds; // moderator scope
@@ -50,7 +51,7 @@ issueRoutes.get('/', requireAuth, scopeToModeratorBuildings, async (req: Request
 });
 
 // GET /issues/count/open - Open issue count (MUST be before /:id)
-issueRoutes.get('/count/open', requireAuth, scopeToModeratorBuildings, async (req: Request, res: Response, next: NextFunction) => {
+issueRoutes.get('/count/open', requireAuth, requireOrgScope, scopeToModeratorBuildings, async (req: Request, res: Response, next: NextFunction) => {
   try {
     let buildingIds = req.allowedBuildingIds;
 
@@ -64,7 +65,7 @@ issueRoutes.get('/count/open', requireAuth, scopeToModeratorBuildings, async (re
 });
 
 // GET /issues/:id - Single issue
-issueRoutes.get('/:id', requireAuth, validate({ params: idParams }), async (req: Request, res: Response, next: NextFunction) => {
+issueRoutes.get('/:id', requireAuth, requireOrgScope, validate({ params: idParams }), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await issueService.getIssue(req.params.id as string);
 
@@ -79,7 +80,7 @@ issueRoutes.get('/:id', requireAuth, validate({ params: idParams }), async (req:
 });
 
 // POST /issues - Create issue (any authenticated user)
-issueRoutes.post('/', requireAuth, validate(createIssueSchema), auditLog('create', 'issue_reports'), async (req: Request, res: Response, next: NextFunction) => {
+issueRoutes.post('/', requireAuth, requireOrgScope, validate(createIssueSchema), auditLog('create', 'issue_reports'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     // Verify user belongs to the building (for regular users)
     if (req.user!.role === 'user') {
@@ -99,7 +100,7 @@ issueRoutes.post('/', requireAuth, validate(createIssueSchema), auditLog('create
 });
 
 // PUT /issues/:id/resolve - Admin/moderator only
-issueRoutes.put('/:id/resolve', requireAuth, requireRole('admin', 'moderator'), validate({ params: idParams }), auditLog('update', 'issue_reports'), async (req: Request, res: Response, next: NextFunction) => {
+issueRoutes.put('/:id/resolve', requireAuth, requireRole('admin', 'moderator'), requireOrgScope, validate({ params: idParams }), auditLog('update', 'issue_reports'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await issueService.resolveIssue(req.params.id as string);
     res.json(result);

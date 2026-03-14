@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { validate } from '../middleware/validate.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireRole } from '../middleware/roles.js';
+import { requireOrgScope } from '../middleware/org-scope.js';
 import { auditLog } from '../middleware/audit.js';
 import * as emailService from '../services/email.service.js';
 import * as ntfyTemplateService from '../services/ntfy-template.service.js';
@@ -62,42 +63,42 @@ const emailLogQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).default(0),
 });
 
-emailRoutes.get('/templates', requireAuth, requireRole('admin'), async (req: Request, res: Response, next: NextFunction) => {
+emailRoutes.get('/templates', requireAuth, requireRole('admin'), requireOrgScope, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await emailService.listTemplates(req.organizationId);
     res.json(result);
   } catch (err) { next(err); }
 });
 
-emailRoutes.get('/templates/:id', requireAuth, requireRole('admin'), validate({ params: idParams }), async (req: Request, res: Response, next: NextFunction) => {
+emailRoutes.get('/templates/:id', requireAuth, requireRole('admin'), requireOrgScope, validate({ params: idParams }), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await emailService.getTemplate(req.params.id as string);
     res.json(result);
   } catch (err) { next(err); }
 });
 
-emailRoutes.put('/templates/:id', requireAuth, requireRole('admin'), validate({ params: idParams, body: updateTemplateSchema }), auditLog('update', 'email_templates'), async (req: Request, res: Response, next: NextFunction) => {
+emailRoutes.put('/templates/:id', requireAuth, requireRole('admin'), requireOrgScope, validate({ params: idParams, body: updateTemplateSchema }), auditLog('update', 'email_templates'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await emailService.updateTemplate(req.params.id as string, req.body);
     res.json(result);
   } catch (err) { next(err); }
 });
 
-emailRoutes.put('/templates/:id/translations', requireAuth, requireRole('admin'), validate({ params: idParams, body: translationsSchema }), auditLog('update', 'email_template_translations'), async (req: Request, res: Response, next: NextFunction) => {
+emailRoutes.put('/templates/:id/translations', requireAuth, requireRole('admin'), requireOrgScope, validate({ params: idParams, body: translationsSchema }), auditLog('update', 'email_template_translations'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await emailService.updateTranslations(req.params.id as string, req.body.translations);
     res.json(result);
   } catch (err) { next(err); }
 });
 
-emailRoutes.post('/send', requireAuth, requireRole('admin'), validate(sendEmailSchema), auditLog('create', 'email_logs'), async (req: Request, res: Response, next: NextFunction) => {
+emailRoutes.post('/send', requireAuth, requireRole('admin'), requireOrgScope, validate(sendEmailSchema), auditLog('create', 'email_logs'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await emailService.sendEmail(req.body);
     res.json(result);
   } catch (err) { next(err); }
 });
 
-emailRoutes.get('/logs', requireAuth, requireRole('admin'), async (req: Request, res: Response, next: NextFunction) => {
+emailRoutes.get('/logs', requireAuth, requireRole('admin'), requireOrgScope, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const query = emailLogQuerySchema.parse(req.query);
     const result = await emailService.listEmailLogs({ ...query, organizationId: req.organizationId });
@@ -107,28 +108,28 @@ emailRoutes.get('/logs', requireAuth, requireRole('admin'), async (req: Request,
 
 // ─── Ntfy Template Routes ───
 
-emailRoutes.get('/ntfy-templates', requireAuth, requireRole('admin'), async (req: Request, res: Response, next: NextFunction) => {
+emailRoutes.get('/ntfy-templates', requireAuth, requireRole('admin'), requireOrgScope, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await ntfyTemplateService.listNtfyTemplates(req.organizationId);
     res.json(result);
   } catch (err) { next(err); }
 });
 
-emailRoutes.get('/ntfy-templates/:id', requireAuth, requireRole('admin'), validate({ params: idParams }), async (req: Request, res: Response, next: NextFunction) => {
+emailRoutes.get('/ntfy-templates/:id', requireAuth, requireRole('admin'), requireOrgScope, validate({ params: idParams }), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await ntfyTemplateService.getNtfyTemplate(req.params.id as string);
     res.json(result);
   } catch (err) { next(err); }
 });
 
-emailRoutes.put('/ntfy-templates/:id', requireAuth, requireRole('admin'), validate({ params: idParams, body: updateTemplateSchema }), auditLog('update', 'ntfy_templates'), async (req: Request, res: Response, next: NextFunction) => {
+emailRoutes.put('/ntfy-templates/:id', requireAuth, requireRole('admin'), requireOrgScope, validate({ params: idParams, body: updateTemplateSchema }), auditLog('update', 'ntfy_templates'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await ntfyTemplateService.updateNtfyTemplate(req.params.id as string, req.body);
     res.json(result);
   } catch (err) { next(err); }
 });
 
-emailRoutes.put('/ntfy-templates/:id/translations', requireAuth, requireRole('admin'), validate({ params: idParams, body: ntfyTranslationsSchema }), auditLog('update', 'ntfy_template_translations'), async (req: Request, res: Response, next: NextFunction) => {
+emailRoutes.put('/ntfy-templates/:id/translations', requireAuth, requireRole('admin'), requireOrgScope, validate({ params: idParams, body: ntfyTranslationsSchema }), auditLog('update', 'ntfy_template_translations'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await ntfyTemplateService.updateNtfyTranslations(req.params.id as string, req.body.translations);
     res.json(result);
@@ -137,32 +138,32 @@ emailRoutes.put('/ntfy-templates/:id/translations', requireAuth, requireRole('ad
 
 // ─── SMS Template Routes ───
 
-emailRoutes.get('/sms-templates', requireAuth, requireRole('admin'), async (req: Request, res: Response, next: NextFunction) => {
+emailRoutes.get('/sms-templates', requireAuth, requireRole('admin'), requireOrgScope, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await smsTemplateService.listSmsTemplates(req.organizationId);
     res.json(result);
   } catch (err) { next(err); }
 });
 
-emailRoutes.get('/sms-templates/variables', requireAuth, requireRole('admin'), (_req: Request, res: Response) => {
+emailRoutes.get('/sms-templates/variables', requireAuth, requireRole('admin'), requireOrgScope, (_req: Request, res: Response) => {
   res.json(smsTemplateService.SMS_TEMPLATE_VARIABLES);
 });
 
-emailRoutes.get('/sms-templates/:id', requireAuth, requireRole('admin'), validate({ params: idParams }), async (req: Request, res: Response, next: NextFunction) => {
+emailRoutes.get('/sms-templates/:id', requireAuth, requireRole('admin'), requireOrgScope, validate({ params: idParams }), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await smsTemplateService.getSmsTemplate(req.params.id as string);
     res.json(result);
   } catch (err) { next(err); }
 });
 
-emailRoutes.put('/sms-templates/:id', requireAuth, requireRole('admin'), validate({ params: idParams, body: updateTemplateSchema }), auditLog('update', 'sms_templates'), async (req: Request, res: Response, next: NextFunction) => {
+emailRoutes.put('/sms-templates/:id', requireAuth, requireRole('admin'), requireOrgScope, validate({ params: idParams, body: updateTemplateSchema }), auditLog('update', 'sms_templates'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await smsTemplateService.updateSmsTemplate(req.params.id as string, req.body);
     res.json(result);
   } catch (err) { next(err); }
 });
 
-emailRoutes.put('/sms-templates/:id/translations', requireAuth, requireRole('admin'), validate({ params: idParams, body: smsTranslationsSchema }), auditLog('update', 'sms_template_translations'), async (req: Request, res: Response, next: NextFunction) => {
+emailRoutes.put('/sms-templates/:id/translations', requireAuth, requireRole('admin'), requireOrgScope, validate({ params: idParams, body: smsTranslationsSchema }), auditLog('update', 'sms_template_translations'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await smsTemplateService.updateSmsTranslations(req.params.id as string, req.body.translations);
     res.json(result);
@@ -180,7 +181,7 @@ const smsLogQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).default(0),
 });
 
-emailRoutes.get('/sms-logs', requireAuth, requireRole('admin'), async (req: Request, res: Response, next: NextFunction) => {
+emailRoutes.get('/sms-logs', requireAuth, requireRole('admin'), requireOrgScope, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const query = smsLogQuerySchema.parse(req.query);
     const result = await listSmsLogs({ ...query, organizationId: req.organizationId });
@@ -194,7 +195,7 @@ const triggerSchema = z.object({
   type: z.enum(['monthly', 'overdue']),
 });
 
-emailRoutes.post('/sms-trigger', requireAuth, requireRole('admin'), dbRateLimit({ prefix: 'sms_trigger', windowMs: 10 * 60 * 1000, max: 3 }), validate(triggerSchema), auditLog('create', 'sms_trigger'), async (req: Request, res: Response, next: NextFunction) => {
+emailRoutes.post('/sms-trigger', requireAuth, requireRole('admin'), requireOrgScope, dbRateLimit({ prefix: 'sms_trigger', windowMs: 10 * 60 * 1000, max: 3 }), validate(triggerSchema), auditLog('create', 'sms_trigger'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { type } = req.body;
     if (type === 'monthly') {

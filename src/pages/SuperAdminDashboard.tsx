@@ -55,6 +55,7 @@ const SuperAdminDashboard = () => {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [extended, setExtended] = useState<any>(null);
+  const [trends, setTrends] = useState<any[]>([]);
 
   useEffect(() => {
     if (user && isSuperAdmin) {
@@ -69,6 +70,9 @@ const SuperAdminDashboard = () => {
     if (user && isSuperAdmin && data) {
       api.get('/super-admin/extended')
         .then(setExtended)
+        .catch(() => {});
+      api.get('/super-admin/trends')
+        .then(setTrends)
         .catch(() => {});
     }
   }, [user, isSuperAdmin, data]);
@@ -243,6 +247,26 @@ const SuperAdminDashboard = () => {
             </CardContent>
           </Card>
         </div>
+      )}
+
+      {/* Revenue Trend */}
+      {!loading && trends.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">{t('revenueTrend')}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={250}>
+              <LineChart data={trends}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                <YAxis tick={{ fontSize: 11 }} />
+                <Tooltip formatter={(value: any) => formatCurrency(parseFloat(value))} />
+                <Line type="monotone" dataKey="revenue" name={t('systemRevenue')} stroke="#10b981" strokeWidth={2} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
       )}
 
       {/* Occupancy + Recent Orgs */}

@@ -41,6 +41,7 @@ import { onlinePaymentRoutes } from './routes/online-payments.routes.js';
 import { notificationInboxRoutes } from './routes/notifications.routes.js';
 import { leaseRoutes } from './routes/leases.routes.js';
 import { inspectionRoutes } from './routes/inspections.routes.js';
+import { messageRoutes } from './routes/messages.routes.js';
 import { dbRateLimit, cleanupRateLimitEntries } from './middleware/db-rate-limit.js';
 import { sanitizeBody } from './middleware/sanitize.js';
 import { resolveSubdomain } from './middleware/subdomain.js';
@@ -134,6 +135,7 @@ export function createApp() {
   app.use('/api/notifications', notificationInboxRoutes);
   app.use('/api/leases', leaseRoutes);
   app.use('/api/inspections', inspectionRoutes);
+  app.use('/api/messages', messageRoutes);
   app.use('/api/v1', v1Routes);
 
   // Health check

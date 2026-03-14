@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { validate } from '../middleware/validate.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireRole } from '../middleware/roles.js';
+import { requireOrgScope } from '../middleware/org-scope.js';
 import { auditLog } from '../middleware/audit.js';
 import * as leaseService from '../services/lease.service.js';
 
@@ -28,14 +29,14 @@ const updateLeaseSchema = createLeaseSchema.partial().extend({
 
 const idParams = z.object({ id: z.string().uuid() });
 
-leaseRoutes.get('/', requireAuth, requireRole('admin', 'moderator'), async (req: Request, res: Response, next: NextFunction) => {
+leaseRoutes.get('/', requireAuth, requireRole('admin', 'moderator'), requireOrgScope, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await leaseService.listLeases(req.organizationId);
     res.json(result);
   } catch (err) { next(err); }
 });
 
-leaseRoutes.get('/expiring', requireAuth, requireRole('admin', 'moderator'), async (req: Request, res: Response, next: NextFunction) => {
+leaseRoutes.get('/expiring', requireAuth, requireRole('admin', 'moderator'), requireOrgScope, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const days = parseInt(req.query.days as string) || 30;
     const result = await leaseService.getExpiringLeases(req.organizationId, days);
@@ -43,28 +44,28 @@ leaseRoutes.get('/expiring', requireAuth, requireRole('admin', 'moderator'), asy
   } catch (err) { next(err); }
 });
 
-leaseRoutes.get('/:id', requireAuth, requireRole('admin', 'moderator'), validate({ params: idParams }), async (req: Request, res: Response, next: NextFunction) => {
+leaseRoutes.get('/:id', requireAuth, requireRole('admin', 'moderator'), requireOrgScope, validate({ params: idParams }), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await leaseService.getLease(req.params.id as string, req.organizationId);
     res.json(result);
   } catch (err) { next(err); }
 });
 
-leaseRoutes.post('/', requireAuth, requireRole('admin'), validate(createLeaseSchema), auditLog('create', 'leases'), async (req: Request, res: Response, next: NextFunction) => {
+leaseRoutes.post('/', requireAuth, requireRole('admin'), requireOrgScope, validate(createLeaseSchema), auditLog('create', 'leases'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await leaseService.createLease({ ...req.body, organizationId: req.organizationId });
     res.status(201).json(result);
   } catch (err) { next(err); }
 });
 
-leaseRoutes.put('/:id', requireAuth, requireRole('admin'), validate({ params: idParams, body: updateLeaseSchema }), auditLog('update', 'leases'), async (req: Request, res: Response, next: NextFunction) => {
+leaseRoutes.put('/:id', requireAuth, requireRole('admin'), requireOrgScope, validate({ params: idParams, body: updateLeaseSchema }), auditLog('update', 'leases'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await leaseService.updateLease(req.params.id as string, req.body, req.organizationId);
     res.json(result);
   } catch (err) { next(err); }
 });
 
-leaseRoutes.delete('/:id', requireAuth, requireRole('admin'), validate({ params: idParams }), auditLog('delete', 'leases'), async (req: Request, res: Response, next: NextFunction) => {
+leaseRoutes.delete('/:id', requireAuth, requireRole('admin'), requireOrgScope, validate({ params: idParams }), auditLog('delete', 'leases'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await leaseService.deleteLease(req.params.id as string, req.organizationId);
     res.json(result);

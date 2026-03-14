@@ -419,6 +419,31 @@ export async function sendInspectionNotificationEmail(email: string, data: {
   });
 }
 
+export async function sendPasswordResetEmail(email: string, code: string) {
+  const config = await getRawSettings();
+  if (!config?.resendApiKey) return;
+
+  const { Resend } = await import('resend');
+  const resend = new Resend(config.resendApiKey);
+
+  await resend.emails.send({
+    from: `${config.smtpFromName || 'Al-Bayt Manager'} <${config.smtpFromEmail || 'noreply@example.com'}>`,
+    to: email,
+    subject: 'Password Reset Code',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <h2>Password Reset</h2>
+        <p>Your password reset code is:</p>
+        <div style="background: #f4f4f4; padding: 20px; text-align: center; font-size: 32px; letter-spacing: 8px; font-weight: bold; border-radius: 8px; margin: 20px 0;">
+          ${code}
+        </div>
+        <p>This code expires in 15 minutes.</p>
+        <p style="color: #666; font-size: 12px;">If you didn't request this, please ignore this email.</p>
+      </div>
+    `,
+  });
+}
+
 export async function listEmailLogs(filters?: {
   status?: string;
   templateIdentifier?: string;

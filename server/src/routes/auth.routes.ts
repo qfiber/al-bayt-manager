@@ -234,6 +234,60 @@ authRoutes.post('/resend-verification', authRateLimit, validate(resendVerificati
   } catch (err) { next(err); }
 });
 
+const requestResetSchema = z.object({
+  email: z.string().email(),
+});
+
+const confirmResetSchema = z.object({
+  token: z.string().min(1),
+  code: z.string().length(6),
+  newPassword: z.string().min(16).max(72),
+});
+
+// Request password reset
+authRoutes.post('/request-password-reset', authRateLimit, validate(requestResetSchema), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { email } = req.body;
+
+    // Always return success to prevent email enumeration
+    const [user] = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
+    if (!user) { res.json({ success: true }); return; }
+
+    const { createResetSession } = await import('../services/password-reset.service.js');
+    const { token, code } = createResetSession(email);
+
+    // Send reset email
+    try {
+      const { sendPasswordResetEmail } = await import('../services/email.service.js');
+      await sendPasswordResetEmail(email, code);
+    } catch { /* don't fail if email fails */ }
+
+    res.json({ success: true, token });
+  } catch (err) { next(err); }
+});
+
+// Confirm password reset
+authRoutes.post('/confirm-password-reset', authRateLimit, validate(confirmResetSchema), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { verifyResetCode } = await import('../services/password-reset.service.js');
+    const { email } = verifyResetCode(req.body.token, req.body.code);
+
+    const [user] = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
+    if (!user) { res.status(400).json({ error: 'User not found' }); return; }
+
+    const { hashPassword } = await import('../utils/bcrypt.js');
+    const passwordHash = await hashPassword(req.body.newPassword);
+    await db.update(users).set({ passwordHash, updatedAt: new Date() }).where(eq(users.id, user.id));
+
+    // Revoke all refresh tokens
+    await db.update(refreshTokens).set({ revoked: true }).where(eq(refreshTokens.userId, user.id));
+
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message || 'Reset failed' });
+  }
+});
+
 authRoutes.post('/refresh', refreshRateLimit, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const refreshToken = req.cookies?.refresh_token as string | undefined;

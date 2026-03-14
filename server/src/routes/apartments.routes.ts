@@ -4,6 +4,7 @@ import { validate } from '../middleware/validate.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireRole } from '../middleware/roles.js';
 import { scopeToModeratorBuildings } from '../middleware/building-scope.js';
+import { requireOrgScope } from '../middleware/org-scope.js';
 import { auditLog } from '../middleware/audit.js';
 import { AppError } from '../middleware/error-handler.js';
 import * as apartmentService from '../services/apartment.service.js';
@@ -43,7 +44,7 @@ const listApartmentQuerySchema = z.object({
   buildingId: z.string().uuid().optional(),
 });
 
-apartmentRoutes.get('/', requireAuth, scopeToModeratorBuildings, async (req: Request, res: Response, next: NextFunction) => {
+apartmentRoutes.get('/', requireAuth, requireOrgScope, scopeToModeratorBuildings, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const query = listApartmentQuerySchema.parse(req.query);
     const result = await apartmentService.listApartments(query.buildingId, req.allowedBuildingIds, req.organizationId);
@@ -51,14 +52,14 @@ apartmentRoutes.get('/', requireAuth, scopeToModeratorBuildings, async (req: Req
   } catch (err) { next(err); }
 });
 
-apartmentRoutes.get('/:id', requireAuth, requireRole('admin', 'moderator'), validate({ params: idParams }), async (req: Request, res: Response, next: NextFunction) => {
+apartmentRoutes.get('/:id', requireAuth, requireRole('admin', 'moderator'), requireOrgScope, validate({ params: idParams }), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await apartmentService.getApartment(req.params.id as string);
     res.json(result);
   } catch (err) { next(err); }
 });
 
-apartmentRoutes.post('/', requireAuth, requireRole('admin'), validate(createApartmentSchema), auditLog('create', 'apartments'), async (req: Request, res: Response, next: NextFunction) => {
+apartmentRoutes.post('/', requireAuth, requireRole('admin'), requireOrgScope, validate(createApartmentSchema), auditLog('create', 'apartments'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = {
       ...req.body,
@@ -70,7 +71,7 @@ apartmentRoutes.post('/', requireAuth, requireRole('admin'), validate(createApar
   } catch (err) { next(err); }
 });
 
-apartmentRoutes.put('/:id', requireAuth, requireRole('admin'), validate({ params: idParams, body: updateApartmentSchema }), auditLog('update', 'apartments'), async (req: Request, res: Response, next: NextFunction) => {
+apartmentRoutes.put('/:id', requireAuth, requireRole('admin'), requireOrgScope, validate({ params: idParams, body: updateApartmentSchema }), auditLog('update', 'apartments'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data: any = { ...req.body };
     // Never allow changing buildingId — would break expense/ledger history
@@ -86,21 +87,21 @@ apartmentRoutes.put('/:id', requireAuth, requireRole('admin'), validate({ params
   } catch (err) { next(err); }
 });
 
-apartmentRoutes.delete('/:id', requireAuth, requireRole('admin'), validate({ params: idParams }), auditLog('delete', 'apartments'), async (req: Request, res: Response, next: NextFunction) => {
+apartmentRoutes.delete('/:id', requireAuth, requireRole('admin'), requireOrgScope, validate({ params: idParams }), auditLog('delete', 'apartments'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await apartmentService.deleteApartment(req.params.id as string);
     res.json(result);
   } catch (err) { next(err); }
 });
 
-apartmentRoutes.post('/:id/terminate', requireAuth, requireRole('admin'), validate({ params: idParams }), auditLog('update', 'apartments'), async (req: Request, res: Response, next: NextFunction) => {
+apartmentRoutes.post('/:id/terminate', requireAuth, requireRole('admin'), requireOrgScope, validate({ params: idParams }), auditLog('update', 'apartments'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await apartmentService.terminateOccupancy(req.params.id as string, req.user!.userId);
     res.json(result);
   } catch (err) { next(err); }
 });
 
-apartmentRoutes.post('/:id/write-off-balance', requireAuth, requireRole('admin'), validate({ params: idParams }), auditLog('update', 'apartments'), async (req: Request, res: Response, next: NextFunction) => {
+apartmentRoutes.post('/:id/write-off-balance', requireAuth, requireRole('admin'), requireOrgScope, validate({ params: idParams }), auditLog('update', 'apartments'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await apartmentService.writeOffBalance(req.params.id as string, req.user!.userId);
     res.json(result);
@@ -111,7 +112,7 @@ const debtDetailsQuerySchema = z.object({
   periodId: z.union([z.literal('current'), z.literal('all'), z.string().uuid()]).optional(),
 });
 
-apartmentRoutes.get('/:id/debt-details', requireAuth, scopeToModeratorBuildings, validate({ params: idParams }), async (req: Request, res: Response, next: NextFunction) => {
+apartmentRoutes.get('/:id/debt-details', requireAuth, requireOrgScope, scopeToModeratorBuildings, validate({ params: idParams }), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const query = debtDetailsQuerySchema.parse(req.query);
     const role = req.user!.role;
@@ -145,7 +146,7 @@ const ledgerQuerySchema = z.object({
   periodId: z.string().uuid().optional(),
 });
 
-apartmentRoutes.get('/:id/ledger', requireAuth, requireRole('admin', 'moderator'), scopeToModeratorBuildings, validate({ params: idParams }), async (req: Request, res: Response, next: NextFunction) => {
+apartmentRoutes.get('/:id/ledger', requireAuth, requireRole('admin', 'moderator'), requireOrgScope, scopeToModeratorBuildings, validate({ params: idParams }), async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (req.user!.role === 'moderator' && req.allowedBuildingIds) {
       const apt = await apartmentService.getApartment(req.params.id as string);
@@ -157,7 +158,7 @@ apartmentRoutes.get('/:id/ledger', requireAuth, requireRole('admin', 'moderator'
   } catch (err) { next(err); }
 });
 
-apartmentRoutes.get('/:id/periods', requireAuth, requireRole('admin', 'moderator'), scopeToModeratorBuildings, validate({ params: idParams }), async (req: Request, res: Response, next: NextFunction) => {
+apartmentRoutes.get('/:id/periods', requireAuth, requireRole('admin', 'moderator'), requireOrgScope, scopeToModeratorBuildings, validate({ params: idParams }), async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (req.user!.role === 'moderator' && req.allowedBuildingIds) {
       const apt = await apartmentService.getApartment(req.params.id as string);

@@ -5,6 +5,7 @@ import path from 'path';
 import { requireAuth } from '../middleware/auth.js';
 import { requireRole } from '../middleware/roles.js';
 import { scopeToModeratorBuildings } from '../middleware/building-scope.js';
+import { requireOrgScope } from '../middleware/org-scope.js';
 import * as documentService from '../services/document.service.js';
 import * as storageService from '../services/storage.service.js';
 
@@ -39,7 +40,7 @@ const upload = multer({
   },
 });
 
-documentRoutes.get('/', requireAuth, requireRole('admin', 'moderator'), scopeToModeratorBuildings, async (req: Request, res: Response, next: NextFunction) => {
+documentRoutes.get('/', requireAuth, requireRole('admin', 'moderator'), requireOrgScope, scopeToModeratorBuildings, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { scopeType, scopeId } = req.query as any;
     const result = await documentService.listDocuments({
@@ -52,7 +53,7 @@ documentRoutes.get('/', requireAuth, requireRole('admin', 'moderator'), scopeToM
   } catch (err) { next(err); }
 });
 
-documentRoutes.post('/', requireAuth, requireRole('admin', 'moderator'), upload.single('file'), async (req: Request, res: Response, next: NextFunction) => {
+documentRoutes.post('/', requireAuth, requireRole('admin', 'moderator'), requireOrgScope, upload.single('file'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'File is required' });
@@ -78,7 +79,7 @@ documentRoutes.post('/', requireAuth, requireRole('admin', 'moderator'), upload.
   } catch (err) { next(err); }
 });
 
-documentRoutes.delete('/:id', requireAuth, requireRole('admin', 'moderator'), async (req: Request, res: Response, next: NextFunction) => {
+documentRoutes.delete('/:id', requireAuth, requireRole('admin', 'moderator'), requireOrgScope, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await documentService.deleteDocument(req.params.id as string);
     res.json(result);

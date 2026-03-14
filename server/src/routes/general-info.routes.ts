@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { validate } from '../middleware/validate.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireRole } from '../middleware/roles.js';
+import { requireOrgScope } from '../middleware/org-scope.js';
 import { auditLog } from '../middleware/audit.js';
 import { db } from '../config/database.js';
 import { generalInformation } from '../db/schema/index.js';
@@ -21,7 +22,7 @@ const createSchema = z.object({
 });
 const updateSchema = createSchema.partial();
 
-generalInfoRoutes.get('/', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+generalInfoRoutes.get('/', requireAuth, requireOrgScope, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const query = db.select().from(generalInformation);
     const result = req.organizationId
@@ -31,14 +32,14 @@ generalInfoRoutes.get('/', requireAuth, async (req: Request, res: Response, next
   } catch (err) { next(err); }
 });
 
-generalInfoRoutes.post('/', requireAuth, requireRole('admin'), validate(createSchema), auditLog('create', 'general_information'), async (req: Request, res: Response, next: NextFunction) => {
+generalInfoRoutes.post('/', requireAuth, requireRole('admin'), requireOrgScope, validate(createSchema), auditLog('create', 'general_information'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const [result] = await db.insert(generalInformation).values({ ...req.body, ...(req.organizationId ? { organizationId: req.organizationId } : {}) }).returning();
     res.status(201).json(result);
   } catch (err) { next(err); }
 });
 
-generalInfoRoutes.put('/:id', requireAuth, requireRole('admin'), validate({ params: idParams, body: updateSchema }), auditLog('update', 'general_information'), async (req: Request, res: Response, next: NextFunction) => {
+generalInfoRoutes.put('/:id', requireAuth, requireRole('admin'), requireOrgScope, validate({ params: idParams, body: updateSchema }), auditLog('update', 'general_information'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const conditions = [eq(generalInformation.id, req.params.id as string)];
     if (req.organizationId) conditions.push(eq(generalInformation.organizationId, req.organizationId));
@@ -52,7 +53,7 @@ generalInfoRoutes.put('/:id', requireAuth, requireRole('admin'), validate({ para
   } catch (err) { next(err); }
 });
 
-generalInfoRoutes.delete('/:id', requireAuth, requireRole('admin'), validate({ params: idParams }), auditLog('delete', 'general_information'), async (req: Request, res: Response, next: NextFunction) => {
+generalInfoRoutes.delete('/:id', requireAuth, requireRole('admin'), requireOrgScope, validate({ params: idParams }), auditLog('delete', 'general_information'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const deleteConditions = [eq(generalInformation.id, req.params.id as string)];
     if (req.organizationId) deleteConditions.push(eq(generalInformation.organizationId, req.organizationId));

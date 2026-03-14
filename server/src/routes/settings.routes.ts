@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { validate } from '../middleware/validate.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireRole } from '../middleware/roles.js';
+import { requireOrgScope } from '../middleware/org-scope.js';
 import { auditLog } from '../middleware/audit.js';
 import * as settingsService from '../services/settings.service.js';
 import { sendTestSms } from '../services/sms.service.js';
@@ -44,21 +45,21 @@ settingsRoutes.get('/public', async (req: Request, res: Response, next: NextFunc
   } catch (err) { next(err); }
 });
 
-settingsRoutes.get('/', requireAuth, requireRole('admin'), async (req: Request, res: Response, next: NextFunction) => {
+settingsRoutes.get('/', requireAuth, requireRole('admin'), requireOrgScope, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await settingsService.getSettings(req.organizationId);
     res.json(result);
   } catch (err) { next(err); }
 });
 
-settingsRoutes.put('/', requireAuth, requireRole('admin'), validate(updateSettingsSchema), auditLog('update', 'settings'), async (req: Request, res: Response, next: NextFunction) => {
+settingsRoutes.put('/', requireAuth, requireRole('admin'), requireOrgScope, validate(updateSettingsSchema), auditLog('update', 'settings'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await settingsService.updateSettings(req.organizationId, req.body);
     res.json(result);
   } catch (err) { next(err); }
 });
 
-settingsRoutes.post('/test-sms', requireAuth, requireRole('admin'), validate(testSmsSchema), async (req: Request, res: Response, next: NextFunction) => {
+settingsRoutes.post('/test-sms', requireAuth, requireRole('admin'), requireOrgScope, validate(testSmsSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await sendTestSms(req.body.phone);
     res.json(result);

@@ -4,6 +4,7 @@ import { validate } from '../middleware/validate.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireRole } from '../middleware/roles.js';
 import { scopeToModeratorBuildings } from '../middleware/building-scope.js';
+import { requireOrgScope } from '../middleware/org-scope.js';
 import { auditLog } from '../middleware/audit.js';
 import * as maintenanceService from '../services/maintenance.service.js';
 
@@ -26,7 +27,7 @@ const updateJobSchema = z.object({
 const idParams = z.object({ id: z.string().uuid() });
 
 // GET /maintenance - List jobs (admin/moderator)
-maintenanceRoutes.get('/', requireAuth, requireRole('admin', 'moderator'), scopeToModeratorBuildings, async (req: Request, res: Response, next: NextFunction) => {
+maintenanceRoutes.get('/', requireAuth, requireRole('admin', 'moderator'), requireOrgScope, scopeToModeratorBuildings, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { buildingId, status } = req.query;
     const result = await maintenanceService.listJobs({
@@ -40,7 +41,7 @@ maintenanceRoutes.get('/', requireAuth, requireRole('admin', 'moderator'), scope
 });
 
 // GET /maintenance/:id - Single job
-maintenanceRoutes.get('/:id', requireAuth, requireRole('admin', 'moderator'), validate({ params: idParams }), async (req: Request, res: Response, next: NextFunction) => {
+maintenanceRoutes.get('/:id', requireAuth, requireRole('admin', 'moderator'), requireOrgScope, validate({ params: idParams }), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await maintenanceService.getJob(req.params.id as string);
     res.json(result);
@@ -48,7 +49,7 @@ maintenanceRoutes.get('/:id', requireAuth, requireRole('admin', 'moderator'), va
 });
 
 // POST /maintenance - Create job
-maintenanceRoutes.post('/', requireAuth, requireRole('admin', 'moderator'), validate(createJobSchema), auditLog('create', 'maintenance_jobs'), async (req: Request, res: Response, next: NextFunction) => {
+maintenanceRoutes.post('/', requireAuth, requireRole('admin', 'moderator'), requireOrgScope, validate(createJobSchema), auditLog('create', 'maintenance_jobs'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await maintenanceService.createJob(req.body, req.user!.userId);
     res.status(201).json(result);
@@ -56,7 +57,7 @@ maintenanceRoutes.post('/', requireAuth, requireRole('admin', 'moderator'), vali
 });
 
 // PUT /maintenance/:id - Update job
-maintenanceRoutes.put('/:id', requireAuth, requireRole('admin', 'moderator'), validate({ params: idParams, body: updateJobSchema }), auditLog('update', 'maintenance_jobs'), async (req: Request, res: Response, next: NextFunction) => {
+maintenanceRoutes.put('/:id', requireAuth, requireRole('admin', 'moderator'), requireOrgScope, validate({ params: idParams, body: updateJobSchema }), auditLog('update', 'maintenance_jobs'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await maintenanceService.updateJob(req.params.id as string, req.body);
     res.json(result);
@@ -64,7 +65,7 @@ maintenanceRoutes.put('/:id', requireAuth, requireRole('admin', 'moderator'), va
 });
 
 // DELETE /maintenance/:id - Admin only
-maintenanceRoutes.delete('/:id', requireAuth, requireRole('admin'), validate({ params: idParams }), auditLog('delete', 'maintenance_jobs'), async (req: Request, res: Response, next: NextFunction) => {
+maintenanceRoutes.delete('/:id', requireAuth, requireRole('admin'), requireOrgScope, validate({ params: idParams }), auditLog('delete', 'maintenance_jobs'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await maintenanceService.deleteJob(req.params.id as string);
     res.json(result);

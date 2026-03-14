@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { requireAuth } from '../middleware/auth.js';
 import { requireRole } from '../middleware/roles.js';
 import { scopeToModeratorBuildings } from '../middleware/building-scope.js';
+import { requireOrgScope } from '../middleware/org-scope.js';
 import * as bulkService from '../services/bulk.service.js';
 
 export const bulkRoutes = Router();
@@ -23,7 +24,7 @@ const batchRemindersSchema = z.object({
   apartmentIds: z.array(z.string().uuid()).min(1).max(500),
 });
 
-bulkRoutes.post('/payments', requireAuth, requireRole('admin', 'moderator'), scopeToModeratorBuildings, async (req: Request, res: Response, next: NextFunction) => {
+bulkRoutes.post('/payments', requireAuth, requireRole('admin', 'moderator'), requireOrgScope, scopeToModeratorBuildings, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = batchPaymentsSchema.parse(req.body);
     const result = await bulkService.batchCreatePayments(data, req.user!.userId, req.organizationId);
@@ -31,7 +32,7 @@ bulkRoutes.post('/payments', requireAuth, requireRole('admin', 'moderator'), sco
   } catch (err) { next(err); }
 });
 
-bulkRoutes.post('/invoices', requireAuth, requireRole('admin', 'moderator'), scopeToModeratorBuildings, async (req: Request, res: Response, next: NextFunction) => {
+bulkRoutes.post('/invoices', requireAuth, requireRole('admin', 'moderator'), requireOrgScope, scopeToModeratorBuildings, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = batchInvoicesSchema.parse(req.body);
     const result = await bulkService.batchGenerateInvoices(data, req.organizationId);
@@ -39,7 +40,7 @@ bulkRoutes.post('/invoices', requireAuth, requireRole('admin', 'moderator'), sco
   } catch (err) { next(err); }
 });
 
-bulkRoutes.post('/reminders', requireAuth, requireRole('admin', 'moderator'), scopeToModeratorBuildings, async (req: Request, res: Response, next: NextFunction) => {
+bulkRoutes.post('/reminders', requireAuth, requireRole('admin', 'moderator'), requireOrgScope, scopeToModeratorBuildings, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = batchRemindersSchema.parse(req.body);
     const result = await bulkService.batchSendReminders(data, req.user!.userId, req.organizationId);

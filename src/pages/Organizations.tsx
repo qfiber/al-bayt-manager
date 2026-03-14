@@ -55,7 +55,7 @@ const Organizations = () => {
   const [membersDialogOpen, setMembersDialogOpen] = useState(false);
   const [selectedOrg, setSelectedOrg] = useState<Organization | null>(null);
   const [members, setMembers] = useState<OrgMember[]>([]);
-  const [addMemberForm, setAddMemberForm] = useState({ email: '', role: 'user' });
+  const [addMemberForm, setAddMemberForm] = useState({ email: '', role: 'org_admin' });
 
   const { search, setSearch, paginated, page, hasPrevious, hasNext, onPrevious, onNext } = usePaginatedSearch({
     items: orgs,
@@ -148,7 +148,7 @@ const Organizations = () => {
       toast({ title: t('success'), description: t('memberAdded') });
       const data = await api.get<OrgMember[]>(`/organizations/${selectedOrg.id}/members`);
       setMembers(data || []);
-      setAddMemberForm({ email: '', role: 'user' });
+      setAddMemberForm({ email: '', role: 'org_admin' });
     } catch (err: any) {
       toast({ title: t('error'), description: err.message, variant: 'destructive' });
     }
@@ -302,6 +302,12 @@ const Organizations = () => {
                       </TableCell>
                       <TableCell className="text-start">
                         <div className="flex justify-end gap-2">
+                          <Button size="sm" variant="outline" onClick={() => {
+                            setAddMemberForm({ email: '', role: 'org_admin' });
+                            showMembers(org);
+                          }} title={t('assignLandlord')}>
+                            <UserPlus className="w-4 h-4" />
+                          </Button>
                           <Button size="sm" variant="outline" onClick={() => showMembers(org)} title={t('members')}>
                             <Users className="w-4 h-4" />
                           </Button>

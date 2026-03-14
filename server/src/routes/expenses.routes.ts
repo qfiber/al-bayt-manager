@@ -4,6 +4,7 @@ import { validate } from '../middleware/validate.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireRole } from '../middleware/roles.js';
 import { scopeToModeratorBuildings } from '../middleware/building-scope.js';
+import { requireOrgScope } from '../middleware/org-scope.js';
 import { auditLog } from '../middleware/audit.js';
 import * as expenseService from '../services/expense.service.js';
 
@@ -38,7 +39,7 @@ const listExpenseQuerySchema = z.object({
   buildingId: z.string().uuid().optional(),
 });
 
-expenseRoutes.get('/', requireAuth, requireRole('admin', 'moderator'), scopeToModeratorBuildings, async (req: Request, res: Response, next: NextFunction) => {
+expenseRoutes.get('/', requireAuth, requireRole('admin', 'moderator'), requireOrgScope, scopeToModeratorBuildings, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const query = listExpenseQuerySchema.parse(req.query);
     const result = await expenseService.listExpenses({
@@ -50,7 +51,7 @@ expenseRoutes.get('/', requireAuth, requireRole('admin', 'moderator'), scopeToMo
   } catch (err) { next(err); }
 });
 
-expenseRoutes.get('/:id', requireAuth, requireRole('admin', 'moderator'), scopeToModeratorBuildings, validate({ params: idParams }), async (req: Request, res: Response, next: NextFunction) => {
+expenseRoutes.get('/:id', requireAuth, requireRole('admin', 'moderator'), requireOrgScope, scopeToModeratorBuildings, validate({ params: idParams }), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await expenseService.getExpense(req.params.id as string);
     // Moderators: verify expense belongs to their assigned buildings
@@ -74,7 +75,7 @@ const batchExpenseSchema = z.object({
   recurringEndDate: z.string().regex(dateRegex, 'Date must be YYYY-MM-DD format').optional(),
 });
 
-expenseRoutes.post('/batch', requireAuth, requireRole('admin', 'moderator'), scopeToModeratorBuildings, validate(batchExpenseSchema), auditLog('create', 'expenses'), async (req: Request, res: Response, next: NextFunction) => {
+expenseRoutes.post('/batch', requireAuth, requireRole('admin', 'moderator'), requireOrgScope, scopeToModeratorBuildings, validate(batchExpenseSchema), auditLog('create', 'expenses'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { buildingIds, ...expenseData } = req.body;
     // Moderators: verify all buildings are authorized
@@ -94,7 +95,7 @@ expenseRoutes.post('/batch', requireAuth, requireRole('admin', 'moderator'), sco
   } catch (err) { next(err); }
 });
 
-expenseRoutes.post('/', requireAuth, requireRole('admin', 'moderator'), scopeToModeratorBuildings, validate(createExpenseSchema), auditLog('create', 'expenses'), async (req: Request, res: Response, next: NextFunction) => {
+expenseRoutes.post('/', requireAuth, requireRole('admin', 'moderator'), requireOrgScope, scopeToModeratorBuildings, validate(createExpenseSchema), auditLog('create', 'expenses'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     // Moderators can only create expenses for their assigned buildings
     if (req.allowedBuildingIds && !req.allowedBuildingIds.includes(req.body.buildingId)) {
@@ -106,7 +107,7 @@ expenseRoutes.post('/', requireAuth, requireRole('admin', 'moderator'), scopeToM
   } catch (err) { next(err); }
 });
 
-expenseRoutes.put('/:id', requireAuth, requireRole('admin', 'moderator'), scopeToModeratorBuildings, validate({ params: idParams, body: updateExpenseSchema }), auditLog('update', 'expenses'), async (req: Request, res: Response, next: NextFunction) => {
+expenseRoutes.put('/:id', requireAuth, requireRole('admin', 'moderator'), requireOrgScope, scopeToModeratorBuildings, validate({ params: idParams, body: updateExpenseSchema }), auditLog('update', 'expenses'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     // Moderators: verify expense belongs to their assigned buildings
     if (req.allowedBuildingIds) {
@@ -121,7 +122,7 @@ expenseRoutes.put('/:id', requireAuth, requireRole('admin', 'moderator'), scopeT
   } catch (err) { next(err); }
 });
 
-expenseRoutes.delete('/:id', requireAuth, requireRole('admin'), validate({ params: idParams }), auditLog('delete', 'expenses'), async (req: Request, res: Response, next: NextFunction) => {
+expenseRoutes.delete('/:id', requireAuth, requireRole('admin'), requireOrgScope, validate({ params: idParams }), auditLog('delete', 'expenses'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await expenseService.deleteExpense(req.params.id as string, req.user!.userId);
     res.json(result);

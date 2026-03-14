@@ -9,6 +9,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { MobileBottomNav } from './MobileBottomNav';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { LegalFooter } from '@/components/LegalFooter';
+import { formatDate } from '@/lib/utils';
 import {
   LayoutDashboard,
   Building2,
@@ -31,6 +32,8 @@ import {
   Moon,
   Sun,
   ScrollText,
+  ClipboardCheck,
+  MessageSquare,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -60,6 +63,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
   const isMobile = useIsMobile();
   const { theme, setTheme, isDark } = useTheme();
   const [notifCount, setNotifCount] = useState(0);
+  const [notifications, setNotifications] = useState<any[]>([]);
   const [lastSeenKey] = useState(() => `notif_last_seen_${user?.id || ''}`);
 
   const fetchNotifCount = () => {
@@ -68,6 +72,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
     api.get<{ count: number }>(url)
       .then(data => setNotifCount(data.count))
       .catch(() => {});
+    api.get('/notifications').then(setNotifications).catch(() => {});
   };
 
   const handleNotifClick = () => {
@@ -115,6 +120,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
         { label: t('expenses'), path: '/expenses', icon: Receipt },
         { label: t('reports'), path: '/reports', icon: FileText },
         { label: t('issues'), path: '/issues', icon: AlertTriangle },
+        { label: t('messages'), path: '/messages', icon: MessageSquare },
       ]
     : isModerator
     ? [
@@ -130,6 +136,8 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
         { label: t('dashboard'), path: '/dashboard', icon: LayoutDashboard },
         { label: t('myApartments'), path: '/my-apartments', icon: Home },
         { label: t('issues'), path: '/issues', icon: AlertTriangle },
+        { label: t('myInspections'), path: '/my-inspections', icon: ClipboardCheck },
+        { label: t('messages'), path: '/messages', icon: MessageSquare },
       ];
 
   // Admin-only dropdown items
@@ -145,6 +153,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
         { label: t('maintenanceJobs'), path: '/maintenance', icon: Wrench },
         { label: t('invoices'), path: '/invoices', icon: FileText },
         { label: t('leases'), path: '/leases', icon: ScrollText },
+        { label: t('inspections'), path: '/inspections', icon: ClipboardCheck },
         { label: t('users'), path: '/users', icon: Users },
         { label: t('settings'), path: '/settings', icon: Settings },
         { label: t('apiKeys'), path: '/api-keys', icon: Key },
@@ -234,18 +243,42 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
                 {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
               </button>
 
-              {/* Notification bell */}
-              <button
-                onClick={handleNotifClick}
-                className="relative p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-              >
-                <Bell className="h-4 w-4" />
-                {notifCount > 0 && (
-                  <span className="absolute -top-0.5 -end-0.5 h-4 min-w-[16px] flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold px-1">
-                    {notifCount > 99 ? '99+' : notifCount}
-                  </span>
-                )}
-              </button>
+              {/* Notification bell dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="relative p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
+                    <Bell className="h-4 w-4" />
+                    {notifCount > 0 && (
+                      <span className="absolute -top-0.5 -end-0.5 h-4 min-w-[16px] flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold px-1">
+                        {notifCount > 99 ? '99+' : notifCount}
+                      </span>
+                    )}
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-80">
+                  <div className="px-3 py-2 flex items-center justify-between border-b">
+                    <span className="text-sm font-medium">{t('notifications')}</span>
+                    <Button variant="ghost" size="sm" className="text-xs h-6" onClick={handleNotifClick}>
+                      {t('viewAll')}
+                    </Button>
+                  </div>
+                  <div className="max-h-64 overflow-y-auto">
+                    {notifications.length === 0 ? (
+                      <div className="px-3 py-4 text-center text-sm text-muted-foreground">{t('noNotifications')}</div>
+                    ) : (
+                      notifications.slice(0, 8).map((n: any) => (
+                        <div key={n.id} className="px-3 py-2 text-xs border-b last:border-0 hover:bg-muted/50">
+                          <div className="flex items-center justify-between">
+                            <span className="font-medium">{n.userEmail || '—'}</span>
+                            <span className="text-muted-foreground">{formatDate(n.createdAt)}</span>
+                          </div>
+                          <span className="text-muted-foreground">{n.actionType}{n.tableName ? ` (${n.tableName})` : ''}</span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
 
               <LanguageSwitcher />
 

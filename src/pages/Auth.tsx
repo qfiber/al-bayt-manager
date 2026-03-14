@@ -28,6 +28,13 @@ const Auth = () => {
   const [powActive, setPowActive] = useState(false);
   const [powHash, setPowHash] = useState('');
   const [powDone, setPowDone] = useState(false);
+  const [resetMode, setResetMode] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetToken, setResetToken] = useState('');
+  const [resetCode, setResetCode] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [resetStep, setResetStep] = useState<'email' | 'code'>('email');
+  const [resetLoading, setResetLoading] = useState(false);
   const hashContainerRef = useRef<HTMLDivElement>(null);
   const { user, loading, refreshUser } = useAuth();
   const { t } = useLanguage();
@@ -162,6 +169,36 @@ const Auth = () => {
     setIsLoading(false);
   };
 
+  const handleRequestReset = async () => {
+    if (!resetEmail) return;
+    setResetLoading(true);
+    try {
+      const result = await api.post<{ token?: string }>('/auth/request-password-reset', { email: resetEmail });
+      if (result.token) setResetToken(result.token);
+      setResetStep('code');
+      toast({ title: t('success'), description: t('resetCodeSent') });
+    } catch (err: any) {
+      toast({ title: t('error'), description: err.message, variant: 'destructive' });
+    } finally { setResetLoading(false); }
+  };
+
+  const handleConfirmReset = async () => {
+    if (!resetCode || !newPassword) return;
+    setResetLoading(true);
+    try {
+      await api.post('/auth/confirm-password-reset', { token: resetToken, code: resetCode, newPassword });
+      toast({ title: t('success'), description: t('passwordResetSuccess') });
+      setResetMode(false);
+      setResetStep('email');
+      setResetEmail('');
+      setResetCode('');
+      setNewPassword('');
+      setResetToken('');
+    } catch (err: any) {
+      toast({ title: t('error'), description: err.message, variant: 'destructive' });
+    } finally { setResetLoading(false); }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-secondary/10">
@@ -214,95 +251,137 @@ const Auth = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {!require2FA ? (
-            <form onSubmit={handleSignIn} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">{t('email')}</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="email@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  disabled={isLoading}
-                />
-              </div>
+          {!resetMode ? (
+            <>
+              {!require2FA ? (
+                <form onSubmit={handleSignIn} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="email">{t('email')}</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="email@example.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                      disabled={isLoading}
+                    />
+                  </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="password">{t('password')}</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  disabled={isLoading}
-                />
-              </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="password">{t('password')}</Label>
+                    <Input
+                      id="password"
+                      type="password"
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                      disabled={isLoading}
+                    />
+                  </div>
 
-              <CaptchaField onToken={setTurnstileToken} />
+                  <CaptchaField onToken={setTurnstileToken} />
 
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={isLoading}
-              >
-                {isLoading ? t('signingIn') : t('signInButton')}
-              </Button>
-            </form>
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    disabled={isLoading}
+                  >
+                    {isLoading ? t('signingIn') : t('signInButton')}
+                  </Button>
+                </form>
+              ) : (
+                <form onSubmit={handleVerify2FA} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="code">{t('twoFactorAuthCode')}</Label>
+                    <Input
+                      id="code"
+                      type="text"
+                      placeholder="000000"
+                      value={verificationCode}
+                      onChange={(e) => setVerificationCode(e.target.value)}
+                      required
+                      disabled={isLoading}
+                      maxLength={6}
+                      pattern="[0-9]{6}"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      {t('enterSixDigitCode')}
+                    </p>
+                  </div>
+
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    disabled={isLoading}
+                  >
+                    {isLoading ? t('verifying') : t('verify')}
+                  </Button>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => {
+                      setRequire2FA(false);
+                      setVerificationCode('');
+                      setSessionToken(null);
+                    }}
+                  >
+                    {t('back')}
+                  </Button>
+                </form>
+              )}
+
+              <button type="button" onClick={() => setResetMode(true)} className="text-xs text-primary hover:underline mt-2 block w-full text-center">
+                {t('forgotPassword')}
+              </button>
+
+              {registrationEnabled && (
+                <div className="mt-6 text-center text-sm">
+                  <p className="text-muted-foreground">
+                    {t('dontHaveAccount')}{' '}
+                    <Link to="/register" className="text-primary hover:underline">
+                      {t('register')}
+                    </Link>
+                  </p>
+                </div>
+              )}
+            </>
           ) : (
-            <form onSubmit={handleVerify2FA} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="code">{t('twoFactorAuthCode')}</Label>
-                <Input
-                  id="code"
-                  type="text"
-                  placeholder="000000"
-                  value={verificationCode}
-                  onChange={(e) => setVerificationCode(e.target.value)}
-                  required
-                  disabled={isLoading}
-                  maxLength={6}
-                  pattern="[0-9]{6}"
-                />
-                <p className="text-xs text-muted-foreground">
-                  {t('enterSixDigitCode')}
-                </p>
-              </div>
-
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={isLoading}
-              >
-                {isLoading ? t('verifying') : t('verify')}
-              </Button>
-
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full"
-                onClick={() => {
-                  setRequire2FA(false);
-                  setVerificationCode('');
-                  setSessionToken(null);
-                }}
-              >
-                {t('back')}
-              </Button>
-            </form>
-          )}
-
-          {registrationEnabled && (
-            <div className="mt-6 text-center text-sm">
-              <p className="text-muted-foreground">
-                {t('dontHaveAccount')}{' '}
-                <Link to="/register" className="text-primary hover:underline">
-                  {t('register')}
-                </Link>
-              </p>
+            <div className="space-y-4">
+              <button type="button" onClick={() => { setResetMode(false); setResetStep('email'); }} className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1">
+                &larr; {t('backToLogin')}
+              </button>
+              <h3 className="font-semibold text-lg">{t('resetPassword')}</h3>
+              {resetStep === 'email' ? (
+                <div className="space-y-3">
+                  <div>
+                    <Label>{t('email')}</Label>
+                    <Input type="email" value={resetEmail} onChange={(e) => setResetEmail(e.target.value)} placeholder="email@example.com" />
+                  </div>
+                  <Button onClick={handleRequestReset} disabled={resetLoading || !resetEmail} className="w-full">
+                    {resetLoading ? t('loading') : t('sendResetCode')}
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground">{t('resetCodeSentTo').replace('{email}', resetEmail)}</p>
+                  <div>
+                    <Label>{t('verificationCode')}</Label>
+                    <Input value={resetCode} onChange={(e) => setResetCode(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="000000" maxLength={6} className="text-center text-xl tracking-widest" />
+                  </div>
+                  <div>
+                    <Label>{t('newPassword')}</Label>
+                    <Input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} minLength={16} />
+                    <p className="text-xs text-muted-foreground mt-1">{t('passwordMinLength')}</p>
+                  </div>
+                  <Button onClick={handleConfirmReset} disabled={resetLoading || resetCode.length !== 6 || newPassword.length < 16} className="w-full">
+                    {resetLoading ? t('loading') : t('resetPassword')}
+                  </Button>
+                </div>
+              )}
             </div>
           )}
 

@@ -4,6 +4,7 @@ import { validate } from '../middleware/validate.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireRole } from '../middleware/roles.js';
 import { scopeToModeratorBuildings } from '../middleware/building-scope.js';
+import { requireOrgScope } from '../middleware/org-scope.js';
 import { auditLog } from '../middleware/audit.js';
 import * as buildingService from '../services/building.service.js';
 
@@ -29,42 +30,42 @@ const updateBuildingSchema = createBuildingSchema.partial();
 
 const idParams = z.object({ id: z.string().uuid() });
 
-buildingRoutes.get('/', requireAuth, scopeToModeratorBuildings, async (req: Request, res: Response, next: NextFunction) => {
+buildingRoutes.get('/', requireAuth, requireOrgScope, scopeToModeratorBuildings, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await buildingService.listBuildings(req.organizationId, req.allowedBuildingIds);
     res.json(result);
   } catch (err) { next(err); }
 });
 
-buildingRoutes.get('/:id', requireAuth, requireRole('admin', 'moderator'), validate({ params: idParams }), async (req: Request, res: Response, next: NextFunction) => {
+buildingRoutes.get('/:id', requireAuth, requireRole('admin', 'moderator'), requireOrgScope, validate({ params: idParams }), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await buildingService.getBuilding(req.params.id as string);
     res.json(result);
   } catch (err) { next(err); }
 });
 
-buildingRoutes.post('/', requireAuth, requireRole('admin'), validate(createBuildingSchema), auditLog('create', 'buildings'), async (req: Request, res: Response, next: NextFunction) => {
+buildingRoutes.post('/', requireAuth, requireRole('admin'), requireOrgScope, validate(createBuildingSchema), auditLog('create', 'buildings'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await buildingService.createBuilding({ ...req.body, organizationId: req.organizationId });
     res.status(201).json(result);
   } catch (err) { next(err); }
 });
 
-buildingRoutes.put('/:id', requireAuth, requireRole('admin'), validate({ params: idParams, body: updateBuildingSchema }), auditLog('update', 'buildings'), async (req: Request, res: Response, next: NextFunction) => {
+buildingRoutes.put('/:id', requireAuth, requireRole('admin'), requireOrgScope, validate({ params: idParams, body: updateBuildingSchema }), auditLog('update', 'buildings'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await buildingService.updateBuilding(req.params.id as string, req.body);
     res.json(result);
   } catch (err) { next(err); }
 });
 
-buildingRoutes.post('/:id/clone', requireAuth, requireRole('admin'), validate({ params: idParams }), auditLog('create', 'buildings'), async (req: Request, res: Response, next: NextFunction) => {
+buildingRoutes.post('/:id/clone', requireAuth, requireRole('admin'), requireOrgScope, validate({ params: idParams }), auditLog('create', 'buildings'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await buildingService.cloneBuilding(req.params.id as string);
     res.status(201).json(result);
   } catch (err) { next(err); }
 });
 
-buildingRoutes.delete('/:id', requireAuth, requireRole('admin'), validate({ params: idParams }), auditLog('delete', 'buildings'), async (req: Request, res: Response, next: NextFunction) => {
+buildingRoutes.delete('/:id', requireAuth, requireRole('admin'), requireOrgScope, validate({ params: idParams }), auditLog('delete', 'buildings'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await buildingService.deleteBuilding(req.params.id as string);
     res.json(result);

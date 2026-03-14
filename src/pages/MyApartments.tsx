@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { Home, Download, Receipt, Clock, AlertTriangle, CreditCard } from 'lucide-react';
+import { downloadCsv } from '@/lib/csv-export';
 import { Textarea } from '@/components/ui/textarea';
 import { useNavigate } from 'react-router-dom';
 import { formatDate } from '@/lib/utils';
@@ -37,10 +38,14 @@ const MyApartments = () => {
   const [issueDialogOpen, setIssueDialogOpen] = useState(false);
   const [issueForm, setIssueForm] = useState({ buildingId: '', category: 'other', description: '' });
   const [issueLoading, setIssueLoading] = useState(false);
+  const [myLeases, setMyLeases] = useState<any[]>([]);
+  const [myMeetings, setMyMeetings] = useState<any>(null);
 
   useEffect(() => {
     if (user) {
       fetchMyApartments();
+      api.get('/my-apartments/leases').then(setMyLeases).catch(() => {});
+      api.get('/my-apartments/meetings').then(setMyMeetings).catch(() => {});
     }
   }, [user]);
 
@@ -192,6 +197,25 @@ const MyApartments = () => {
                       >
                         <Download className="w-4 h-4 me-2" />
                         {t('downloadStatement')}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const rows = [
+                            ...apartment.payments.map((p: any) => [
+                              formatDate(p.createdAt), t('payment'), p.month, String(parseFloat(p.amount).toFixed(2)), p.isCanceled ? t('canceled') : t('paid'),
+                            ]),
+                            ...apartment.expenses.map((e: any) => [
+                              formatDate(e.createdAt), t('expense'), e.expenseDescription || '', String(parseFloat(e.amount).toFixed(2)), e.isCanceled ? t('canceled') : t('active'),
+                            ]),
+                          ].sort((a, b) => new Date(b[0]).getTime() - new Date(a[0]).getTime());
+                          downloadCsv(`payment-history-${apartment.apartmentNumber}.csv`, ['Date', 'Type', 'Description', 'Amount', 'Status'], rows);
+                        }}
+                        className="w-fit"
+                      >
+                        <Download className="w-4 h-4 me-2" />
+                        {t('exportCsv')}
                       </Button>
                       {user?.onlinePaymentsEnabled && (
                         <Button
@@ -375,6 +399,90 @@ const MyApartments = () => {
               );
             })}
           </div>
+        )}
+        {/* Lease Details */}
+        {myLeases.length > 0 && (
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle className="text-lg">{t('myLeases')}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {myLeases.map((item: any) => (
+                  <div key={item.lease.id} className="border rounded-lg p-4">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h4 className="font-medium">{item.buildingName} — {t('apartment')} {item.apartmentNumber}</h4>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          {t('tenantName')}: {item.lease.tenantName}
+                        </p>
+                      </div>
+                      <Badge variant={item.lease.status === 'active' ? 'default' : 'secondary'}>
+                        {item.lease.status}
+                      </Badge>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3 text-sm">
+                      <div>
+                        <span className="text-muted-foreground">{t('startDate')}</span>
+                        <p className="font-medium">{formatDate(item.lease.startDate)}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">{t('endDate')}</span>
+                        <p className="font-medium">{item.lease.endDate ? formatDate(item.lease.endDate) : t('openEnded')}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">{t('monthlyRent')}</span>
+                        <p className="font-medium">{formatCurrency(parseFloat(item.lease.monthlyRent))}</p>
+                      </div>
+                      {item.lease.securityDeposit && parseFloat(item.lease.securityDeposit) > 0 && (
+                        <div>
+                          <span className="text-muted-foreground">{t('securityDeposit')}</span>
+                          <p className="font-medium">{formatCurrency(parseFloat(item.lease.securityDeposit))}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Meeting Decisions */}
+        {myMeetings?.meetings?.length > 0 && (
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle className="text-lg">{t('buildingMeetings')}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {myMeetings.meetings.map((meeting: any) => {
+                  const decisions = (myMeetings.decisions || []).filter((d: any) => d.meetingId === meeting.id);
+                  return (
+                    <div key={meeting.id} className="border rounded-lg p-4">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h4 className="font-medium">{meeting.title}</h4>
+                          <p className="text-sm text-muted-foreground">{meeting.buildingName} — {formatDate(meeting.meetingDate)}</p>
+                        </div>
+                      </div>
+                      {decisions.length > 0 && (
+                        <div className="mt-3 space-y-2">
+                          <p className="text-xs font-medium text-muted-foreground uppercase">{t('decisions')}</p>
+                          {decisions.map((d: any) => (
+                            <div key={d.id} className="flex items-center gap-2 text-sm">
+                              <Badge variant="outline" className="text-[10px]">{d.status}</Badge>
+                              <span>{d.description}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
         )}
       </div>
 

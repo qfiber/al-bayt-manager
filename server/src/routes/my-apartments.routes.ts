@@ -6,7 +6,7 @@ import * as pdfService from '../services/pdf.service.js';
 import { AppError } from '../middleware/error-handler.js';
 import { db } from '../config/database.js';
 import { userApartments, apartments, buildings } from '../db/schema/index.js';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, inArray } from 'drizzle-orm';
 
 export const myApartmentRoutes = Router();
 
@@ -123,5 +123,129 @@ myApartmentRoutes.get('/:apartmentId/statement/download', requireAuth, async (re
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="statement-${apt.apartmentNumber}.pdf"`);
     res.send(pdfBuffer);
+  } catch (err) { next(err); }
+});
+
+myApartmentRoutes.get('/inspections', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId;
+
+    // Get tenant's apartment IDs
+    const assignments = await db.select({ apartmentId: userApartments.apartmentId })
+      .from(userApartments)
+      .where(eq(userApartments.userId, userId));
+
+    if (assignments.length === 0) { res.json([]); return; }
+
+    const aptIds = assignments.map(a => a.apartmentId);
+
+    // Get building IDs for these apartments
+    const apts = await db.select({ buildingId: apartments.buildingId })
+      .from(apartments)
+      .where(inArray(apartments.id, aptIds));
+    const buildingIds = [...new Set(apts.map(a => a.buildingId))];
+
+    // Find inspections for these apartments OR their buildings
+    const { inspections } = await import('../db/schema/index.js');
+    const { or, gte } = await import('drizzle-orm');
+
+    const results = await db
+      .select({
+        inspection: inspections,
+        buildingName: buildings.name,
+        apartmentNumber: apartments.apartmentNumber,
+      })
+      .from(inspections)
+      .leftJoin(buildings, eq(inspections.buildingId, buildings.id))
+      .leftJoin(apartments, eq(inspections.apartmentId, apartments.id))
+      .where(and(
+        eq(inspections.status, 'scheduled'),
+        gte(inspections.scheduledAt, new Date()),
+        or(
+          inArray(inspections.apartmentId, aptIds),
+          inArray(inspections.buildingId, buildingIds),
+        ),
+      ))
+      .orderBy(inspections.scheduledAt);
+
+    res.json(results);
+  } catch (err) { next(err); }
+});
+
+myApartmentRoutes.get('/leases', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId;
+
+    const assignments = await db.select({ apartmentId: userApartments.apartmentId })
+      .from(userApartments)
+      .where(eq(userApartments.userId, userId));
+
+    if (assignments.length === 0) { res.json([]); return; }
+
+    const aptIds = assignments.map(a => a.apartmentId);
+
+    const { leases } = await import('../db/schema/index.js');
+
+    const results = await db
+      .select({
+        lease: leases,
+        apartmentNumber: apartments.apartmentNumber,
+        buildingName: buildings.name,
+      })
+      .from(leases)
+      .innerJoin(apartments, eq(leases.apartmentId, apartments.id))
+      .innerJoin(buildings, eq(apartments.buildingId, buildings.id))
+      .where(inArray(leases.apartmentId, aptIds))
+      .orderBy(leases.startDate);
+
+    res.json(results);
+  } catch (err) { next(err); }
+});
+
+myApartmentRoutes.get('/meetings', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId;
+
+    const assignments = await db.select({ apartmentId: userApartments.apartmentId })
+      .from(userApartments)
+      .where(eq(userApartments.userId, userId));
+
+    if (assignments.length === 0) { res.json([]); return; }
+
+    const aptIds = assignments.map(a => a.apartmentId);
+    const apts = await db.select({ buildingId: apartments.buildingId })
+      .from(apartments)
+      .where(inArray(apartments.id, aptIds));
+    const buildingIds = [...new Set(apts.map(a => a.buildingId))];
+
+    const { meetings, meetingDecisions } = await import('../db/schema/index.js');
+    const { desc } = await import('drizzle-orm');
+
+    const meetingResults = await db
+      .select({
+        id: meetings.id,
+        title: meetings.title,
+        buildingId: meetings.buildingId,
+        buildingName: buildings.name,
+        meetingDate: meetings.date,
+        location: meetings.location,
+      })
+      .from(meetings)
+      .innerJoin(buildings, eq(meetings.buildingId, buildings.id))
+      .where(inArray(meetings.buildingId, buildingIds))
+      .orderBy(desc(meetings.date))
+      .limit(20);
+
+    // Get decisions for these meetings
+    const meetingIds = meetingResults.map(m => m.id);
+    let decisions: any[] = [];
+    if (meetingIds.length > 0) {
+      decisions = await db
+        .select()
+        .from(meetingDecisions)
+        .where(inArray(meetingDecisions.meetingId, meetingIds));
+    }
+
+    res.json({ meetings: meetingResults, decisions });
   } catch (err) { next(err); }
 });

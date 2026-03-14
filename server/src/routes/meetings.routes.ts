@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { requireAuth } from '../middleware/auth.js';
 import { requireRole } from '../middleware/roles.js';
 import { scopeToModeratorBuildings } from '../middleware/building-scope.js';
+import { requireOrgScope } from '../middleware/org-scope.js';
 import * as meetingService from '../services/meeting.service.js';
 
 export const meetingRoutes = Router();
@@ -27,7 +28,7 @@ const createMeetingSchema = z.object({
 
 const updateMeetingSchema = createMeetingSchema.partial().omit({ buildingId: true });
 
-meetingRoutes.get('/', requireAuth, requireRole('admin', 'moderator'), scopeToModeratorBuildings, async (req: Request, res: Response, next: NextFunction) => {
+meetingRoutes.get('/', requireAuth, requireRole('admin', 'moderator'), requireOrgScope, scopeToModeratorBuildings, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { buildingId } = req.query as any;
     const result = await meetingService.listMeetings({
@@ -39,14 +40,14 @@ meetingRoutes.get('/', requireAuth, requireRole('admin', 'moderator'), scopeToMo
   } catch (err) { next(err); }
 });
 
-meetingRoutes.get('/:id', requireAuth, requireRole('admin', 'moderator'), async (req: Request, res: Response, next: NextFunction) => {
+meetingRoutes.get('/:id', requireAuth, requireRole('admin', 'moderator'), requireOrgScope, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await meetingService.getMeeting(req.params.id as string);
     res.json(result);
   } catch (err) { next(err); }
 });
 
-meetingRoutes.post('/', requireAuth, requireRole('admin', 'moderator'), async (req: Request, res: Response, next: NextFunction) => {
+meetingRoutes.post('/', requireAuth, requireRole('admin', 'moderator'), requireOrgScope, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = createMeetingSchema.parse(req.body);
     const result = await meetingService.createMeeting(data, req.user!.userId);
@@ -54,7 +55,7 @@ meetingRoutes.post('/', requireAuth, requireRole('admin', 'moderator'), async (r
   } catch (err) { next(err); }
 });
 
-meetingRoutes.put('/:id', requireAuth, requireRole('admin', 'moderator'), async (req: Request, res: Response, next: NextFunction) => {
+meetingRoutes.put('/:id', requireAuth, requireRole('admin', 'moderator'), requireOrgScope, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = updateMeetingSchema.parse(req.body);
     const result = await meetingService.updateMeeting(req.params.id as string, data);
@@ -62,14 +63,14 @@ meetingRoutes.put('/:id', requireAuth, requireRole('admin', 'moderator'), async 
   } catch (err) { next(err); }
 });
 
-meetingRoutes.delete('/:id', requireAuth, requireRole('admin', 'moderator'), async (req: Request, res: Response, next: NextFunction) => {
+meetingRoutes.delete('/:id', requireAuth, requireRole('admin', 'moderator'), requireOrgScope, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await meetingService.deleteMeeting(req.params.id as string);
     res.json(result);
   } catch (err) { next(err); }
 });
 
-meetingRoutes.put('/decisions/:id/status', requireAuth, requireRole('admin', 'moderator'), async (req: Request, res: Response, next: NextFunction) => {
+meetingRoutes.put('/decisions/:id/status', requireAuth, requireRole('admin', 'moderator'), requireOrgScope, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { status } = z.object({
       status: z.enum(['pending', 'in_progress', 'completed', 'canceled']),
