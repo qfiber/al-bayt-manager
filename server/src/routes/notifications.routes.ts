@@ -13,7 +13,8 @@ notificationInboxRoutes.get('/', requireAuth, async (req: Request, res: Response
 
 notificationInboxRoutes.get('/count', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const count = await notificationInbox.getUnreadCount(req.user!.organizationId);
+    const since = req.query.since ? new Date(req.query.since as string) : undefined;
+    const count = await notificationInbox.getUnreadCount(req.user!.organizationId, since);
     res.json({ count });
   } catch (err) { next(err); }
 });

@@ -60,17 +60,26 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
   const isMobile = useIsMobile();
   const { theme, setTheme, isDark } = useTheme();
   const [notifCount, setNotifCount] = useState(0);
+  const [lastSeenKey] = useState(() => `notif_last_seen_${user?.id || ''}`);
+
+  const fetchNotifCount = () => {
+    const lastSeen = localStorage.getItem(lastSeenKey);
+    const url = lastSeen ? `/notifications/count?since=${encodeURIComponent(lastSeen)}` : '/notifications/count';
+    api.get<{ count: number }>(url)
+      .then(data => setNotifCount(data.count))
+      .catch(() => {});
+  };
+
+  const handleNotifClick = () => {
+    localStorage.setItem(lastSeenKey, new Date().toISOString());
+    setNotifCount(0);
+    navigate(isSuperAdmin ? '/super-admin' : '/audit-logs');
+  };
 
   useEffect(() => {
     if (user) {
-      api.get<{ count: number }>('/notifications/count')
-        .then(data => setNotifCount(data.count))
-        .catch(() => {});
-      const interval = setInterval(() => {
-        api.get<{ count: number }>('/notifications/count')
-          .then(data => setNotifCount(data.count))
-          .catch(() => {});
-      }, 60000);
+      fetchNotifCount();
+      const interval = setInterval(fetchNotifCount, 60000);
       return () => clearInterval(interval);
     }
   }, [user]);
@@ -221,7 +230,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
 
               {/* Notification bell */}
               <button
-                onClick={() => navigate('/audit-logs')}
+                onClick={handleNotifClick}
                 className="relative p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
               >
                 <Bell className="h-4 w-4" />
@@ -319,7 +328,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
 
               {/* Notification bell (mobile) */}
               <button
-                onClick={() => navigate('/audit-logs')}
+                onClick={handleNotifClick}
                 className="relative p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
               >
                 <Bell className="h-4 w-4" />
