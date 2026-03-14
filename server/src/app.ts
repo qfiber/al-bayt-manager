@@ -45,6 +45,7 @@ import { messageRoutes } from './routes/messages.routes.js';
 import { paymentPlanRoutes } from './routes/payment-plans.routes.js';
 import { handbookRoutes } from './routes/building-handbook.routes.js';
 import { subscriptionRoutes } from './routes/subscription.routes.js';
+import { contactRoutes } from './routes/contact.routes.js';
 import { dbRateLimit, cleanupRateLimitEntries } from './middleware/db-rate-limit.js';
 import { sanitizeBody } from './middleware/sanitize.js';
 import { resolveSubdomain } from './middleware/subdomain.js';
@@ -142,6 +143,7 @@ export function createApp() {
   app.use('/api/payment-plans', paymentPlanRoutes);
   app.use('/api/handbook', handbookRoutes);
   app.use('/api/subscriptions', subscriptionRoutes);
+  app.use('/api/contact', contactRoutes);
   app.use('/api/v1', v1Routes);
 
   // Health check
