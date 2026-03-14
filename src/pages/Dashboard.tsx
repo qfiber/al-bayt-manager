@@ -135,7 +135,7 @@ function relativeTime(dateStr: string, language: string): string {
 const Dashboard = () => {
   useRequireAuth();
 
-  const { user, isAdmin, isModerator } = useAuth();
+  const { user, isAdmin, isModerator, isSuperAdmin } = useAuth();
   const { t, language, dir } = useLanguage();
   const isRTL = dir === 'rtl';
   const { currencySymbol, formatCurrency } = useCurrency();
@@ -295,6 +295,12 @@ const Dashboard = () => {
   };
 
   if (!user) return null;
+
+  // Super-admin goes to their own dashboard
+  if (isSuperAdmin) {
+    navigate('/super-admin', { replace: true });
+    return null;
+  }
 
   // User role: rich tenant dashboard
   if (!canViewFinancials) {

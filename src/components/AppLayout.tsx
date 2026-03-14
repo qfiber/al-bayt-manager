@@ -47,7 +47,7 @@ interface NavLink {
 }
 
 export const AppLayout = ({ children }: AppLayoutProps) => {
-  const { user, isAdmin, isModerator, loading, signOut } = useAuth();
+  const { user, isAdmin, isModerator, isSuperAdmin, loading, signOut } = useAuth();
   const { t, dir } = useLanguage();
   const { logoUrl, companyName } = usePublicSettings();
   const navigate = useNavigate();
@@ -68,8 +68,13 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
 
   const isActive = (path: string) => location.pathname === path;
 
-  // Primary nav links (shown directly in top bar)
-  const primaryLinks: NavLink[] = isAdmin
+  // Super-admin gets a completely separate nav
+  const primaryLinks: NavLink[] = isSuperAdmin
+    ? [
+        { label: t('superAdminDashboard'), path: '/super-admin', icon: Shield },
+        { label: t('organizations'), path: '/organizations', icon: Building2 },
+      ]
+    : isAdmin
     ? [
         { label: t('dashboard'), path: '/dashboard', icon: LayoutDashboard },
         { label: t('buildings'), path: '/buildings', icon: Building2 },
@@ -95,17 +100,20 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
         { label: t('issues'), path: '/issues', icon: AlertTriangle },
       ];
 
-  // Admin-only dropdown items
-  const adminDropdownLinks: NavLink[] = [
-    { label: t('maintenanceJobs'), path: '/maintenance', icon: Wrench },
-    { label: t('users'), path: '/users', icon: Users },
-    { label: t('settings'), path: '/settings', icon: Settings },
-    { label: t('apiKeys'), path: '/api-keys', icon: Key },
-    { label: t('auditLogs'), path: '/audit-logs', icon: Shield },
-    { label: t('notificationTemplates'), path: '/email-templates', icon: Bell },
-    { label: t('emailLogs'), path: '/email-logs', icon: MailOpen },
-    ...(user?.isSuperAdmin ? [{ label: t('organizations'), path: '/organizations', icon: Building2 }] : []),
-  ];
+  // Admin-only dropdown items (hidden for super-admin — they have their own nav)
+  const adminDropdownLinks: NavLink[] = isSuperAdmin
+    ? [
+        { label: t('settings'), path: '/settings', icon: Settings },
+      ]
+    : [
+        { label: t('maintenanceJobs'), path: '/maintenance', icon: Wrench },
+        { label: t('users'), path: '/users', icon: Users },
+        { label: t('settings'), path: '/settings', icon: Settings },
+        { label: t('apiKeys'), path: '/api-keys', icon: Key },
+        { label: t('auditLogs'), path: '/audit-logs', icon: Shield },
+        { label: t('notificationTemplates'), path: '/email-templates', icon: Bell },
+        { label: t('emailLogs'), path: '/email-logs', icon: MailOpen },
+      ];
 
   const adminDropdownActive = adminDropdownLinks.some((l) => isActive(l.path));
 
@@ -117,7 +125,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
           <div className="container mx-auto flex h-14 items-center gap-4 px-4">
             {/* Logo / App name */}
             <button
-              onClick={() => navigate('/dashboard')}
+              onClick={() => navigate(isSuperAdmin ? '/super-admin' : '/dashboard')}
               className="flex items-center gap-2 font-semibold text-foreground shrink-0"
             >
               {logoUrl ? (
@@ -223,7 +231,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
         <header className="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
           <div className="flex h-12 items-center justify-between px-4">
             <button
-              onClick={() => navigate('/dashboard')}
+              onClick={() => navigate(isSuperAdmin ? '/super-admin' : '/dashboard')}
               className="flex items-center gap-2 font-semibold text-foreground"
             >
               {logoUrl ? (

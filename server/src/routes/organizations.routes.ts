@@ -5,6 +5,8 @@ import { requireAuth } from '../middleware/auth.js';
 import { requireSuperAdmin } from '../middleware/org-scope.js';
 import { auditLog } from '../middleware/audit.js';
 import * as organizationService from '../services/organization.service.js';
+import * as authService from '../services/auth.service.js';
+import { setAuthCookies } from '../utils/cookie.js';
 
 export const organizationRoutes = Router();
 
@@ -85,5 +87,14 @@ organizationRoutes.delete('/:id/members/:userId', requireAuth, requireSuperAdmin
   try {
     const result = await organizationService.removeMember(req.params.id as string, req.params.userId as string);
     res.json(result);
+  } catch (err) { next(err); }
+});
+
+// Impersonate a user (login as them) — super-admin only
+organizationRoutes.post('/impersonate/:userId', requireAuth, requireSuperAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const result = await authService.impersonateUser(req.params.userId as string);
+    setAuthCookies(res, result.accessToken, result.refreshToken);
+    res.json({ success: true });
   } catch (err) { next(err); }
 });

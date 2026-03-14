@@ -24,6 +24,17 @@ export const settings = pgTable('settings', {
   smsSenderName: varchar('sms_sender_name', { length: 11 }),
   currencyCode: varchar('currency_code', { length: 10 }).default('ILS').notNull(),
   currencySymbol: varchar('currency_symbol', { length: 10 }).default('₪').notNull(),
+  // Payment gateways (placeholder)
+  stripeEnabled: boolean('stripe_enabled').default(false).notNull(),
+  stripePublishableKey: varchar('stripe_publishable_key', { length: 500 }),
+  stripeSecretKey: varchar('stripe_secret_key', { length: 500 }),
+  stripeWebhookSecret: varchar('stripe_webhook_secret', { length: 500 }),
+  cardcomEnabled: boolean('cardcom_enabled').default(false).notNull(),
+  cardcomTerminalNumber: varchar('cardcom_terminal_number', { length: 50 }),
+  cardcomApiName: varchar('cardcom_api_name', { length: 255 }),
+  cardcomApiPassword: varchar('cardcom_api_password', { length: 500 }),
+  // Email verification
+  emailVerificationEnabled: boolean('email_verification_enabled').default(false).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });

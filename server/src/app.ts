@@ -35,6 +35,7 @@ import { meetingRoutes } from './routes/meetings.routes.js';
 import { debtCollectionRoutes } from './routes/debt-collection.routes.js';
 import { v1Routes } from './routes/v1/index.js';
 import { organizationRoutes } from './routes/organizations.routes.js';
+import { superAdminDashboardRoutes } from './routes/super-admin-dashboard.routes.js';
 import { dbRateLimit, cleanupRateLimitEntries } from './middleware/db-rate-limit.js';
 
 export function createApp() {
@@ -101,6 +102,7 @@ export function createApp() {
   app.use('/api/meetings', meetingRoutes);
   app.use('/api/debt-collection', debtCollectionRoutes);
   app.use('/api/organizations', organizationRoutes);
+  app.use('/api/super-admin', superAdminDashboardRoutes);
   app.use('/api/v1', v1Routes);
 
   // Health check

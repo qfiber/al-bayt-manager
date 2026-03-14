@@ -378,6 +378,20 @@ export async function reissueTokens(userId: string) {
 }
 
 /**
+ * Super-admin: impersonate a user (login as them)
+ */
+export async function impersonateUser(targetUserId: string) {
+  const [user] = await db.select().from(users).where(eq(users.id, targetUserId)).limit(1);
+  if (!user) throw new AppError(404, 'User not found');
+
+  const payload = await buildTokenPayload(user.id, user.email);
+  const accessToken = signAccessToken(payload);
+  const refreshToken = await createRefreshToken(user.id);
+
+  return { accessToken, refreshToken };
+}
+
+/**
  * Admin: create user with specified role
  */
 export async function adminCreateUser(email: string, password: string, name: string, role: string, phone?: string, organizationId?: string) {

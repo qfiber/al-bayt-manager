@@ -16,7 +16,7 @@ import { SearchInput } from '@/components/SearchInput';
 import { PaginationControls } from '@/components/PaginationControls';
 import { usePaginatedSearch } from '@/hooks/use-paginated-search';
 import { useToast } from '@/hooks/use-toast';
-import { Building2, Plus, Pencil, Trash2, Users, UserPlus } from 'lucide-react';
+import { Building2, Plus, Pencil, Trash2, Users, UserPlus, LogIn } from 'lucide-react';
 
 interface Organization {
   id: string;
@@ -128,6 +128,16 @@ const Organizations = () => {
       const data = await api.get<OrgMember[]>(`/organizations/${selectedOrg.id}/members`);
       setMembers(data || []);
       setAddMemberForm({ email: '', role: 'user' });
+    } catch (err: any) {
+      toast({ title: t('error'), description: err.message, variant: 'destructive' });
+    }
+  };
+
+  const handleImpersonate = async (userId: string) => {
+    try {
+      await api.post(`/organizations/impersonate/${userId}`);
+      // Force full page reload to pick up new auth cookies
+      window.location.href = '/dashboard';
     } catch (err: any) {
       toast({ title: t('error'), description: err.message, variant: 'destructive' });
     }
@@ -294,9 +304,14 @@ const Organizations = () => {
                           <Badge variant="outline">{member.role}</Badge>
                         </TableCell>
                         <TableCell>
-                          <Button size="sm" variant="destructive" onClick={() => handleRemoveMember(member.userId)}>
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
+                          <div className="flex gap-1">
+                            <Button size="sm" variant="outline" onClick={() => handleImpersonate(member.userId)} title={t('loginAs')}>
+                              <LogIn className="w-4 h-4" />
+                            </Button>
+                            <Button size="sm" variant="destructive" onClick={() => handleRemoveMember(member.userId)}>
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))

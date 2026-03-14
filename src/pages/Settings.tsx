@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { Switch } from '@/components/ui/switch';
-import { Settings as SettingsIcon, Save, Globe, Upload, Shield, Mail, Bell, DollarSign, Building2, MessageSquare } from 'lucide-react';
+import { Settings as SettingsIcon, Save, Globe, Upload, Shield, Mail, Bell, DollarSign, Building2, MessageSquare, CreditCard } from 'lucide-react';
 
 interface SettingsData {
   id: string;
@@ -36,6 +36,15 @@ interface SettingsData {
   smsSenderName: string | null;
   currencyCode: string;
   currencySymbol: string;
+  stripeEnabled: boolean;
+  stripePublishableKey: string | null;
+  stripeSecretKey: string | null;
+  stripeWebhookSecret: string | null;
+  cardcomEnabled: boolean;
+  cardcomTerminalNumber: string | null;
+  cardcomApiName: string | null;
+  cardcomApiPassword: string | null;
+  emailVerificationEnabled: boolean;
 }
 
 interface LogoFile {
@@ -99,6 +108,15 @@ const Settings = () => {
   const [currencyPreset, setCurrencyPreset] = useState('ILS');
   const [currencyCode, setCurrencyCode] = useState('ILS');
   const [currencySymbol, setCurrencySymbol] = useState('₪');
+  const [stripeEnabled, setStripeEnabled] = useState(false);
+  const [stripePublishableKey, setStripePublishableKey] = useState('');
+  const [stripeSecretKey, setStripeSecretKey] = useState('');
+  const [stripeWebhookSecret, setStripeWebhookSecret] = useState('');
+  const [cardcomEnabled, setCardcomEnabled] = useState(false);
+  const [cardcomTerminalNumber, setCardcomTerminalNumber] = useState('');
+  const [cardcomApiName, setCardcomApiName] = useState('');
+  const [cardcomApiPassword, setCardcomApiPassword] = useState('');
+  const [emailVerificationEnabled, setEmailVerificationEnabled] = useState(false);
 
   const applySettingsToForm = useCallback((data: SettingsData) => {
     setSettings(data);
@@ -124,6 +142,15 @@ const Settings = () => {
     setCurrencyCode(code);
     setCurrencySymbol(symbol);
     setCurrencyPreset(detectCurrencyPreset(code, symbol));
+    setStripeEnabled(data.stripeEnabled ?? false);
+    setStripePublishableKey(data.stripePublishableKey || '');
+    setStripeSecretKey(data.stripeSecretKey || '');
+    setStripeWebhookSecret(data.stripeWebhookSecret || '');
+    setCardcomEnabled(data.cardcomEnabled ?? false);
+    setCardcomTerminalNumber(data.cardcomTerminalNumber || '');
+    setCardcomApiName(data.cardcomApiName || '');
+    setCardcomApiPassword(data.cardcomApiPassword || '');
+    setEmailVerificationEnabled(data.emailVerificationEnabled ?? false);
   }, []);
 
   useEffect(() => {
@@ -213,6 +240,15 @@ const Settings = () => {
         smsSenderName: smsSenderName || null,
         currencyCode,
         currencySymbol,
+        stripeEnabled,
+        stripePublishableKey: stripePublishableKey || null,
+        stripeSecretKey: stripeSecretKey || null,
+        stripeWebhookSecret: stripeWebhookSecret || null,
+        cardcomEnabled,
+        cardcomTerminalNumber: cardcomTerminalNumber || null,
+        cardcomApiName: cardcomApiName || null,
+        cardcomApiPassword: cardcomApiPassword || null,
+        emailVerificationEnabled,
       });
 
       toast({ title: t('success'), description: t('settingsUpdated') });
@@ -761,6 +797,129 @@ const Settings = () => {
                   </div>
                 </div>
               )}
+            </CardContent>
+          </Card>
+
+          {/* Stripe Payment Gateway */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CreditCard className="w-5 h-5" />
+                {t('stripeConfiguration')}
+              </CardTitle>
+              <CardDescription>{t('stripeConfigDesc')}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between mb-4">
+                <Label htmlFor="stripeEnabled">{t('enableStripe')}</Label>
+                <Switch
+                  id="stripeEnabled"
+                  checked={stripeEnabled}
+                  onCheckedChange={setStripeEnabled}
+                />
+              </div>
+              {stripeEnabled && (
+                <div className="space-y-4">
+                  <div>
+                    <Label>{t('stripePublishableKey')}</Label>
+                    <Input
+                      value={stripePublishableKey}
+                      onChange={(e) => setStripePublishableKey(e.target.value)}
+                      placeholder="pk_live_..."
+                    />
+                  </div>
+                  <div>
+                    <Label>{t('stripeSecretKey')}</Label>
+                    <Input
+                      type="password"
+                      value={stripeSecretKey}
+                      onChange={(e) => setStripeSecretKey(e.target.value)}
+                      placeholder="sk_live_..."
+                    />
+                  </div>
+                  <div>
+                    <Label>{t('stripeWebhookSecret')}</Label>
+                    <Input
+                      type="password"
+                      value={stripeWebhookSecret}
+                      onChange={(e) => setStripeWebhookSecret(e.target.value)}
+                      placeholder="whsec_..."
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">{t('stripeComingSoon')}</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* CardCom Payment Gateway */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CreditCard className="w-5 h-5" />
+                {t('cardcomConfiguration')}
+              </CardTitle>
+              <CardDescription>{t('cardcomConfigDesc')}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between mb-4">
+                <Label htmlFor="cardcomEnabled">{t('enableCardcom')}</Label>
+                <Switch
+                  id="cardcomEnabled"
+                  checked={cardcomEnabled}
+                  onCheckedChange={setCardcomEnabled}
+                />
+              </div>
+              {cardcomEnabled && (
+                <div className="space-y-4">
+                  <div>
+                    <Label>{t('cardcomTerminalNumber')}</Label>
+                    <Input
+                      value={cardcomTerminalNumber}
+                      onChange={(e) => setCardcomTerminalNumber(e.target.value)}
+                      placeholder="1000"
+                    />
+                  </div>
+                  <div>
+                    <Label>{t('cardcomApiName')}</Label>
+                    <Input
+                      value={cardcomApiName}
+                      onChange={(e) => setCardcomApiName(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label>{t('cardcomApiPassword')}</Label>
+                    <Input
+                      type="password"
+                      value={cardcomApiPassword}
+                      onChange={(e) => setCardcomApiPassword(e.target.value)}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">{t('cardcomComingSoon')}</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Email Verification */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Mail className="w-5 h-5" />
+                {t('emailVerification')}
+              </CardTitle>
+              <CardDescription>{t('emailVerificationDesc')}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="emailVerificationEnabled">{t('enableEmailVerification')}</Label>
+                <Switch
+                  id="emailVerificationEnabled"
+                  checked={emailVerificationEnabled}
+                  onCheckedChange={setEmailVerificationEnabled}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">{t('emailVerificationHelp')}</p>
             </CardContent>
           </Card>
 

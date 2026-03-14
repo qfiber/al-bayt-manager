@@ -34,6 +34,7 @@ import Portfolio from "./pages/Portfolio";
 import Meetings from "./pages/Meetings";
 import DebtCollection from "./pages/DebtCollection";
 import Organizations from "./pages/Organizations";
+import SuperAdminDashboard from "./pages/SuperAdminDashboard";
 import NotFound from "./pages/NotFound";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfUsage from "./pages/TermsOfUsage";
@@ -103,6 +104,7 @@ const App = () => (
               <Route path="/meetings" element={<AppLayout><Meetings /></AppLayout>} />
               <Route path="/debt-collection" element={<AppLayout><DebtCollection /></AppLayout>} />
               <Route path="/organizations" element={<AppLayout><Organizations /></AppLayout>} />
+              <Route path="/super-admin" element={<AppLayout><SuperAdminDashboard /></AppLayout>} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
