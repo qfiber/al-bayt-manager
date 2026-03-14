@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { stripHtml, escapeHtml, sanitizeString, sanitizeObject } from '../../utils/sanitize.js';
+import { stripHtml, escapeHtml, sanitizeString, sanitizeObject, sanitizeSensitiveField } from '../../utils/sanitize.js';
 
 describe('sanitize utilities', () => {
   describe('stripHtml', () => {
@@ -51,6 +51,38 @@ describe('sanitize utilities', () => {
 
     it('handles empty objects', () => {
       expect(sanitizeObject({})).toEqual({});
+    });
+
+    it('preserves special chars in password fields', () => {
+      const input = { password: 'my<?>pass!@#$%', name: '<b>Test</b>' };
+      const result = sanitizeObject(input);
+      expect(result.password).toBe('my<?>pass!@#$%'); // preserved
+      expect(result.name).toBe('Test'); // stripped
+    });
+
+    it('preserves API key fields', () => {
+      const input = { stripeSecretKey: 'sk_live_abc<123>', description: '<script>hack</script>' };
+      const result = sanitizeObject(input);
+      expect(result.stripeSecretKey).toBe('sk_live_abc<123>');
+      expect(result.description).toBe('hack');
+    });
+  });
+
+  describe('sanitizeSensitiveField', () => {
+    it('preserves angle brackets in passwords', () => {
+      expect(sanitizeSensitiveField('pass<?>word')).toBe('pass<?>word');
+    });
+
+    it('removes null bytes', () => {
+      expect(sanitizeSensitiveField('pass\0word')).toBe('password');
+    });
+
+    it('removes BiDi override characters', () => {
+      expect(sanitizeSensitiveField('pass\u202Eword')).toBe('password');
+    });
+
+    it('preserves normal special characters', () => {
+      expect(sanitizeSensitiveField('P@$$w0rd!#%^&*()_+-=[]{}|;:\'",.<>?/~`')).toBe('P@$$w0rd!#%^&*()_+-=[]{}|;:\'",.<>?/~`');
     });
   });
 });
