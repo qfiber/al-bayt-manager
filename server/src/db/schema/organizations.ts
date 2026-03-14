@@ -3,6 +3,7 @@ import { pgTable, uuid, varchar, boolean, timestamp, integer } from 'drizzle-orm
 export const organizations = pgTable('organizations', {
   id: uuid('id').defaultRandom().primaryKey(),
   name: varchar('name', { length: 255 }).notNull(),
+  subdomain: varchar('subdomain', { length: 100 }).unique(),
   isActive: boolean('is_active').default(true).notNull(),
   defaultLanguage: varchar('default_language', { length: 10 }).default('ar').notNull(),
   maxBuildings: integer('max_buildings').default(0).notNull(), // 0 = unlimited

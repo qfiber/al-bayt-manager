@@ -15,13 +15,15 @@ export async function getOrganization(id: string) {
 
 export async function createOrganization(data: {
   name: string;
+  subdomain?: string;
   defaultLanguage?: string;
   maxBuildings?: number;
   maxApartments?: number;
   maxTenants?: number;
 }) {
+  const subdomain = data.subdomain || data.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   return await db.transaction(async (tx) => {
-    const [org] = await tx.insert(organizations).values(data).returning();
+    const [org] = await tx.insert(organizations).values({ ...data, subdomain }).returning();
 
     // Create default settings for the org
     await tx.insert(settings).values({
@@ -35,6 +37,7 @@ export async function createOrganization(data: {
 
 export async function updateOrganization(id: string, data: Partial<{
   name: string;
+  subdomain: string;
   isActive: boolean;
   defaultLanguage: string;
   maxBuildings: number;

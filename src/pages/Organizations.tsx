@@ -21,6 +21,7 @@ import { Building2, Plus, Pencil, Trash2, Users, UserPlus, LogIn } from 'lucide-
 interface Organization {
   id: string;
   name: string;
+  subdomain: string | null;
   defaultLanguage: string;
   maxBuildings: number;
   maxApartments: number;
@@ -47,7 +48,7 @@ const Organizations = () => {
   const [orgs, setOrgs] = useState<Organization[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingOrg, setEditingOrg] = useState<Organization | null>(null);
-  const [formData, setFormData] = useState({ name: '', defaultLanguage: 'ar', maxBuildings: '0', maxApartments: '0', maxTenants: '0' });
+  const [formData, setFormData] = useState({ name: '', subdomain: '', defaultLanguage: 'ar', maxBuildings: '0', maxApartments: '0', maxTenants: '0' });
 
   // Members dialog
   const [membersDialogOpen, setMembersDialogOpen] = useState(false);
@@ -77,6 +78,7 @@ const Organizations = () => {
     e.preventDefault();
     const payload = {
       name: formData.name,
+      subdomain: formData.subdomain || null,
       defaultLanguage: formData.defaultLanguage,
       maxBuildings: parseInt(formData.maxBuildings) || 0,
       maxApartments: parseInt(formData.maxApartments) || 0,
@@ -112,6 +114,7 @@ const Organizations = () => {
     setEditingOrg(org);
     setFormData({
       name: org.name,
+      subdomain: org.subdomain || '',
       defaultLanguage: org.defaultLanguage || 'ar',
       maxBuildings: String(org.maxBuildings ?? 0),
       maxApartments: String(org.maxApartments ?? 0),
@@ -121,7 +124,7 @@ const Organizations = () => {
   };
 
   const resetForm = () => {
-    setFormData({ name: '', defaultLanguage: 'ar', maxBuildings: '0', maxApartments: '0', maxTenants: '0' });
+    setFormData({ name: '', subdomain: '', defaultLanguage: 'ar', maxBuildings: '0', maxApartments: '0', maxTenants: '0' });
     setEditingOrg(null);
     setIsDialogOpen(false);
   };
@@ -205,6 +208,15 @@ const Organizations = () => {
                     />
                   </div>
                   <div>
+                    <Label>{t('subdomain')}</Label>
+                    <Input
+                      value={formData.subdomain}
+                      onChange={(e) => setFormData({...formData, subdomain: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '')})}
+                      placeholder="acme-properties"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">{t('subdomainHelp')}</p>
+                  </div>
+                  <div>
                     <Label>{t('defaultLanguage')}</Label>
                     <Select value={formData.defaultLanguage} onValueChange={(v) => setFormData({...formData, defaultLanguage: v})}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
@@ -253,6 +265,7 @@ const Organizations = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead className="text-start">{t('nameLabel')}</TableHead>
+                  <TableHead className="text-start">{t('subdomain')}</TableHead>
                   <TableHead className="text-start">{t('language')}</TableHead>
                   <TableHead className="text-start">{t('maxBuildings')}</TableHead>
                   <TableHead className="text-start">{t('maxApartments')}</TableHead>
@@ -262,11 +275,14 @@ const Organizations = () => {
               </TableHeader>
               <TableBody>
                 {paginated.length === 0 ? (
-                  <TableEmptyRow colSpan={6} message={t('noOrganizationsFound')} />
+                  <TableEmptyRow colSpan={7} message={t('noOrganizationsFound')} />
                 ) : (
                   paginated.map((org) => (
                     <TableRow key={org.id}>
                       <TableCell className="font-medium text-start">{org.name}</TableCell>
+                      <TableCell className="text-start text-muted-foreground text-sm">
+                        {org.subdomain ? `${org.subdomain}.domain.com` : '-'}
+                      </TableCell>
                       <TableCell className="text-start">
                         {org.defaultLanguage === 'ar' ? 'العربية' : org.defaultLanguage === 'he' ? 'עברית' : 'English'}
                       </TableCell>

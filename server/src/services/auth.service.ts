@@ -139,7 +139,7 @@ export async function verifyTotpLogin(sessionToken: string, code: string) {
   return { accessToken, refreshToken, userId };
 }
 
-export async function signUp(email: string, password: string, name: string, phone?: string, organizationName?: string) {
+export async function signUp(email: string, password: string, name: string, phone?: string, organizationName?: string, organizationSubdomain?: string) {
   const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
   if (existing) throw new AppError(409, 'Email already registered');
 
@@ -158,8 +158,15 @@ export async function signUp(email: string, password: string, name: string, phon
     });
 
     if (organizationName) {
+      // Check subdomain uniqueness
+      const subdomain = organizationSubdomain || organizationName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      if (subdomain) {
+        const [existingOrg] = await tx.select({ id: organizations.id }).from(organizations).where(eq(organizations.subdomain, subdomain)).limit(1);
+        if (existingOrg) throw new AppError(409, 'This subdomain is already taken');
+      }
+
       // Create a new organization
-      const [org] = await tx.insert(organizations).values({ name: organizationName }).returning();
+      const [org] = await tx.insert(organizations).values({ name: organizationName, subdomain }).returning();
 
       // Create default settings for the org
       await tx.insert(settings).values({

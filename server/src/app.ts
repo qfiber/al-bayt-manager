@@ -43,6 +43,7 @@ import { leaseRoutes } from './routes/leases.routes.js';
 import { inspectionRoutes } from './routes/inspections.routes.js';
 import { dbRateLimit, cleanupRateLimitEntries } from './middleware/db-rate-limit.js';
 import { sanitizeBody } from './middleware/sanitize.js';
+import { resolveSubdomain } from './middleware/subdomain.js';
 
 export function createApp() {
   const app = express();
@@ -65,6 +66,9 @@ export function createApp() {
   // Sanitize all request body strings (strip HTML to prevent XSS)
   app.use(sanitizeBody);
   app.use(cookieParser());
+
+  // Resolve organization from subdomain
+  app.use(resolveSubdomain);
 
   // Public uploads (logos) — no auth, served by Express in dev, nginx in prod
   app.use('/public-uploads', (_req, res, next) => {

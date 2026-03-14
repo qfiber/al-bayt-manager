@@ -43,6 +43,8 @@ import TermsOfUsage from "./pages/TermsOfUsage";
 import Accessibility from "./pages/Accessibility";
 import { CookieConsentBanner } from "./components/CookieConsentBanner";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import { SubdomainProvider } from "./contexts/SubdomainContext";
+import { getOrgSubdomain, isMainDomain, isAppSubdomain } from './lib/subdomain';
 
 const queryClient = new QueryClient();
 
@@ -65,6 +67,7 @@ const TitleUpdater = () => {
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider>
+    <SubdomainProvider>
     <BrowserRouter>
       <LanguageProvider>
         <ScrollToTop />
@@ -76,7 +79,11 @@ const App = () => (
             <Sonner />
             <CookieConsentBanner />
             <Routes>
-              <Route path="/" element={<Index />} />
+              <Route path="/" element={
+                isMainDomain() ? <Index /> :
+                isAppSubdomain() ? <Navigate to="/super-admin" replace /> :
+                <Navigate to="/dashboard" replace />
+              } />
               {/* Unauthenticated routes — no AppLayout */}
               <Route path="/login" element={<Auth />} />
               <Route path="/auth" element={<Navigate to="/login" replace />} />
@@ -119,6 +126,7 @@ const App = () => (
         </PublicSettingsProvider>
       </LanguageProvider>
     </BrowserRouter>
+    </SubdomainProvider>
     </ThemeProvider>
   </QueryClientProvider>
 );

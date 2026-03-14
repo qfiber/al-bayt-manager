@@ -41,6 +41,10 @@ const registerSchema = z.object({
   name: z.string().min(1).max(255),
   phone: z.string().max(50).optional(),
   organizationName: z.string().min(1).max(255).optional(),
+  organizationSubdomain: z.string()
+    .min(3).max(32)
+    .regex(/^[a-z0-9][a-z0-9-]*[a-z0-9]$/, 'Only lowercase letters, numbers, and hyphens (cannot start/end with hyphen)')
+    .optional(),
   challengeId: z.string().uuid(),
   nonce: z.string(),
 });
@@ -115,6 +119,20 @@ authRoutes.post('/login', authRateLimit, requirePow, validate(loginSchema), asyn
     // Successful login — clear failed attempts
     await clearFailedAttempts(email);
 
+    // If logging in via org subdomain, verify membership
+    if (req.subdomainOrg) {
+      const [loginUserForOrg] = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
+      if (loginUserForOrg) {
+        const [membership] = await db.select().from(organizationMembers)
+          .where(and(eq(organizationMembers.userId, loginUserForOrg.id), eq(organizationMembers.organizationId, req.subdomainOrg.id)))
+          .limit(1);
+        if (!membership && !result.requires2FA) {
+          res.status(403).json({ error: 'You are not a member of this organization' });
+          return;
+        }
+      }
+    }
+
     // Check email verification
     const [loginUser] = await db.select({ emailConfirmed: users.emailConfirmed }).from(users).where(eq(users.email, email)).limit(1);
     const [loginConfig] = await db.select({ emailVerificationEnabled: settings.emailVerificationEnabled }).from(settings).limit(1);
@@ -162,7 +180,7 @@ authRoutes.post('/login/2fa', authRateLimit, validate(login2FASchema), async (re
 
 authRoutes.post('/register', authRateLimit, requirePow, validate(registerSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const result = await authService.signUp(req.body.email, req.body.password, req.body.name, req.body.phone, req.body.organizationName);
+    const result = await authService.signUp(req.body.email, req.body.password, req.body.name, req.body.phone, req.body.organizationName, req.body.organizationSubdomain);
     logAuditEvent({
       userId: result.id,
       userEmail: req.body.email,

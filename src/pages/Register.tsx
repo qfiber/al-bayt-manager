@@ -21,6 +21,7 @@ const Register = () => {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [organizationName, setOrganizationName] = useState('');
+  const [organizationSubdomain, setOrganizationSubdomain] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [verificationMode, setVerificationMode] = useState(false);
@@ -87,7 +88,7 @@ const Register = () => {
           return;
         }
       }
-      const { error, requiresVerification, verificationToken: token } = await signUp(email, password, name, phone, organizationName || undefined);
+      const { error, requiresVerification, verificationToken: token } = await signUp(email, password, name, phone, organizationName || undefined, organizationSubdomain || undefined);
 
       if (requiresVerification && token) {
         setVerificationToken(token);
@@ -259,6 +260,29 @@ const Register = () => {
                       />
                       <p className="text-xs text-muted-foreground">{t('organizationNameHelp')}</p>
                     </div>
+
+                    {organizationName && (
+                      <div className="space-y-2">
+                        <Label htmlFor="organizationSubdomain">{t('subdomain')}</Label>
+                        <div className="flex items-center gap-1">
+                          <Input
+                            id="organizationSubdomain"
+                            type="text"
+                            value={organizationSubdomain}
+                            onChange={(e) => setOrganizationSubdomain(
+                              e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 32)
+                            )}
+                            disabled={isLoading}
+                            placeholder="my-company"
+                            maxLength={32}
+                            className="flex-1"
+                            dir="ltr"
+                          />
+                          <span className="text-xs text-muted-foreground shrink-0">.{window.location.hostname.split('.').slice(-2).join('.')}</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground">{t('subdomainRegisterHelp')}</p>
+                      </div>
+                    )}
 
                     <div className="space-y-2">
                       <Label htmlFor="password">{t('password')}</Label>

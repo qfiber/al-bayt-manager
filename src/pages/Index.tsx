@@ -12,12 +12,6 @@ const LandingPage = () => {
   const { user, loading } = useAuth();
   const { companyName, logoUrl } = usePublicSettings();
 
-  // If already logged in, go to dashboard
-  if (user) {
-    navigate('/dashboard', { replace: true });
-    return null;
-  }
-
   // Show nothing while checking auth status to avoid flicker
   if (loading) {
     return null;
@@ -59,9 +53,15 @@ const LandingPage = () => {
                 </Button>
               ))}
             </div>
-            <Button onClick={() => navigate('/login')}>
-              {t('signIn')}
-            </Button>
+            {user ? (
+              <Button onClick={() => navigate('/dashboard')}>
+                {t('dashboard')}
+              </Button>
+            ) : (
+              <Button onClick={() => navigate('/login')}>
+                {t('signIn')}
+              </Button>
+            )}
           </div>
         </div>
       </header>

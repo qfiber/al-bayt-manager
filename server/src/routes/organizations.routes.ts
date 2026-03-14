@@ -7,11 +7,15 @@ import { auditLog } from '../middleware/audit.js';
 import * as organizationService from '../services/organization.service.js';
 import * as authService from '../services/auth.service.js';
 import { setAuthCookies } from '../utils/cookie.js';
+import { db } from '../config/database.js';
+import { organizations } from '../db/schema/index.js';
+import { eq } from 'drizzle-orm';
 
 export const organizationRoutes = Router();
 
 const createOrgSchema = z.object({
   name: z.string().min(1).max(255),
+  subdomain: z.string().min(1).max(100).regex(/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/, 'Must be lowercase alphanumeric with hyphens').optional(),
   defaultLanguage: z.enum(['ar', 'he', 'en']).optional(),
   maxBuildings: z.number().int().min(0).max(10000).optional(),
   maxApartments: z.number().int().min(0).max(100000).optional(),
@@ -20,6 +24,7 @@ const createOrgSchema = z.object({
 
 const updateOrgSchema = z.object({
   name: z.string().min(1).max(255).optional(),
+  subdomain: z.string().min(1).max(100).regex(/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/, 'Must be lowercase alphanumeric with hyphens').optional(),
   isActive: z.boolean().optional(),
   defaultLanguage: z.enum(['ar', 'he', 'en']).optional(),
   maxBuildings: z.number().int().min(0).max(10000).optional(),
@@ -32,6 +37,34 @@ const idParams = z.object({ id: z.string().uuid() });
 const addMemberSchema = z.object({
   email: z.string().email(),
   role: z.enum(['org_admin', 'moderator', 'user']),
+});
+
+// Public: get org info by subdomain (for login page branding)
+organizationRoutes.get('/by-subdomain/:subdomain', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const subdomain = req.params.subdomain as string;
+    const [org] = await db
+      .select({
+        id: organizations.id,
+        name: organizations.name,
+        subdomain: organizations.subdomain,
+        isActive: organizations.isActive,
+      })
+      .from(organizations)
+      .where(eq(organizations.subdomain, subdomain))
+      .limit(1);
+
+    if (!org || !org.isActive) {
+      res.status(404).json({ error: 'Organization not found' });
+      return;
+    }
+
+    // Get org's public settings (branding)
+    const { getPublicSettings } = await import('../services/settings.service.js');
+    const settings = await getPublicSettings(org.id);
+
+    res.json({ organization: org, settings });
+  } catch (err) { next(err); }
 });
 
 // List all organizations (super-admin only)

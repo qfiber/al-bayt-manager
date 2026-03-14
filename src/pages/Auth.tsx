@@ -12,6 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useToast } from '@/hooks/use-toast';
 import { Building, Shield } from 'lucide-react';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
+import { useSubdomain } from '@/contexts/SubdomainContext';
 import { LegalFooter } from '@/components/LegalFooter';
 import { CaptchaField } from '@/components/CaptchaField';
 
@@ -31,6 +32,7 @@ const Auth = () => {
   const { user, loading, refreshUser } = useAuth();
   const { t } = useLanguage();
   const { logoUrl, companyName, turnstileEnabled, registrationEnabled } = usePublicSettings();
+  const { subdomainOrg } = useSubdomain();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -206,7 +208,7 @@ const Auth = () => {
               </div>
             )}
           </div>
-          <CardTitle className="text-2xl font-bold">{companyName || t('buildingManagementSystem')}</CardTitle>
+          <CardTitle className="text-2xl font-bold">{subdomainOrg?.name || companyName || t('buildingManagementSystem')}</CardTitle>
           <CardDescription>
             {t('signInToAccount')}
           </CardDescription>
