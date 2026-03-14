@@ -634,54 +634,59 @@ const Dashboard = () => {
       </div>
 
       {/* Subscription Status Banner */}
-      {subscription && (
-        <Card className={`border ${
-          subscription.subscription?.status === 'past_due' ? 'border-red-300 bg-red-50/50 dark:bg-red-950/20' :
-          subscription.subscription?.status === 'trial' ? 'border-amber-300 bg-amber-50/50 dark:bg-amber-950/20' :
-          'border-emerald-300 bg-emerald-50/50 dark:bg-emerald-950/20'
-        }`}>
-          <CardContent className="p-4 flex items-center justify-between gap-4 flex-wrap">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className={`p-2 rounded-lg shrink-0 ${
-                subscription.subscription?.status === 'past_due' ? 'bg-red-100 text-red-600' :
-                subscription.subscription?.status === 'trial' ? 'bg-amber-100 text-amber-600' :
-                'bg-emerald-100 text-emerald-600'
-              }`}>
-                <CreditCard className="h-5 w-5" />
-              </div>
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <p className="text-sm font-semibold">{t('currentPlan')}: {subscription.planName || '-'}</p>
-                  <Badge variant={
-                    subscription.subscription?.status === 'past_due' ? 'destructive' :
-                    subscription.subscription?.status === 'trial' ? 'outline' :
-                    'default'
-                  }>
-                    {subscription.subscription?.status}
-                  </Badge>
+      {subscription && (() => {
+        const status = subscription.subscription?.status;
+        const isTrialOrExpired = status === 'trial' || status === 'past_due';
+        const periodEnd = subscription.subscription?.currentPeriodEnd;
+        const trialEnd = subscription.subscription?.trialEndDate;
+
+        // Calculate days left
+        const endDate = status === 'trial' ? trialEnd : periodEnd;
+        const daysLeft = endDate ? Math.max(0, Math.ceil((new Date(endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))) : null;
+        const isExpiringSoon = daysLeft !== null && daysLeft <= 7 && status === 'active';
+
+        // Only show banner for: trial, past_due, or active expiring within 7 days
+        if (!isTrialOrExpired && !isExpiringSoon) return null;
+
+        return (
+          <Card className={`border ${
+            status === 'past_due' ? 'border-red-300 bg-red-50/50 dark:bg-red-950/20' :
+            status === 'trial' ? 'border-amber-300 bg-amber-50/50 dark:bg-amber-950/20' :
+            'border-orange-300 bg-orange-50/50 dark:bg-orange-950/20'
+          }`}>
+            <CardContent className="p-4 flex items-center justify-between gap-4 flex-wrap">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className={`p-2 rounded-lg shrink-0 ${
+                  status === 'past_due' ? 'bg-red-100 text-red-600' :
+                  status === 'trial' ? 'bg-amber-100 text-amber-600' :
+                  'bg-orange-100 text-orange-600'
+                }`}>
+                  <CreditCard className="h-5 w-5" />
                 </div>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {subscription.subscription?.status === 'trial' && subscription.subscription?.trialEndDate ? (
-                    (() => {
-                      const daysLeft = Math.max(0, Math.ceil((new Date(subscription.subscription.trialEndDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
-                      return daysLeft > 0
-                        ? t('trialEndsIn').replace('{days}', String(daysLeft))
-                        : t('subscriptionExpired');
-                    })()
-                  ) : subscription.subscription?.status === 'past_due' ? (
-                    t('subscriptionExpired')
-                  ) : subscription.subscription?.currentPeriodEnd ? (
-                    `${t('billingCycle')}: ${subscription.subscription?.billingCycle || '-'}`
-                  ) : null}
-                </p>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-sm font-semibold">{t('currentPlan')}: {subscription.planName || '-'}</p>
+                    <Badge variant={status === 'past_due' ? 'destructive' : 'outline'}>
+                      {status}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {status === 'past_due' ? t('subscriptionExpired') :
+                     status === 'trial' && daysLeft !== null ? (
+                       daysLeft > 0 ? t('trialEndsIn').replace('{days}', String(daysLeft)) : t('subscriptionExpired')
+                     ) :
+                     isExpiringSoon ? t('subscriptionExpiringSoon').replace('{days}', String(daysLeft)) :
+                     null}
+                  </p>
+                </div>
               </div>
-            </div>
-            <Button size="sm" variant="outline" onClick={() => setShowUpgradeDialog(true)}>
-              {t('upgradePlan')}
-            </Button>
-          </CardContent>
-        </Card>
-      )}
+              <Button size="sm" variant="outline" onClick={() => setShowUpgradeDialog(true)}>
+                {t('upgradePlan')}
+              </Button>
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {/* Upgrade Plan Dialog */}
       <Dialog open={showUpgradeDialog} onOpenChange={setShowUpgradeDialog}>
