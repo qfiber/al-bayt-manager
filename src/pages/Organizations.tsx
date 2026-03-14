@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { TableEmptyRow } from '@/components/TableEmptyRow';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SearchInput } from '@/components/SearchInput';
 import { PaginationControls } from '@/components/PaginationControls';
@@ -25,7 +26,7 @@ interface Organization {
   defaultLanguage: string;
   maxBuildings: number;
   maxApartments: number;
-  maxTenants: number;
+  onlinePaymentsEnabled: boolean;
   isActive: boolean;
   createdAt: string;
 }
@@ -48,7 +49,7 @@ const Organizations = () => {
   const [orgs, setOrgs] = useState<Organization[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingOrg, setEditingOrg] = useState<Organization | null>(null);
-  const [formData, setFormData] = useState({ name: '', subdomain: '', defaultLanguage: 'ar', maxBuildings: '0', maxApartments: '0', maxTenants: '0' });
+  const [formData, setFormData] = useState({ name: '', subdomain: '', defaultLanguage: 'ar', maxBuildings: '0', maxApartments: '0', onlinePaymentsEnabled: false });
 
   // Members dialog
   const [membersDialogOpen, setMembersDialogOpen] = useState(false);
@@ -82,7 +83,7 @@ const Organizations = () => {
       defaultLanguage: formData.defaultLanguage,
       maxBuildings: parseInt(formData.maxBuildings) || 0,
       maxApartments: parseInt(formData.maxApartments) || 0,
-      maxTenants: parseInt(formData.maxTenants) || 0,
+      onlinePaymentsEnabled: formData.onlinePaymentsEnabled,
     };
     try {
       if (editingOrg) {
@@ -118,13 +119,13 @@ const Organizations = () => {
       defaultLanguage: org.defaultLanguage || 'ar',
       maxBuildings: String(org.maxBuildings ?? 0),
       maxApartments: String(org.maxApartments ?? 0),
-      maxTenants: String(org.maxTenants ?? 0),
+      onlinePaymentsEnabled: org.onlinePaymentsEnabled ?? false,
     });
     setIsDialogOpen(true);
   };
 
   const resetForm = () => {
-    setFormData({ name: '', subdomain: '', defaultLanguage: 'ar', maxBuildings: '0', maxApartments: '0', maxTenants: '0' });
+    setFormData({ name: '', subdomain: '', defaultLanguage: 'ar', maxBuildings: '0', maxApartments: '0', onlinePaymentsEnabled: false });
     setEditingOrg(null);
     setIsDialogOpen(false);
   };
@@ -227,7 +228,7 @@ const Organizations = () => {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
                       <Label>{t('maxBuildings')}</Label>
                       <Input type="number" min="0" value={formData.maxBuildings} onChange={(e) => setFormData({...formData, maxBuildings: e.target.value})} placeholder="0 = unlimited" />
@@ -236,12 +237,18 @@ const Organizations = () => {
                       <Label>{t('maxApartments')}</Label>
                       <Input type="number" min="0" value={formData.maxApartments} onChange={(e) => setFormData({...formData, maxApartments: e.target.value})} placeholder="0 = unlimited" />
                     </div>
-                    <div>
-                      <Label>{t('maxTenants')}</Label>
-                      <Input type="number" min="0" value={formData.maxTenants} onChange={(e) => setFormData({...formData, maxTenants: e.target.value})} placeholder="0 = unlimited" />
-                    </div>
                   </div>
                   <p className="text-xs text-muted-foreground">{t('limitZeroUnlimited')}</p>
+                  <div className="flex items-center justify-between border rounded-lg p-3">
+                    <div>
+                      <Label>{t('onlinePayments')}</Label>
+                      <p className="text-xs text-muted-foreground">{t('onlinePaymentsDesc')}</p>
+                    </div>
+                    <Switch
+                      checked={formData.onlinePaymentsEnabled}
+                      onCheckedChange={(checked) => setFormData({...formData, onlinePaymentsEnabled: checked})}
+                    />
+                  </div>
                   <div className="flex gap-2">
                     <Button type="submit" className="flex-1">
                       {editingOrg ? t('update') : t('create')}

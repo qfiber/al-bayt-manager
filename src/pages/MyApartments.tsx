@@ -193,21 +193,23 @@ const MyApartments = () => {
                         <Download className="w-4 h-4 me-2" />
                         {t('downloadStatement')}
                       </Button>
-                      <Button
-                        variant="default"
-                        size="sm"
-                        onClick={() => {
-                          setPayingApartment(apartment);
-                          setPayAmount(Math.abs(balance) > 0 ? Math.abs(balance).toFixed(2) : subscriptionAmount.toFixed(2));
-                          const now = new Date();
-                          setPayMonth(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`);
-                          setPayDialogOpen(true);
-                        }}
-                        className="w-fit"
-                      >
-                        <CreditCard className="w-4 h-4 me-2" />
-                        {t('payNow')}
-                      </Button>
+                      {user?.onlinePaymentsEnabled && (
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={() => {
+                            setPayingApartment(apartment);
+                            setPayAmount(Math.abs(balance) > 0 ? Math.abs(balance).toFixed(2) : subscriptionAmount.toFixed(2));
+                            const now = new Date();
+                            setPayMonth(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`);
+                            setPayDialogOpen(true);
+                          }}
+                          className="w-fit"
+                        >
+                          <CreditCard className="w-4 h-4 me-2" />
+                          {t('payNow')}
+                        </Button>
+                      )}
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-6">

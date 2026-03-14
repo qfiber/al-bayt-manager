@@ -19,7 +19,7 @@ const createOrgSchema = z.object({
   defaultLanguage: z.enum(['ar', 'he', 'en']).optional(),
   maxBuildings: z.number().int().min(0).max(10000).optional(),
   maxApartments: z.number().int().min(0).max(100000).optional(),
-  maxTenants: z.number().int().min(0).max(100000).optional(),
+  onlinePaymentsEnabled: z.boolean().optional(),
 });
 
 const updateOrgSchema = z.object({
@@ -29,7 +29,7 @@ const updateOrgSchema = z.object({
   defaultLanguage: z.enum(['ar', 'he', 'en']).optional(),
   maxBuildings: z.number().int().min(0).max(10000).optional(),
   maxApartments: z.number().int().min(0).max(100000).optional(),
-  maxTenants: z.number().int().min(0).max(100000).optional(),
+  onlinePaymentsEnabled: z.boolean().optional(),
 });
 
 const idParams = z.object({ id: z.string().uuid() });

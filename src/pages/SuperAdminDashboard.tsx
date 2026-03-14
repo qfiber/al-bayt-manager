@@ -54,6 +54,7 @@ const SuperAdminDashboard = () => {
   const navigate = useNavigate();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [extended, setExtended] = useState<any>(null);
 
   useEffect(() => {
     if (user && isSuperAdmin) {
@@ -63,6 +64,14 @@ const SuperAdminDashboard = () => {
         .finally(() => setLoading(false));
     }
   }, [user, isSuperAdmin]);
+
+  useEffect(() => {
+    if (user && isSuperAdmin && data) {
+      api.get('/super-admin/extended')
+        .then(setExtended)
+        .catch(() => {});
+    }
+  }, [user, isSuperAdmin, data]);
 
   if (!user || !isSuperAdmin) return null;
 
@@ -452,6 +461,111 @@ const SuperAdminDashboard = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Organization Details */}
+      {extended?.orgDetails && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">{t('organizationDetails')}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-xs">{t('organizationName')}</TableHead>
+                  <TableHead className="text-xs">{t('subdomain')}</TableHead>
+                  <TableHead className="text-xs">{t('buildings')}</TableHead>
+                  <TableHead className="text-xs">{t('apartments')}</TableHead>
+                  <TableHead className="text-xs">{t('systemRevenue')}</TableHead>
+                  <TableHead className="text-xs">{t('status')}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {extended.orgDetails.map((org: any) => (
+                  <TableRow key={org.id}>
+                    <TableCell className="font-medium text-sm">{org.name}</TableCell>
+                    <TableCell className="font-mono text-xs">{org.subdomain || '-'}</TableCell>
+                    <TableCell className="tabular-nums text-sm">{org.building_count}</TableCell>
+                    <TableCell className="tabular-nums text-sm">{org.apartment_count}</TableCell>
+                    <TableCell className="tabular-nums text-sm font-medium">{formatCurrency(parseFloat(org.total_revenue || '0'))}</TableCell>
+                    <TableCell>
+                      <Badge variant={org.is_active ? 'default' : 'secondary'} className="text-[10px]">
+                        {org.is_active ? t('active') : t('inactive')}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Recent Payments */}
+      {extended?.recentPayments && extended.recentPayments.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">{t('recentPayments')}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-xs">{t('organizationName')}</TableHead>
+                  <TableHead className="text-xs">{t('building')}</TableHead>
+                  <TableHead className="text-xs">{t('apartment')}</TableHead>
+                  <TableHead className="text-xs">{t('amount')}</TableHead>
+                  <TableHead className="text-xs">{t('month')}</TableHead>
+                  <TableHead className="text-xs">{t('date')}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {extended.recentPayments.slice(0, 10).map((p: any) => (
+                  <TableRow key={p.id}>
+                    <TableCell className="text-sm">{p.org_name || '-'}</TableCell>
+                    <TableCell className="text-sm">{p.building_name}</TableCell>
+                    <TableCell className="text-sm">{p.apartment_number}</TableCell>
+                    <TableCell className="text-sm font-medium tabular-nums text-green-600">{formatCurrency(parseFloat(p.amount))}</TableCell>
+                    <TableCell className="text-sm">{p.month}</TableCell>
+                    <TableCell className="text-sm">{formatDate(p.created_at)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Top Debtors */}
+      {extended?.topDebtors && extended.topDebtors.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">{t('topDebtors')}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-xs">{t('organizationName')}</TableHead>
+                  <TableHead className="text-xs">{t('building')}</TableHead>
+                  <TableHead className="text-xs">{t('apartment')}</TableHead>
+                  <TableHead className="text-xs">{t('balance')}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {extended.topDebtors.slice(0, 10).map((d: any) => (
+                  <TableRow key={d.id}>
+                    <TableCell className="text-sm">{d.org_name || '-'}</TableCell>
+                    <TableCell className="text-sm">{d.building_name}</TableCell>
+                    <TableCell className="text-sm">{d.apartment_number}</TableCell>
+                    <TableCell className="text-sm font-medium tabular-nums text-red-600">{formatCurrency(parseFloat(d.cached_balance))}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };

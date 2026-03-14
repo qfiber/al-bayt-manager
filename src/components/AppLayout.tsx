@@ -73,7 +73,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
   const handleNotifClick = () => {
     localStorage.setItem(lastSeenKey, new Date().toISOString());
     setNotifCount(0);
-    navigate(isSuperAdmin ? '/super-admin' : '/audit-logs');
+    navigate('/audit-logs');
   };
 
   useEffect(() => {
@@ -103,6 +103,8 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
     ? [
         { label: t('superAdminDashboard'), path: '/super-admin', icon: Shield },
         { label: t('organizations'), path: '/organizations', icon: Building2 },
+        { label: t('landlords'), path: '/landlords', icon: Users },
+        { label: t('auditLogs'), path: '/audit-logs', icon: Shield },
       ]
     : isAdmin
     ? [
@@ -130,10 +132,14 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
         { label: t('issues'), path: '/issues', icon: AlertTriangle },
       ];
 
-  // Admin-only dropdown items (hidden for super-admin — they have their own nav)
+  // Admin-only dropdown items
   const adminDropdownLinks: NavLink[] = isSuperAdmin
     ? [
+        { label: t('users'), path: '/users', icon: Users },
         { label: t('settings'), path: '/settings', icon: Settings },
+        { label: t('notificationTemplates'), path: '/email-templates', icon: Bell },
+        { label: t('emailLogs'), path: '/email-logs', icon: MailOpen },
+        { label: t('apiKeys'), path: '/api-keys', icon: Key },
       ]
     : [
         { label: t('maintenanceJobs'), path: '/maintenance', icon: Wrench },

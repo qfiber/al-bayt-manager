@@ -74,6 +74,64 @@ export async function getDashboardData() {
   };
 }
 
+export async function getExtendedMetrics() {
+  const [
+    recentPayments,
+    recentInvoices,
+    topDebtors,
+    orgBuildingCounts,
+  ] = await Promise.all([
+    // Recent payments across all orgs (last 20)
+    db.execute(sql`
+      SELECT p.id, p.amount::text, p.month, p.created_at,
+        a.apartment_number, b.name AS building_name, o.name AS org_name
+      FROM payments p
+      JOIN apartments a ON p.apartment_id = a.id
+      JOIN buildings b ON a.building_id = b.id
+      LEFT JOIN organizations o ON b.organization_id = o.id
+      WHERE p.is_canceled = false
+      ORDER BY p.created_at DESC LIMIT 20
+    `),
+    // Recent invoices across all orgs (last 20)
+    db.execute(sql`
+      SELECT i.id, i.invoice_number, i.total_amount::text, i.month, i.generated_at,
+        a.apartment_number, b.name AS building_name, o.name AS org_name
+      FROM invoices i
+      JOIN apartments a ON i.apartment_id = a.id
+      JOIN buildings b ON a.building_id = b.id
+      LEFT JOIN organizations o ON b.organization_id = o.id
+      ORDER BY i.generated_at DESC LIMIT 20
+    `),
+    // Top apartments with debt (negative balance)
+    db.execute(sql`
+      SELECT a.id, a.apartment_number, a.cached_balance::text,
+        b.name AS building_name, o.name AS org_name
+      FROM apartments a
+      JOIN buildings b ON a.building_id = b.id
+      LEFT JOIN organizations o ON b.organization_id = o.id
+      WHERE a.cached_balance::numeric < 0
+      ORDER BY a.cached_balance::numeric ASC
+      LIMIT 20
+    `),
+    // Building count per org
+    db.execute(sql`
+      SELECT o.id, o.name, o.subdomain, o.is_active,
+        (SELECT count(*)::int FROM buildings b WHERE b.organization_id = o.id) AS building_count,
+        (SELECT count(*)::int FROM apartments a JOIN buildings b2 ON a.building_id = b2.id WHERE b2.organization_id = o.id) AS apartment_count,
+        (SELECT COALESCE(SUM(p2.amount::numeric), 0)::text FROM payments p2 JOIN apartments a2 ON p2.apartment_id = a2.id JOIN buildings b3 ON a2.building_id = b3.id WHERE b3.organization_id = o.id AND p2.is_canceled = false) AS total_revenue
+      FROM organizations o
+      ORDER BY total_revenue DESC
+    `),
+  ]);
+
+  return {
+    recentPayments: recentPayments.rows,
+    recentInvoices: recentInvoices.rows,
+    topDebtors: topDebtors.rows,
+    orgDetails: orgBuildingCounts.rows,
+  };
+}
+
 export async function getMonthlyTrends() {
   const result = await db.execute(sql`
     SELECT

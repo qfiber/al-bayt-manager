@@ -4,7 +4,7 @@ import { eq, and } from 'drizzle-orm';
 import { requireAuth } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { db } from '../config/database.js';
-import { userApartments } from '../db/schema/index.js';
+import { userApartments, organizations } from '../db/schema/index.js';
 import * as paymentGateway from '../services/payment-gateway.service.js';
 
 export const onlinePaymentRoutes = Router();
@@ -22,6 +22,10 @@ onlinePaymentRoutes.post('/checkout', requireAuth, validate(checkoutSchema), asy
     const { apartmentId, amount, month, gateway } = req.body;
     const orgId = req.user!.organizationId;
     if (!orgId) { res.status(400).json({ error: 'No organization context' }); return; }
+
+    // Check if online payments are enabled for this org
+    const [org] = await db.select({ onlinePaymentsEnabled: organizations.onlinePaymentsEnabled }).from(organizations).where(eq(organizations.id, orgId)).limit(1);
+    if (!org?.onlinePaymentsEnabled) { res.status(403).json({ error: 'Online payments are not enabled for this organization' }); return; }
 
     // Verify tenant owns this apartment
     const [assignment] = await db.select().from(userApartments)

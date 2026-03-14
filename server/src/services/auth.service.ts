@@ -10,7 +10,6 @@ import { env } from '../config/env.js';
 import { createTwoFASession, consumeTwoFASession, invalidateTwoFASession } from './twofa-session.service.js';
 import { deleteFile, getAvatarPath } from './storage.service.js';
 import { createVerificationSession } from './email-verification.service.js';
-import * as organizationService from './organization.service.js';
 
 function hashToken(token: string): string {
   return crypto.createHash('sha256').update(token).digest('hex');
@@ -260,9 +259,11 @@ export async function getMe(userId: string) {
   const role = orgMembership?.role || await getUserRole(userId);
 
   let organizationName: string | null = null;
+  let onlinePaymentsEnabled = false;
   if (orgMembership?.organizationId) {
-    const [org] = await db.select({ name: organizations.name }).from(organizations).where(eq(organizations.id, orgMembership.organizationId)).limit(1);
+    const [org] = await db.select({ name: organizations.name, onlinePaymentsEnabled: organizations.onlinePaymentsEnabled }).from(organizations).where(eq(organizations.id, orgMembership.organizationId)).limit(1);
     organizationName = org?.name || null;
+    onlinePaymentsEnabled = org?.onlinePaymentsEnabled || false;
   }
 
   const factors = await db
@@ -283,6 +284,7 @@ export async function getMe(userId: string) {
     isSuperAdmin: user.isSuperAdmin,
     organizationId: orgMembership?.organizationId || null,
     organizationName,
+    onlinePaymentsEnabled,
     totpFactors: factors,
   };
 }
@@ -453,11 +455,6 @@ export async function impersonateUser(targetUserId: string, impersonatorUserId: 
 export async function adminCreateUser(email: string, password: string, name: string, role: string, phone?: string, organizationId?: string) {
   const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
   if (existing) throw new AppError(409, 'Email already registered');
-
-  // Check tenant limit for user role
-  if (organizationId && (role === 'user')) {
-    await organizationService.checkTenantLimit(organizationId);
-  }
 
   const passwordHash = await hashPassword(password);
 
