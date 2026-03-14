@@ -46,6 +46,10 @@ import { paymentPlanRoutes } from './routes/payment-plans.routes.js';
 import { handbookRoutes } from './routes/building-handbook.routes.js';
 import { subscriptionRoutes } from './routes/subscription.routes.js';
 import { contactRoutes } from './routes/contact.routes.js';
+import { webhookRoutes } from './routes/webhooks.routes.js';
+import { importRoutes } from './routes/import.routes.js';
+import { sseRoutes } from './routes/sse.routes.js';
+import { customReportRoutes } from './routes/custom-reports.routes.js';
 import { dbRateLimit, cleanupRateLimitEntries } from './middleware/db-rate-limit.js';
 import { sanitizeBody } from './middleware/sanitize.js';
 import { resolveSubdomain } from './middleware/subdomain.js';
@@ -67,6 +71,7 @@ export function createApp() {
   }));
   // Raw body for Stripe webhooks (must be before json parser)
   app.use('/api/payments/stripe-webhook', express.raw({ type: 'application/json' }));
+  app.use('/api/subscriptions/stripe-webhook', express.raw({ type: 'application/json' }));
   app.use(express.json());
   // Sanitize all request body strings (strip HTML to prevent XSS)
   app.use(sanitizeBody);
@@ -144,6 +149,10 @@ export function createApp() {
   app.use('/api/handbook', handbookRoutes);
   app.use('/api/subscriptions', subscriptionRoutes);
   app.use('/api/contact', contactRoutes);
+  app.use('/api/webhooks', webhookRoutes);
+  app.use('/api/import', importRoutes);
+  app.use('/api/sse', sseRoutes);
+  app.use('/api/custom-reports', customReportRoutes);
   app.use('/api/v1', v1Routes);
 
   // Health check

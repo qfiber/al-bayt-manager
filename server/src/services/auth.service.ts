@@ -451,7 +451,9 @@ export async function impersonateUser(targetUserId: string, impersonatorUserId: 
 
   const payload = await buildTokenPayload(target.id, target.email);
   const accessToken = signAccessToken(payload);
-  const refreshToken = await createRefreshToken(target.id);
+  // Don't store refresh token in DB for impersonation — it will exist in the cookie
+  // but cannot be used to refresh, limiting the impersonation session lifespan
+  const refreshToken = signRefreshToken({ userId: target.id });
 
   return { accessToken, refreshToken };
 }

@@ -10,6 +10,7 @@ import { ensureDefaultSmsTemplates } from './services/sms-template.service.js';
 import { startSmsCron } from './services/sms-cron.service.js';
 import { startEmailCron } from './services/email-cron.service.js';
 import { startLandlordReminderCron } from './services/landlord-reminder.service.js';
+import { startSubscriptionBillingCron } from './services/subscription-cron.service.js';
 
 async function main() {
   try {
@@ -36,6 +37,7 @@ async function main() {
     startSmsCron();
     startEmailCron();
     startLandlordReminderCron();
+    startSubscriptionBillingCron();
   });
 }
 

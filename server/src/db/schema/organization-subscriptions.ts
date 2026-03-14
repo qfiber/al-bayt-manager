@@ -14,6 +14,8 @@ export const organizationSubscriptions = pgTable('organization_subscriptions', {
   currentPeriodEnd: timestamp('current_period_end', { withTimezone: true }),
   amount: numeric('amount', { precision: 10, scale: 2 }),
   cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
+  stripeCustomerId: varchar('stripe_customer_id', { length: 255 }),
+  stripeSubscriptionId: varchar('stripe_subscription_id', { length: 255 }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });

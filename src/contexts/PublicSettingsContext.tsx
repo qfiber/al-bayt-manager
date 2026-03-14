@@ -10,6 +10,8 @@ interface PublicSettingsContextType {
   turnstileEnabled: boolean;
   turnstileSiteKey: string | null;
   registrationEnabled: boolean;
+  primaryColor: string | null;
+  accentColor: string | null;
   refresh: () => Promise<void>;
   /** @deprecated Use refresh() instead */
   refreshCurrency: () => Promise<void>;
@@ -24,6 +26,8 @@ const PublicSettingsContext = createContext<PublicSettingsContextType>({
   turnstileEnabled: false,
   turnstileSiteKey: null,
   registrationEnabled: true,
+  primaryColor: null,
+  accentColor: null,
   refresh: async () => {},
   refreshCurrency: async () => {},
 });
@@ -41,6 +45,8 @@ export const PublicSettingsProvider = ({ children }: { children: ReactNode }) =>
   const [turnstileEnabled, setTurnstileEnabled] = useState(false);
   const [turnstileSiteKey, setTurnstileSiteKey] = useState<string | null>(null);
   const [registrationEnabled, setRegistrationEnabled] = useState(true);
+  const [primaryColor, setPrimaryColor] = useState<string | null>(null);
+  const [accentColor, setAccentColor] = useState<string | null>(null);
 
   const fetchPublicSettings = useCallback(async () => {
     try {
@@ -53,6 +59,8 @@ export const PublicSettingsProvider = ({ children }: { children: ReactNode }) =>
         turnstileEnabled: boolean;
         turnstileSiteKey: string | null;
         registrationEnabled: boolean;
+        primaryColor: string | null;
+        accentColor: string | null;
       }>('/settings/public');
       if (data) {
         setCurrencyCode(data.currencyCode || 'ILS');
@@ -62,6 +70,8 @@ export const PublicSettingsProvider = ({ children }: { children: ReactNode }) =>
         setTurnstileEnabled(data.turnstileEnabled ?? false);
         setTurnstileSiteKey(data.turnstileSiteKey || null);
         setRegistrationEnabled(data.registrationEnabled ?? true);
+        setPrimaryColor(data.primaryColor || null);
+        setAccentColor(data.accentColor || null);
       }
     } catch {
       // Use defaults on error
@@ -71,6 +81,15 @@ export const PublicSettingsProvider = ({ children }: { children: ReactNode }) =>
   useEffect(() => {
     fetchPublicSettings();
   }, [fetchPublicSettings]);
+
+  useEffect(() => {
+    if (primaryColor) {
+      document.documentElement.style.setProperty('--brand-primary', primaryColor);
+    }
+    if (accentColor) {
+      document.documentElement.style.setProperty('--brand-accent', accentColor);
+    }
+  }, [primaryColor, accentColor]);
 
   const formatCurrency = useCallback(
     (amount: number | string) => `${currencySymbol}${Number(amount).toFixed(2)}`,
@@ -87,6 +106,8 @@ export const PublicSettingsProvider = ({ children }: { children: ReactNode }) =>
       turnstileEnabled,
       turnstileSiteKey,
       registrationEnabled,
+      primaryColor,
+      accentColor,
       refresh: fetchPublicSettings,
       refreshCurrency: fetchPublicSettings,
     }}>

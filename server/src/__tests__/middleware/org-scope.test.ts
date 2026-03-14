@@ -32,13 +32,13 @@ describe('requireOrgScope', () => {
   });
 
   it('allows super-admin with orgId query param', () => {
-    const req = createMockReq({ isSuperAdmin: true, organizationId: 'default-org' }, { orgId: 'specific-org' });
+    const req = createMockReq({ isSuperAdmin: true, organizationId: 'default-org' }, { orgId: '550e8400-e29b-41d4-a716-446655440099' });
     const res = createMockRes();
     const next = vi.fn();
 
     requireOrgScope(req, res, next);
 
-    expect(req.organizationId).toBe('specific-org');
+    expect(req.organizationId).toBe('550e8400-e29b-41d4-a716-446655440099');
     expect(next).toHaveBeenCalledWith();
   });
 

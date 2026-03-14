@@ -10,9 +10,10 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { formatDate } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
 import {
   Building2, Users, Home, TrendingUp, Shield, Plus, Settings, ArrowRight,
-  Activity, ShieldAlert, Clock, CheckCircle, XCircle, Download,
+  Activity, ShieldAlert, Clock, CheckCircle, XCircle, Download, Database,
 } from 'lucide-react';
 import {
   ResponsiveContainer, LineChart, Line, BarChart, Bar,
@@ -51,6 +52,7 @@ const SuperAdminDashboard = () => {
   const { user, isSuperAdmin } = useAuth();
   const { t } = useLanguage();
   const { formatCurrency } = useCurrency();
+  const { toast } = useToast();
   const navigate = useNavigate();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -519,7 +521,7 @@ const SuperAdminDashboard = () => {
       )}
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-5 gap-4">
         <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate('/organizations')}>
           <CardContent className="p-6 flex items-center gap-4">
             <div className="p-3 rounded-lg bg-violet-50 text-violet-600">
@@ -561,6 +563,24 @@ const SuperAdminDashboard = () => {
             <div>
               <p className="font-semibold">{t('exportOrganizations')}</p>
               <p className="text-xs text-muted-foreground">{t('exportOrgsDesc')}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={async () => {
+          try {
+            await api.post('/super-admin/backup');
+            toast({ title: t('success'), description: t('backupCreated') });
+          } catch (err: any) {
+            toast({ title: t('error'), description: err.message, variant: 'destructive' });
+          }
+        }}>
+          <CardContent className="p-6 flex items-center gap-4">
+            <div className="p-3 rounded-lg bg-cyan-50 text-cyan-600">
+              <Database className="h-6 w-6" />
+            </div>
+            <div>
+              <p className="font-semibold">{t('createBackup')}</p>
+              <p className="text-xs text-muted-foreground">{t('createBackupDesc')}</p>
             </div>
           </CardContent>
         </Card>

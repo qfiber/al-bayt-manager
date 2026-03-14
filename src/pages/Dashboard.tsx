@@ -51,6 +51,7 @@ import {
 import { formatDate } from '@/lib/utils';
 import { GeneralInformationCard } from '@/components/GeneralInformationCard';
 import { GeneralInformationDialog } from '@/components/GeneralInformationDialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 
 interface Summary {
@@ -156,6 +157,11 @@ const Dashboard = () => {
   const [expiringLeases, setExpiringLeases] = useState<any[]>([]);
   const [enhancedMetrics, setEnhancedMetrics] = useState<any>(null);
 
+  // Subscription state
+  const [subscription, setSubscription] = useState<any>(null);
+  const [availablePlans, setAvailablePlans] = useState<any[]>([]);
+  const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
+
   // Tenant dashboard state
   const [tenantApartments, setTenantApartments] = useState<any[]>([]);
 
@@ -199,6 +205,9 @@ const Dashboard = () => {
           api.get('/leases/expiring?days=30').then(setExpiringLeases).catch(() => {});
           // Fetch enhanced dashboard metrics
           api.get('/reports/dashboard-metrics').then(setEnhancedMetrics).catch(() => {});
+          // Fetch subscription info
+          api.get('/subscriptions/current').then(setSubscription).catch(() => {});
+          api.get('/subscriptions/plans').then(setAvailablePlans).catch(() => {});
         }
 
         // Tenant: fetch apartment details inline
@@ -623,6 +632,126 @@ const Dashboard = () => {
           {t('welcomeBack')}, {user.name || user.email}
         </p>
       </div>
+
+      {/* Subscription Status Banner */}
+      {subscription && (
+        <Card className={`border ${
+          subscription.subscription?.status === 'past_due' ? 'border-red-300 bg-red-50/50 dark:bg-red-950/20' :
+          subscription.subscription?.status === 'trial' ? 'border-amber-300 bg-amber-50/50 dark:bg-amber-950/20' :
+          'border-emerald-300 bg-emerald-50/50 dark:bg-emerald-950/20'
+        }`}>
+          <CardContent className="p-4 flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className={`p-2 rounded-lg shrink-0 ${
+                subscription.subscription?.status === 'past_due' ? 'bg-red-100 text-red-600' :
+                subscription.subscription?.status === 'trial' ? 'bg-amber-100 text-amber-600' :
+                'bg-emerald-100 text-emerald-600'
+              }`}>
+                <CreditCard className="h-5 w-5" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="text-sm font-semibold">{t('currentPlan')}: {subscription.planName || '-'}</p>
+                  <Badge variant={
+                    subscription.subscription?.status === 'past_due' ? 'destructive' :
+                    subscription.subscription?.status === 'trial' ? 'outline' :
+                    'default'
+                  }>
+                    {subscription.subscription?.status}
+                  </Badge>
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {subscription.subscription?.status === 'trial' && subscription.subscription?.trialEndDate ? (
+                    (() => {
+                      const daysLeft = Math.max(0, Math.ceil((new Date(subscription.subscription.trialEndDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+                      return daysLeft > 0
+                        ? t('trialEndsIn').replace('{days}', String(daysLeft))
+                        : t('subscriptionExpired');
+                    })()
+                  ) : subscription.subscription?.status === 'past_due' ? (
+                    t('subscriptionExpired')
+                  ) : subscription.subscription?.currentPeriodEnd ? (
+                    `${t('billingCycle')}: ${subscription.subscription?.billingCycle || '-'}`
+                  ) : null}
+                </p>
+              </div>
+            </div>
+            <Button size="sm" variant="outline" onClick={() => setShowUpgradeDialog(true)}>
+              {t('upgradePlan')}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Upgrade Plan Dialog */}
+      <Dialog open={showUpgradeDialog} onOpenChange={setShowUpgradeDialog}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{t('changePlan')}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 mt-2">
+            {availablePlans.filter((p: any) => p.isActive && !p.isCustom).map((plan: any) => (
+              <div key={plan.id} className="border rounded-lg p-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold text-sm">{plan.name}</h3>
+                  {subscription?.subscription?.planId === plan.id && (
+                    <Badge variant="secondary">{t('currentPlan')}</Badge>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {plan.maxBuildings} {t('buildings')}, {plan.maxApartmentsPerBuilding} {t('apartments')}/{t('building')}
+                </p>
+                <p className="text-sm font-medium">{formatCurrency(parseFloat(plan.monthlyPrice))}/{t('monthly')}</p>
+                <div className="flex gap-2 flex-wrap">
+                  {['monthly', 'semi_annual', 'yearly'].map((cycle) => (
+                    <Button
+                      key={cycle}
+                      size="sm"
+                      variant={subscription?.subscription?.planId === plan.id && subscription?.subscription?.billingCycle === cycle ? 'default' : 'outline'}
+                      disabled={subscription?.subscription?.planId === plan.id && subscription?.subscription?.billingCycle === cycle}
+                      onClick={async () => {
+                        try {
+                          // Try HYP first (Israeli landlords)
+                          try {
+                            const result = await api.post('/subscriptions/hyp-checkout', { planId: plan.id, billingCycle: cycle });
+                            if (result.url) {
+                              window.location.href = result.url;
+                              return;
+                            }
+                          } catch {
+                            // HYP not configured — try Stripe
+                          }
+
+                          // Try Stripe checkout (for international landlords)
+                          try {
+                            const result = await api.post('/subscriptions/stripe-checkout', { planId: plan.id, billingCycle: cycle });
+                            if (result.url) {
+                              window.location.href = result.url;
+                              return;
+                            }
+                          } catch {
+                            // Stripe not configured — fall back to direct plan change
+                          }
+
+                          // Direct plan change (for orgs where admin assigns manually)
+                          await api.post('/subscriptions/change-plan', { planId: plan.id, billingCycle: cycle });
+                          toast.success(t('saveSuccess'));
+                          setShowUpgradeDialog(false);
+                          api.get('/subscriptions/current').then(setSubscription).catch(() => {});
+                        } catch {
+                          toast.error(t('error'));
+                        }
+                      }}
+                    >
+                      {cycle === 'monthly' ? t('monthly') : cycle === 'semi_annual' ? t('semiAnnual') : t('yearly')}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* KPI Cards */}
       {dataLoading ? (

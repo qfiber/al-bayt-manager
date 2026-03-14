@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { Switch } from '@/components/ui/switch';
-import { Settings as SettingsIcon, Save, Globe, Upload, Shield, Mail, Bell, DollarSign, Building2, MessageSquare, CreditCard } from 'lucide-react';
+import { Settings as SettingsIcon, Save, Globe, Upload, Shield, Mail, Bell, DollarSign, Building2, MessageSquare, CreditCard, Palette, FileText } from 'lucide-react';
 
 interface SettingsData {
   id: string;
@@ -54,6 +54,14 @@ interface SettingsData {
   twilioAuthToken: string | null;
   twilioPhoneNumber: string | null;
   region: string;
+  ezCountApiKey: string | null;
+  ezCountApiEmail: string | null;
+  hypEnabled: boolean;
+  hypMasof: string | null;
+  hypKey: string | null;
+  hypPassP: string | null;
+  primaryColor: string | null;
+  accentColor: string | null;
 }
 
 interface LogoFile {
@@ -135,6 +143,14 @@ const Settings = () => {
   const [twilioAuthToken, setTwilioAuthToken] = useState('');
   const [twilioPhoneNumber, setTwilioPhoneNumber] = useState('');
   const [region, setRegion] = useState('IL');
+  const [ezCountApiKey, setEzCountApiKey] = useState('');
+  const [ezCountApiEmail, setEzCountApiEmail] = useState('');
+  const [hypEnabled, setHypEnabled] = useState(false);
+  const [hypMasof, setHypMasof] = useState('');
+  const [hypKey, setHypKey] = useState('');
+  const [hypPassP, setHypPassP] = useState('');
+  const [primaryColor, setPrimaryColor] = useState('#3b82f6');
+  const [accentColor, setAccentColor] = useState('#6366f1');
 
   const applySettingsToForm = useCallback((data: SettingsData) => {
     setSettings(data);
@@ -178,6 +194,14 @@ const Settings = () => {
     setTwilioAuthToken(data.twilioAuthToken || '');
     setTwilioPhoneNumber(data.twilioPhoneNumber || '');
     setRegion(data.region || 'IL');
+    setEzCountApiKey(data.ezCountApiKey || '');
+    setEzCountApiEmail(data.ezCountApiEmail || '');
+    setHypEnabled(data.hypEnabled ?? false);
+    setHypMasof(data.hypMasof || '');
+    setHypKey(data.hypKey || '');
+    setHypPassP(data.hypPassP || '');
+    setPrimaryColor(data.primaryColor || '#3b82f6');
+    setAccentColor(data.accentColor || '#6366f1');
   }, []);
 
   useEffect(() => {
@@ -285,6 +309,14 @@ const Settings = () => {
         twilioAuthToken: twilioAuthToken || null,
         twilioPhoneNumber: twilioPhoneNumber || null,
         region,
+        ezCountApiKey: ezCountApiKey || null,
+        ezCountApiEmail: ezCountApiEmail || null,
+        hypEnabled,
+        hypMasof: hypMasof || null,
+        hypKey: hypKey || null,
+        hypPassP: hypPassP || null,
+        primaryColor,
+        accentColor,
       });
 
       toast({ title: t('success'), description: t('settingsUpdated') });
@@ -1009,6 +1041,61 @@ const Settings = () => {
             </CardContent>
           </Card>
 
+          {/* EZCount Invoicing */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="w-5 h-5" />
+                {t('ezCountConfiguration')}
+              </CardTitle>
+              <CardDescription>{t('ezCountConfigDesc')}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label>{t('ezCountApiKey')}</Label>
+                <Input type="password" value={ezCountApiKey} onChange={(e) => setEzCountApiKey(e.target.value)} placeholder="API Key" />
+              </div>
+              <div>
+                <Label>{t('ezCountApiEmail')}</Label>
+                <Input type="email" value={ezCountApiEmail} onChange={(e) => setEzCountApiEmail(e.target.value)} placeholder="email@example.com" />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* HYP Payment Gateway */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CreditCard className="w-5 h-5" />
+                {t('hypConfiguration')}
+              </CardTitle>
+              <CardDescription>{t('hypConfigDesc')}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between mb-4">
+                <Label>{t('enableHyp')}</Label>
+                <Switch checked={hypEnabled} onCheckedChange={setHypEnabled} />
+              </div>
+              {hypEnabled && (
+                <div className="space-y-4">
+                  <div>
+                    <Label>{t('hypMasof')}</Label>
+                    <Input value={hypMasof} onChange={(e) => setHypMasof(e.target.value)} placeholder="0010131918" />
+                  </div>
+                  <div>
+                    <Label>{t('hypKey')}</Label>
+                    <Input type="password" value={hypKey} onChange={(e) => setHypKey(e.target.value)} />
+                  </div>
+                  <div>
+                    <Label>{t('hypPassP')}</Label>
+                    <Input type="password" value={hypPassP} onChange={(e) => setHypPassP(e.target.value)} />
+                  </div>
+                  <p className="text-xs text-muted-foreground">{t('hypTestMode')}</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           {/* Region */}
           <Card>
             <CardHeader>
@@ -1052,6 +1139,35 @@ const Settings = () => {
                 />
               </div>
               <p className="text-xs text-muted-foreground mt-2">{t('emailVerificationHelp')}</p>
+            </CardContent>
+          </Card>
+
+          {/* Branding */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Palette className="w-5 h-5" />
+                {t('brandingSettings')}
+              </CardTitle>
+              <CardDescription>{t('brandingSettingsDesc')}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>{t('primaryColor')}</Label>
+                  <div className="flex gap-2 items-center mt-1">
+                    <input type="color" value={primaryColor || '#3b82f6'} onChange={(e) => setPrimaryColor(e.target.value)} className="w-10 h-10 rounded cursor-pointer" />
+                    <Input value={primaryColor || '#3b82f6'} onChange={(e) => setPrimaryColor(e.target.value)} className="flex-1" placeholder="#3b82f6" />
+                  </div>
+                </div>
+                <div>
+                  <Label>{t('accentColor')}</Label>
+                  <div className="flex gap-2 items-center mt-1">
+                    <input type="color" value={accentColor || '#6366f1'} onChange={(e) => setAccentColor(e.target.value)} className="w-10 h-10 rounded cursor-pointer" />
+                    <Input value={accentColor || '#6366f1'} onChange={(e) => setAccentColor(e.target.value)} className="flex-1" placeholder="#6366f1" />
+                  </div>
+                </div>
+              </div>
             </CardContent>
           </Card>
 

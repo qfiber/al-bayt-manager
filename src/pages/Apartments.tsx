@@ -20,7 +20,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { useToast } from '@/hooks/use-toast';
 import { SearchInput } from '@/components/SearchInput';
 import { downloadCsv } from '@/lib/csv-export';
-import { Home, Plus, Pencil, Trash2, Eye, XCircle, Calendar as CalendarIcon, Eraser, Package, Car, Download } from 'lucide-react';
+import { Home, Plus, Pencil, Trash2, Eye, XCircle, Calendar as CalendarIcon, Eraser, Package, Car, Download, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 
@@ -591,6 +591,30 @@ const Apartments = () => {
             >
               <Download className="w-4 h-4 me-2" />
               {t('exportCsv')}
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full sm:w-auto"
+              onClick={() => {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = '.csv';
+                input.onchange = async (e) => {
+                  const file = (e.target as HTMLInputElement).files?.[0];
+                  if (!file) return;
+                  try {
+                    const result = await api.upload<{ created: number; errors: { row: number; error: string }[]; total: number }>('/import/apartments', file);
+                    toast({ title: t('success'), description: `${result.created} ${t('created')}${result.errors.length > 0 ? `, ${result.errors.length} ${t('errors')}` : ''}` });
+                    fetchApartments();
+                  } catch (err: any) {
+                    toast({ title: t('error'), description: err.message, variant: 'destructive' });
+                  }
+                };
+                input.click();
+              }}
+            >
+              <Upload className="w-4 h-4 me-2" />
+              {t('importCsv')}
             </Button>
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>

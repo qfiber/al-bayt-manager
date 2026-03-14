@@ -9,6 +9,9 @@ const SENSITIVE_FIELDS = [
   'cardcomApiPassword',
   'paypalClientSecret',
   'twilioAuthToken',
+  'ezCountApiKey',
+  'hypPassP',
+  'hypKey',
 ] as const;
 
 type SettingsRow = typeof settings.$inferSelect;
@@ -74,6 +77,8 @@ export async function getPublicSettings(organizationId?: string) {
     registrationEnabled: settings.registrationEnabled,
     currencyCode: settings.currencyCode,
     currencySymbol: settings.currencySymbol,
+    primaryColor: settings.primaryColor,
+    accentColor: settings.accentColor,
   }).from(settings);
   const [result] = organizationId
     ? await baseQuery.where(eq(settings.organizationId, organizationId)).limit(1)

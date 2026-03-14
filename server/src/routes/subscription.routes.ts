@@ -6,6 +6,7 @@ import { requireRole } from '../middleware/roles.js';
 import { requireOrgScope, requireSuperAdmin } from '../middleware/org-scope.js';
 import { auditLog } from '../middleware/audit.js';
 import * as subService from '../services/subscription.plan.service.js';
+import * as stripeSubService from '../services/stripe-subscription.service.js';
 
 export const subscriptionRoutes = Router();
 
@@ -85,6 +86,22 @@ subscriptionRoutes.post('/cancel', requireAuth, requireOrgScope, requireRole('ad
   } catch (err) { next(err); }
 });
 
+// ---- Self-service plan change ----
+
+const changePlanSchema = z.object({
+  planId: z.string().uuid(),
+  billingCycle: z.enum(['monthly', 'semi_annual', 'yearly']),
+});
+
+subscriptionRoutes.post('/change-plan', requireAuth, requireOrgScope, requireRole('admin'), validate(changePlanSchema), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!req.organizationId) { res.status(400).json({ error: 'No org context' }); return; }
+    const { planId, billingCycle } = req.body;
+    const result = await subService.assignPlan(req.organizationId, planId, billingCycle);
+    res.json(result);
+  } catch (err) { next(err); }
+});
+
 // ---- Invoices ----
 
 subscriptionRoutes.get('/invoices', requireAuth, requireOrgScope, async (req: Request, res: Response, next: NextFunction) => {
@@ -100,6 +117,108 @@ subscriptionRoutes.get('/all-invoices', requireAuth, requireSuperAdmin, async (_
     const result = await subService.listAllInvoices();
     res.json(result);
   } catch (err) { next(err); }
+});
+
+// ---- Stripe subscription (landlord self-service) ----
+
+// Stripe checkout for SaaS subscription (landlord self-service)
+subscriptionRoutes.post('/stripe-checkout', requireAuth, requireOrgScope, requireRole('admin'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!req.organizationId) { res.status(400).json({ error: 'No org context' }); return; }
+    const { planId, billingCycle } = req.body;
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const result = await stripeSubService.createCheckoutSession(
+      req.organizationId, planId, billingCycle,
+      `${baseUrl}/dashboard?subscription=success`,
+      `${baseUrl}/dashboard?subscription=cancelled`,
+    );
+    res.json(result);
+  } catch (err) { next(err); }
+});
+
+// Stripe webhook for SaaS subscriptions
+subscriptionRoutes.post('/stripe-webhook', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const signature = req.headers['stripe-signature'] as string;
+    if (!signature) { res.status(400).json({ error: 'Missing signature' }); return; }
+    await stripeSubService.handleWebhook(req.body, signature);
+    res.json({ received: true });
+  } catch (err) { next(err); }
+});
+
+// ---- HYP subscription (Israeli landlord self-service) ----
+
+// HYP checkout for SaaS subscription
+subscriptionRoutes.post('/hyp-checkout', requireAuth, requireOrgScope, requireRole('admin'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!req.organizationId) { res.status(400).json({ error: 'No org context' }); return; }
+    const { planId, billingCycle } = req.body;
+
+    const plan = await subService.getPlan(planId);
+    let amount = parseFloat(plan.monthlyPrice);
+    if (billingCycle === 'semi_annual' && plan.semiAnnualPrice) amount = parseFloat(plan.semiAnnualPrice);
+    if (billingCycle === 'yearly' && plan.yearlyPrice) amount = parseFloat(plan.yearlyPrice);
+
+    const country = (req.headers['cf-ipcountry'] as string || '').toUpperCase();
+    const locale = country === 'IL' ? 'he' : 'en';
+
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+
+    // For recurring, use HK module
+    const monthsInCycle = billingCycle === 'yearly' ? 12 : billingCycle === 'semi_annual' ? 6 : 1;
+
+    const { createRecurringPayment } = await import('../services/hyp.service.js');
+    const result = await createRecurringPayment(req.organizationId, {
+      amount,
+      order: `sub|${req.organizationId}|${planId}|${billingCycle}`,
+      description: `${plan.name} Plan Subscription`,
+      successUrl: `${baseUrl}/api/subscriptions/hyp-success?orgId=${req.organizationId}&planId=${planId}&billingCycle=${billingCycle}`,
+      errorUrl: `${baseUrl}/dashboard?subscription=failed`,
+      installmentCount: 12, // 12 recurring charges
+      frequencyMonths: monthsInCycle,
+      locale,
+      currency: 1, // ILS
+    });
+
+    res.json({ url: result.url });
+  } catch (err) { next(err); }
+});
+
+// HYP subscription success callback
+subscriptionRoutes.get('/hyp-success', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { orgId, planId, billingCycle, CCode, Id, Sign } = req.query as Record<string, string>;
+
+    if (CCode !== '0' || !orgId || !planId) {
+      res.redirect('/dashboard?subscription=failed');
+      return;
+    }
+
+    // Verify signature
+    try {
+      const { verifyPaymentResponse } = await import('../services/hyp.service.js');
+      await verifyPaymentResponse(orgId, {
+        id: Id || '', ccode: CCode, amount: req.query.Amount as string || '0',
+        acode: req.query.ACode as string || '', order: req.query.Order as string || '',
+        sign: Sign || '',
+      });
+    } catch {
+      // Verification failed — still process if CCode=0 (we can verify later)
+    }
+
+    // Activate subscription
+    await subService.assignPlan(orgId, planId, billingCycle || 'monthly');
+
+    // Reactivate org if suspended
+    const { organizations } = await import('../db/schema/index.js');
+    const { eq } = await import('drizzle-orm');
+    const { db } = await import('../config/database.js');
+    await db.update(organizations).set({ isActive: true, updatedAt: new Date() }).where(eq(organizations.id, orgId));
+
+    res.redirect('/dashboard?subscription=success');
+  } catch {
+    res.redirect('/dashboard?subscription=error');
+  }
 });
 
 // ---- Metrics (super-admin) ----

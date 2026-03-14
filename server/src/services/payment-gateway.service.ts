@@ -21,6 +21,7 @@ export async function createStripeCheckoutSession(
   month: string,
   successUrl: string,
   cancelUrl: string,
+  locale: string = 'en',
 ): Promise<{ sessionId: string; url: string }> {
   const config = await getOrgSettings(organizationId);
   if (!config.stripeEnabled || !config.stripeSecretKey) {
@@ -38,6 +39,7 @@ export async function createStripeCheckoutSession(
   const [building] = await db.select({ name: buildings.name }).from(buildings).where(eq(buildings.id, apt.buildingId)).limit(1);
 
   const session = await stripe.checkout.sessions.create({
+    locale: locale === 'he' ? 'auto' : 'en' as any,
     payment_method_types: ['card'],
     line_items: [{
       price_data: {
@@ -106,16 +108,17 @@ export async function handleStripeWebhook(
   }
 }
 
-// ============ CARDCOM ============
+// ============ CARDCOM (Low Profile API) ============
 
-export async function createCardcomPaymentPage(
+export async function createCardcomSession(
   organizationId: string,
   apartmentId: string,
   amount: number,
   month: string,
   successUrl: string,
-  failureUrl: string,
-): Promise<{ url: string }> {
+  failedUrl: string,
+  locale: string = 'he',
+): Promise<{ lowProfileId: string }> {
   const config = await getOrgSettings(organizationId);
   if (!config.cardcomEnabled || !config.cardcomTerminalNumber) {
     throw new AppError(400, 'CardCom is not configured');
@@ -124,64 +127,121 @@ export async function createCardcomPaymentPage(
   const [apt] = await db.select().from(apartments).where(eq(apartments.id, apartmentId)).limit(1);
   if (!apt) throw new AppError(404, 'Apartment not found');
 
-  const [bldg] = await db.select({ orgId: buildings.organizationId }).from(buildings).where(eq(buildings.id, apt.buildingId)).limit(1);
+  const [bldg] = await db.select({ name: buildings.name, orgId: buildings.organizationId }).from(buildings).where(eq(buildings.id, apt.buildingId)).limit(1);
   if (bldg?.orgId !== organizationId) throw new AppError(403, 'Apartment does not belong to this organization');
 
-  const [building] = await db.select({ name: buildings.name }).from(buildings).where(eq(buildings.id, apt.buildingId)).limit(1);
-
-  // Build CardCom low-profile payment page URL
-  const params = new URLSearchParams({
-    TerminalNumber: config.cardcomTerminalNumber,
+  const body = {
+    TerminalNumber: parseInt(config.cardcomTerminalNumber),
     ApiName: config.cardcomApiName || '',
-    SumToBill: amount.toFixed(2),
-    CoinID: '1', // 1 = ILS
-    Language: 'he',
-    ProductName: `Payment - ${building?.name || 'Building'} Apt ${apt.apartmentNumber} (${month})`,
+    Operation: 'ChargeOnly',
+    Amount: amount,
+    ProductName: `Payment - ${bldg?.name || 'Building'} Apt ${apt.apartmentNumber} (${month})`,
+    Language: locale,
+    ISOCoinId: 1, // ILS
+    ReturnValue: JSON.stringify({ apartmentId, month, organizationId, locale }),
     SuccessRedirectUrl: successUrl,
-    FailedRedirectUrl: failureUrl,
-    IndicatorUrl: `${successUrl.split('/').slice(0, 3).join('/')}/api/payments/cardcom-callback`,
-    ReturnValue: JSON.stringify({ apartmentId, month, organizationId }),
+    FailedRedirectUrl: failedUrl,
+    WebHookUrl: `${successUrl.split('/').slice(0, 3).join('/')}/api/payments/cardcom-webhook`,
+  };
+
+  const res = await fetch('https://secure.cardcom.solutions/api/v11/LowProfile/Create', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
   });
 
-  const url = `https://secure.cardcom.solutions/interface/ChargeToken.aspx?${params.toString()}`;
-  return { url };
+  if (!res.ok) throw new AppError(502, `CardCom API error: ${res.status}`);
+
+  const data = await res.json();
+  if (!data.LowProfileId) {
+    throw new AppError(502, `CardCom failed: ${data.Description || JSON.stringify(data)}`);
+  }
+
+  return { lowProfileId: data.LowProfileId };
 }
 
-export async function handleCardcomCallback(data: Record<string, string>): Promise<void> {
-  const responseCode = data.ResponseCode || data.OperationResponse;
-  if (responseCode !== '0') {
-    // Payment failed
-    return;
+export async function verifyCardcomPayment(lowProfileId: string, organizationId: string): Promise<{
+  verified: boolean;
+  transactionId: string;
+  ccLast4: string;
+  amount: number;
+  returnValue: any;
+}> {
+  const config = await getOrgSettings(organizationId);
+
+  const res = await fetch('https://secure.cardcom.solutions/api/v11/LowProfile/GetLpResult', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      TerminalNumber: parseInt(config.cardcomTerminalNumber || '0'),
+      ApiName: config.cardcomApiName || '',
+      LowProfileId: lowProfileId,
+    }),
+  });
+
+  if (!res.ok) throw new AppError(502, `CardCom verification error: ${res.status}`);
+
+  const result = await res.json();
+
+  if (String(result.ResponseCode) !== '0') {
+    return { verified: false, transactionId: '', ccLast4: '', amount: 0, returnValue: null };
   }
 
+  let returnValue = null;
+  try { returnValue = JSON.parse(result.ReturnValue || '{}'); } catch {}
+
+  return {
+    verified: true,
+    transactionId: result.InternalDealNumber?.toString() || result.TranzactionInfo?.InternalDealNumber?.toString() || lowProfileId,
+    ccLast4: result.Last4CardDigits || result.CardInfo?.Last4CardDigits || '',
+    amount: parseFloat(result.Amount || '0'),
+    returnValue,
+  };
+}
+
+export async function handleCardcomWebhook(body: any): Promise<void> {
+  const lowProfileId = body.LowProfileId || body.InternalDealNumber?.toString() || body.TranzactionInfo?.InternalDealNumber?.toString() || '';
+  const returnValueRaw = body.ReturnValue || '';
+
+  if (!lowProfileId) return;
+
+  let returnValue: any;
+  try { returnValue = JSON.parse(returnValueRaw); } catch { return; }
+
+  const { apartmentId, month, organizationId, locale } = returnValue || {};
+  if (!apartmentId || !month || !organizationId) return;
+
+  // Verify payment server-to-server
+  const verification = await verifyCardcomPayment(lowProfileId, organizationId);
+  if (!verification.verified) return;
+
+  // Validate UUID
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!uuidRegex.test(apartmentId)) return;
+
+  // Create payment
+  const amount = verification.amount || parseFloat(body.Amount || body.Sum || '0');
+  if (amount <= 0) return;
+
+  await paymentService.createPayment({ apartmentId, month, amount }, 'system');
+
+  // Auto-generate invoice
   try {
-    const returnValue = JSON.parse(data.ReturnValue || '{}');
-    const { apartmentId, month } = returnValue;
+    const { createInvoice } = await import('./receipt.service.js');
+    await createInvoice(apartmentId, month);
+  } catch {}
 
-    // Validate UUID format
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!uuidRegex.test(apartmentId)) return;
-
-    const amount = parseFloat(data.Sum || data.SumToBill || '0');
-
-    if (apartmentId && month && amount > 0) {
-      await paymentService.createPayment({
-        apartmentId,
-        month,
-        amount,
-      }, 'system');
-
-      // Auto-generate invoice
-      try {
-        const { createInvoice } = await import('./receipt.service.js');
-        await createInvoice(apartmentId, month);
-      } catch {
-        // Don't fail payment if invoice generation fails
-      }
-    }
-  } catch {
-    // Log error but don't throw — CardCom expects 200
-  }
+  // Create EZCount invoice if configured
+  try {
+    const { createEZCountInvoice } = await import('./ezcount.service.js');
+    await createEZCountInvoice(organizationId, {
+      transactionId: verification.transactionId,
+      description: `Payment - Apt ${apartmentId} (${month})`,
+      amount,
+      currency: 'ILS',
+      ccLast4: verification.ccLast4,
+    }, locale || 'he');
+  } catch {}
 }
 
 // ============ PAYPAL ============

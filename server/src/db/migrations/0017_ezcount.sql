@@ -1,0 +1,2 @@
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS ez_count_api_key VARCHAR(500);
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS ez_count_api_email VARCHAR(255);

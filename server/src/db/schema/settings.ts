@@ -45,8 +45,19 @@ export const settings = pgTable('settings', {
   twilioAccountSid: varchar('twilio_account_sid', { length: 255 }),
   twilioAuthToken: varchar('twilio_auth_token', { length: 500 }),
   twilioPhoneNumber: varchar('twilio_phone_number', { length: 50 }),
+  // EZCount invoicing
+  ezCountApiKey: varchar('ez_count_api_key', { length: 500 }),
+  ezCountApiEmail: varchar('ez_count_api_email', { length: 255 }),
+  // HYP Payment Gateway
+  hypEnabled: boolean('hyp_enabled').default(false).notNull(),
+  hypMasof: varchar('hyp_masof', { length: 20 }),
+  hypKey: varchar('hyp_key', { length: 255 }),
+  hypPassP: varchar('hyp_passp', { length: 255 }),
   // Region setting for payment/SMS routing
   region: varchar('region', { length: 10 }).default('IL').notNull(), // IL = Israel, INTL = International
+  // White-label branding
+  primaryColor: varchar('primary_color', { length: 20 }).default('#3b82f6'),
+  accentColor: varchar('accent_color', { length: 20 }).default('#6366f1'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });

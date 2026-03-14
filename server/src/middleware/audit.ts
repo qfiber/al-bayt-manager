@@ -53,6 +53,26 @@ export function auditLog(actionType: AuditAction, tableName: string) {
             .set({ lastActivityAt: new Date() })
             .where(eq(organizations.id, req.organizationId))
             .catch(() => {});
+
+          // Fire webhooks
+          import('../services/webhook.service.js').then(({ fireWebhook }) => {
+            fireWebhook(req.organizationId!, `${actionType}.${tableName || 'unknown'}`, {
+              userId: req.user?.userId,
+              recordId: recordId?.toString() || undefined,
+            }).catch(() => {});
+          });
+
+          // Send real-time notification via SSE
+          import('../routes/sse.routes.js').then(({ broadcastToOrg }) => {
+            broadcastToOrg(req.organizationId!, `${actionType}.${tableName || 'unknown'}`, {
+              userId: req.user?.userId,
+              userEmail: req.user?.email,
+              action: actionType,
+              tableName,
+              recordId,
+              timestamp: new Date().toISOString(),
+            });
+          }).catch(() => {});
         }
       }
       return originalJson(body);

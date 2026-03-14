@@ -58,7 +58,9 @@ export function sanitizeObject<T extends Record<string, any>>(obj: T): T {
       (result as any)[key] = SENSITIVE_FIELDS.has(key)
         ? sanitizeSensitiveField(value)
         : sanitizeString(value);
-    } else if (value && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date)) {
+    } else if (Array.isArray(value)) {
+      (result as any)[key] = value.map(v => typeof v === 'string' ? sanitizeString(v) : v);
+    } else if (value && typeof value === 'object' && !(value instanceof Date)) {
       (result as any)[key] = sanitizeObject(value);
     }
   }

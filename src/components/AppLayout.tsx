@@ -6,6 +6,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { usePublicSettings } from '@/contexts/PublicSettingsContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useSSE } from '@/hooks/use-sse';
 import { MobileBottomNav } from './MobileBottomNav';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { LegalFooter } from '@/components/LegalFooter';
@@ -35,6 +36,7 @@ import {
   ClipboardCheck,
   MessageSquare,
   BookOpen,
+  BarChart3,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -81,6 +83,11 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
     setNotifCount(0);
     navigate('/audit-logs');
   };
+
+  // Real-time notifications via SSE
+  useSSE(() => {
+    fetchNotifCount();
+  });
 
   useEffect(() => {
     if (user) {
@@ -152,6 +159,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
         { label: t('apiKeys'), path: '/api-keys', icon: Key },
       ]
     : [
+        { label: t('reportBuilder'), path: '/report-builder', icon: BarChart3 },
         { label: t('maintenanceJobs'), path: '/maintenance', icon: Wrench },
         { label: t('invoices'), path: '/invoices', icon: FileText },
         { label: t('leases'), path: '/leases', icon: ScrollText },

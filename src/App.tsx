@@ -41,6 +41,7 @@ import Messages from "./pages/Messages";
 import Invoices from "./pages/Invoices";
 import Leases from "./pages/Leases";
 import Inspections from "./pages/Inspections";
+import ReportBuilder from "./pages/ReportBuilder";
 import MyInspections from "./pages/MyInspections";
 import BuildingHandbook from "./pages/BuildingHandbook";
 import SubscriptionPlans from "./pages/SubscriptionPlans";
@@ -95,10 +96,10 @@ const App = () => (
                 <Navigate to="/dashboard" replace />
               } />
               {/* Unauthenticated routes — no AppLayout */}
-              <Route path="/login" element={<Auth />} />
+              <Route path="/login" element={<MarketingLayout><Auth /></MarketingLayout>} />
               <Route path="/auth" element={<Navigate to="/login" replace />} />
-              <Route path="/register" element={<Register />} />
-              <Route path="/setup-2fa" element={<Setup2FA />} />
+              <Route path="/register" element={<MarketingLayout><Register /></MarketingLayout>} />
+              <Route path="/setup-2fa" element={<AppLayout><Setup2FA /></AppLayout>} />
               <Route path="/privacy-policy" element={<MarketingLayout><PrivacyPolicy /></MarketingLayout>} />
               <Route path="/terms" element={<MarketingLayout><TermsOfUsage /></MarketingLayout>} />
               <Route path="/accessibility" element={<MarketingLayout><Accessibility /></MarketingLayout>} />
@@ -135,6 +136,7 @@ const App = () => (
               <Route path="/super-admin" element={<AppLayout><SuperAdminDashboard /></AppLayout>} />
               <Route path="/landlords" element={<AppLayout><Landlords /></AppLayout>} />
               <Route path="/messages" element={<AppLayout><Messages /></AppLayout>} />
+              <Route path="/report-builder" element={<AppLayout><ReportBuilder /></AppLayout>} />
               <Route path="/handbook" element={<AppLayout><BuildingHandbook /></AppLayout>} />
               <Route path="/subscription-plans" element={<AppLayout><SubscriptionPlans /></AppLayout>} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

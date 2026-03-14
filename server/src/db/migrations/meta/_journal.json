@@ -99,6 +99,41 @@
       "when": 1774700000000,
       "tag": "0013_subscriptions",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1774800000000,
+      "tag": "0014_whitelabel_webhooks",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1774900000000,
+      "tag": "0015_stripe_subscriptions_sse",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1775000000000,
+      "tag": "0016_saved_reports",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1775100000000,
+      "tag": "0017_ezcount",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1775200000000,
+      "tag": "0018_hyp_payment",
+      "breakpoints": true
     }
   ]
 }

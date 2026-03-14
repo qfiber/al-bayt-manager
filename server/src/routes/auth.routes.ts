@@ -126,7 +126,7 @@ authRoutes.post('/login', authRateLimit, requirePow, validate(loginSchema), asyn
         const [membership] = await db.select().from(organizationMembers)
           .where(and(eq(organizationMembers.userId, loginUserForOrg.id), eq(organizationMembers.organizationId, req.subdomainOrg.id)))
           .limit(1);
-        if (!membership && !result.requires2FA) {
+        if (!membership) {
           res.status(403).json({ error: 'You are not a member of this organization' });
           return;
         }

@@ -1,9 +1,5 @@
-import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft } from 'lucide-react';
-import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import type { TranslationKey } from '@/lib/i18n';
 
 interface LegalPageProps {
@@ -14,19 +10,10 @@ interface LegalPageProps {
 
 export const LegalPage = ({ titleKey, lastUpdatedKey, sections }: LegalPageProps) => {
   const { t } = useLanguage();
-  const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/10 p-4">
+    <div className="py-12 sm:py-20 px-4">
       <div className="mx-auto max-w-2xl">
-        <div className="flex items-center justify-between mb-4">
-          <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
-            <ArrowLeft className="h-4 w-4 me-1 rtl:rotate-180" />
-            {t('back')}
-          </Button>
-          <LanguageSwitcher />
-        </div>
-
         <Card>
           <CardHeader className="text-center">
             <CardTitle className="text-2xl">{t(titleKey)}</CardTitle>

@@ -1,6 +1,6 @@
 import { db } from '../config/database.js';
 import { subscriptionPlans, organizationSubscriptions, subscriptionInvoices, organizations } from '../db/schema/index.js';
-import { eq, desc, sql } from 'drizzle-orm';
+import { eq, desc, sql, and, lte } from 'drizzle-orm';
 import { AppError } from '../middleware/error-handler.js';
 
 // ============ PLANS ============
@@ -111,6 +111,10 @@ export async function assignPlan(organizationId: string, planId: string, billing
 }
 
 export async function startTrial(organizationId: string, planId?: string) {
+  // Prevent duplicate trials
+  const existing = await getOrgSubscription(organizationId);
+  if (existing) return existing.subscription;
+
   const defaultPlanId = planId || (await db.select({ id: subscriptionPlans.id }).from(subscriptionPlans).where(eq(subscriptionPlans.slug, 'starter')).limit(1))[0]?.id;
 
   const now = new Date();
@@ -181,6 +185,78 @@ export async function generateInvoice(organizationId: string, amount: string, bi
   }).returning();
 
   return invoice;
+}
+
+// ============ TRIAL EXPIRY ============
+
+export async function processExpiredTrials() {
+  const now = new Date();
+
+  // Find active trials that have expired
+  const expired = await db
+    .select({ id: organizationSubscriptions.id, organizationId: organizationSubscriptions.organizationId })
+    .from(organizationSubscriptions)
+    .where(and(
+      eq(organizationSubscriptions.status, 'trial'),
+      lte(organizationSubscriptions.trialEndDate, now),
+    ));
+
+  for (const sub of expired) {
+    // Mark subscription as expired
+    await db.update(organizationSubscriptions)
+      .set({ status: 'past_due', updatedAt: now })
+      .where(eq(organizationSubscriptions.id, sub.id));
+
+    // Suspend the organization
+    await db.update(organizations)
+      .set({ isActive: false, updatedAt: now })
+      .where(eq(organizations.id, sub.organizationId));
+  }
+
+  return expired.length;
+}
+
+// ============ AUTO-INVOICING ============
+
+export async function generateMonthlyInvoices() {
+  const now = new Date();
+
+  // Find all active subscriptions where current period has ended
+  const activeSubs = await db
+    .select({
+      sub: organizationSubscriptions,
+      orgName: organizations.name,
+    })
+    .from(organizationSubscriptions)
+    .innerJoin(organizations, eq(organizationSubscriptions.organizationId, organizations.id))
+    .where(and(
+      eq(organizationSubscriptions.status, 'active'),
+      lte(organizationSubscriptions.currentPeriodEnd, now),
+    ));
+
+  let generated = 0;
+
+  for (const { sub, orgName } of activeSubs) {
+    if (!sub.amount || parseFloat(sub.amount) <= 0) continue;
+
+    // Generate invoice
+    const periodStart = sub.currentPeriodEnd || now;
+    let periodEnd = new Date(periodStart);
+    if (sub.billingCycle === 'monthly') periodEnd.setMonth(periodEnd.getMonth() + 1);
+    else if (sub.billingCycle === 'semi_annual') periodEnd.setMonth(periodEnd.getMonth() + 6);
+    else if (sub.billingCycle === 'yearly') periodEnd.setFullYear(periodEnd.getFullYear() + 1);
+
+    await generateInvoice(sub.organizationId, sub.amount, sub.billingCycle, periodStart, periodEnd);
+
+    // Advance the subscription period
+    await db.update(organizationSubscriptions)
+      .set({ currentPeriodStart: periodStart, currentPeriodEnd: periodEnd, updatedAt: now })
+      .where(eq(organizationSubscriptions.id, sub.id));
+
+    generated++;
+  }
+
+  return generated;
 }
 
 // ============ METRICS ============

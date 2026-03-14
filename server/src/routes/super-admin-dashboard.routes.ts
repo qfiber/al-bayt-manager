@@ -69,6 +69,15 @@ superAdminDashboardRoutes.get('/impersonation-log', requireAuth, requireSuperAdm
   } catch (err) { next(err); }
 });
 
+// Trigger manual backup
+superAdminDashboardRoutes.post('/backup', requireAuth, requireSuperAdmin, async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { createBackup } = await import('../services/backup.service.js');
+    const filepath = await createBackup();
+    res.json({ success: true, filepath });
+  } catch (err) { next(err); }
+});
+
 // Export organizations as CSV
 superAdminDashboardRoutes.get('/export/organizations', requireAuth, requireSuperAdmin, async (_req: Request, res: Response, next: NextFunction) => {
   try {

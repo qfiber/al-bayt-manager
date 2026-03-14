@@ -23,6 +23,10 @@ export function requireOrgScope(req: Request, _res: Response, next: NextFunction
   if (req.user.isSuperAdmin) {
     // Super-admins can optionally scope to a specific org
     const orgIdParam = req.query.orgId as string | undefined;
+    if (orgIdParam && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orgIdParam)) {
+      next(new AppError(400, 'Invalid organization ID format'));
+      return;
+    }
     req.organizationId = orgIdParam || req.user.organizationId;
   } else {
     if (!req.user.organizationId) {
