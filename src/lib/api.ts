@@ -54,9 +54,11 @@ async function request<T = any>(
         credentials: 'include',
       });
     } else {
-      // Only redirect from authenticated pages (not landing, login, register, etc.)
-      const publicPaths = ['/', '/login', '/auth', '/register', '/privacy-policy', '/terms', '/accessibility'];
-      if (!publicPaths.includes(window.location.pathname)) {
+      // Only redirect from authenticated pages
+      // Check if current page requires auth (dashboard, buildings, etc.)
+      const authenticatedPrefixes = ['/dashboard', '/buildings', '/apartments', '/payments', '/expenses', '/reports', '/settings', '/users', '/api-keys', '/audit-logs', '/email-', '/my-apartments', '/my-inspections', '/profile', '/bulk-', '/documents', '/portfolio', '/meetings', '/debt-', '/organizations', '/super-admin', '/landlords', '/messages', '/invoices', '/leases', '/inspections', '/handbook', '/subscription-plans'];
+      const isAuthPage = authenticatedPrefixes.some(p => window.location.pathname.startsWith(p));
+      if (isAuthPage) {
         window.location.href = '/login';
       }
       throw new Error('Session expired');
