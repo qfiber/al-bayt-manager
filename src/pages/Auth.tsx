@@ -182,7 +182,7 @@ const Auth = () => {
             <h3 className="text-lg font-semibold mb-4">{t('securingConnection')}</h3>
             <div
               ref={hashContainerRef}
-              className="w-full h-32 overflow-hidden rounded-lg bg-muted/50 border p-3 font-mono text-xs leading-relaxed break-all"
+              className="w-full max-h-[3.75em] overflow-hidden rounded-lg bg-muted/50 border p-3 font-mono text-xs leading-[1.25em] break-all text-center"
               dir="ltr"
             >
               {powHash && (
