@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
-import { Building2, Check, ArrowRight } from 'lucide-react';
+import { Check } from 'lucide-react';
+import { MarketingLayout } from '@/components/MarketingLayout';
 
 interface Plan {
   id: string; name: string; slug: string;
@@ -39,21 +40,8 @@ const Pricing = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-950">
-      {/* Header */}
-      <header className="bg-white/80 dark:bg-gray-950/80 backdrop-blur-xl border-b border-gray-100 dark:border-gray-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <a href="/" onClick={(e) => { e.preventDefault(); navigate('/'); }} className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center">
-              <Building2 className="w-5 h-5 text-white" />
-            </div>
-            <span className="font-bold text-xl">Al-Bayt</span>
-          </a>
-          <Button variant="ghost" onClick={() => navigate('/login')}>{t('signIn')}</Button>
-        </div>
-      </header>
-
-      <section className="py-20 sm:py-28">
+    <MarketingLayout>
+      <section className="py-20 sm:py-28 pt-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h1 className="text-4xl sm:text-5xl font-extrabold text-gray-900 dark:text-white">{t('pricingTitle')}</h1>
@@ -123,7 +111,7 @@ const Pricing = () => {
           <p className="text-center mt-8 text-sm text-gray-500">{t('pricingTrial')}</p>
         </div>
       </section>
-    </div>
+    </MarketingLayout>
   );
 };
 

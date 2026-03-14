@@ -32,7 +32,7 @@ const assignPlanSchema = z.object({
 
 // ---- Plans CRUD (super-admin) ----
 
-subscriptionRoutes.get('/plans', requireAuth, async (_req: Request, res: Response, next: NextFunction) => {
+subscriptionRoutes.get('/plans', async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await subService.listPlans();
     res.json(result);

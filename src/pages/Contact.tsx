@@ -7,7 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Building2, Send, Mail, Globe, CheckCircle } from 'lucide-react';
+import { Send, Mail, Globe, CheckCircle } from 'lucide-react';
+import { MarketingLayout } from '@/components/MarketingLayout';
 
 const Contact = () => {
   const navigate = useNavigate();
@@ -34,19 +35,7 @@ const Contact = () => {
   };
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-950">
-      <header className="bg-white/80 dark:bg-gray-950/80 backdrop-blur-xl border-b border-gray-100 dark:border-gray-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <a href="/" onClick={(e) => { e.preventDefault(); navigate('/'); }} className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center">
-              <Building2 className="w-5 h-5 text-white" />
-            </div>
-            <span className="font-bold text-xl">Al-Bayt</span>
-          </a>
-          <Button variant="ghost" onClick={() => navigate('/login')}>{t('signIn')}</Button>
-        </div>
-      </header>
-
+    <MarketingLayout>
       <section className="py-20 sm:py-28">
         <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
@@ -100,7 +89,7 @@ const Contact = () => {
           </div>
         </div>
       </section>
-    </div>
+    </MarketingLayout>
   );
 };
 
