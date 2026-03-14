@@ -1,9 +1,8 @@
-import { db } from '../config/database.js';
-import { settings } from '../db/schema/index.js';
+import { getRawSettings } from './settings.service.js';
 
 export async function verifyTurnstile(token: string): Promise<boolean> {
-  const [row] = await db.select({ turnstileSecretKey: settings.turnstileSecretKey }).from(settings).limit(1);
-  const secretKey = row?.turnstileSecretKey;
+  const config = await getRawSettings();
+  const secretKey = config?.turnstileSecretKey;
 
   if (!secretKey) {
     return true; // Skip verification if no secret key configured

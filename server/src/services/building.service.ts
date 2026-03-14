@@ -1,5 +1,5 @@
 import { db } from '../config/database.js';
-import { buildings, apartments } from '../db/schema/index.js';
+import { buildings, apartments, organizations } from '../db/schema/index.js';
 import { eq, and, inArray, sql } from 'drizzle-orm';
 import { AppError } from '../middleware/error-handler.js';
 
@@ -28,6 +28,7 @@ export async function createBuilding(data: {
   monthlyFee?: string;
   logoUrl?: string;
   ntfyTopicUrl?: string | null;
+  organizationId?: string;
   generateApartments?: boolean;
   uniformApartmentsPerFloor?: number;
   apartmentsPerFloor?: Record<string, number>;
@@ -35,6 +36,17 @@ export async function createBuilding(data: {
   const { generateApartments, uniformApartmentsPerFloor, apartmentsPerFloor, ...buildingData } = data;
 
   return await db.transaction(async (tx) => {
+    // Check org building limit
+    if (buildingData.organizationId) {
+      const [org] = await tx.select().from(organizations).where(eq(organizations.id, buildingData.organizationId)).limit(1);
+      if (org && org.maxBuildings > 0) {
+        const [count] = await tx.select({ count: sql<number>`count(*)::int` }).from(buildings).where(eq(buildings.organizationId, buildingData.organizationId));
+        if (count.count >= org.maxBuildings) {
+          throw new AppError(403, 'Building limit reached for this organization');
+        }
+      }
+    }
+
     const [building] = await tx.insert(buildings).values(buildingData).returning();
 
     if (generateApartments && building.numberOfFloors) {

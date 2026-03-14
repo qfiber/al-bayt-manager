@@ -79,13 +79,6 @@ const UserManagement = () => {
   const [passwordFormData, setPasswordFormData] = useState({ adminPassword: '', newPassword: '', confirmPassword: '' });
   const [isChangingPassword, setIsChangingPassword] = useState(false);
 
-  const [isOwnerDialogOpen, setIsOwnerDialogOpen] = useState(false);
-  const [isBeneficiaryDialogOpen, setIsBeneficiaryDialogOpen] = useState(false);
-  const [assigningOwnerUser, setAssigningOwnerUser] = useState<UserProfile | null>(null);
-  const [assigningBeneficiaryUser, setAssigningBeneficiaryUser] = useState<UserProfile | null>(null);
-  const [selectedOwnerApartments, setSelectedOwnerApartments] = useState<string[]>([]);
-  const [selectedBeneficiaryApartments, setSelectedBeneficiaryApartments] = useState<string[]>([]);
-
   const [isBuildingsDialogOpen, setIsBuildingsDialogOpen] = useState(false);
   const [assigningBuildingsUser, setAssigningBuildingsUser] = useState<UserProfile | null>(null);
   const [selectedBuildings, setSelectedBuildings] = useState<string[]>([]);
@@ -369,80 +362,6 @@ const UserManagement = () => {
     return `${apartment.apartmentNumber} - ${building?.name || 'Unknown'}`;
   };
 
-  const handleAssignOwner = async (userProfile: UserProfile) => {
-    setAssigningOwnerUser(userProfile);
-
-    try {
-      const userData = await api.get<{ ownerApartments?: { id: string }[] }>(`/users/${userProfile.id}`);
-      setSelectedOwnerApartments((userData.ownerApartments || []).map(a => a.id));
-      setIsOwnerDialogOpen(true);
-    } catch (error: any) {
-      toast({ title: t('error'), description: error.message, variant: 'destructive' });
-    }
-  };
-
-  const handleAssignBeneficiary = async (userProfile: UserProfile) => {
-    setAssigningBeneficiaryUser(userProfile);
-
-    try {
-      const userData = await api.get<{ beneficiaryApartments?: { id: string }[] }>(`/users/${userProfile.id}`);
-      setSelectedBeneficiaryApartments((userData.beneficiaryApartments || []).map(a => a.id));
-      setIsBeneficiaryDialogOpen(true);
-    } catch (error: any) {
-      toast({ title: t('error'), description: error.message, variant: 'destructive' });
-    }
-  };
-
-  const handleSaveOwnerAssignments = async () => {
-    if (!assigningOwnerUser) return;
-
-    try {
-      await api.put(`/users/${assigningOwnerUser.id}/owner-assignments`, {
-        ids: selectedOwnerApartments,
-      });
-
-      toast({ title: t('success'), description: t('ownerAssignmentsUpdated') });
-      setIsOwnerDialogOpen(false);
-      setAssigningOwnerUser(null);
-      setSelectedOwnerApartments([]);
-    } catch (error: any) {
-      toast({ title: t('error'), description: error.message, variant: 'destructive' });
-    }
-  };
-
-  const handleSaveBeneficiaryAssignments = async () => {
-    if (!assigningBeneficiaryUser) return;
-
-    try {
-      await api.put(`/users/${assigningBeneficiaryUser.id}/beneficiary-assignments`, {
-        ids: selectedBeneficiaryApartments,
-      });
-
-      toast({ title: t('success'), description: t('beneficiaryAssignmentsUpdated') });
-      setIsBeneficiaryDialogOpen(false);
-      setAssigningBeneficiaryUser(null);
-      setSelectedBeneficiaryApartments([]);
-    } catch (error: any) {
-      toast({ title: t('error'), description: error.message, variant: 'destructive' });
-    }
-  };
-
-  const toggleOwnerApartmentSelection = (apartmentId: string) => {
-    setSelectedOwnerApartments(prev =>
-      prev.includes(apartmentId)
-        ? prev.filter(id => id !== apartmentId)
-        : [...prev, apartmentId]
-    );
-  };
-
-  const toggleBeneficiaryApartmentSelection = (apartmentId: string) => {
-    setSelectedBeneficiaryApartments(prev =>
-      prev.includes(apartmentId)
-        ? prev.filter(id => id !== apartmentId)
-        : [...prev, apartmentId]
-    );
-  };
-
   const handleAssignBuildings = async (userProfile: UserProfile) => {
     // Only allow assigning buildings to moderators
     if (userProfile.role !== 'moderator') {
@@ -672,22 +591,6 @@ const UserManagement = () => {
                             title={t('assignTenantApartments')}
                           >
                             <Home className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            onClick={() => handleAssignOwner(userProfile)}
-                            title={t('assignAsOwner')}
-                          >
-                            👤
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            onClick={() => handleAssignBeneficiary(userProfile)}
-                            title={t('assignAsBeneficiary')}
-                          >
-                            ⭐
                           </Button>
                           {userProfile.role !== 'admin' && (
                             <Button
@@ -974,68 +877,6 @@ const UserManagement = () => {
           </AlertDialogContent>
         </AlertDialog>
 
-        {/* Assign as Owner Dialog */}
-        <Dialog open={isOwnerDialogOpen} onOpenChange={setIsOwnerDialogOpen}>
-          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>
-                {t('assignAsOwner')} - {assigningOwnerUser?.name}
-              </DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">{t('selectApartmentsAsOwner')}</p>
-              <div className="space-y-2">
-                {buildings.map(building => {
-                  const buildingApartments = apartments.filter(a => a.buildingId === building.id);
-                  if (buildingApartments.length === 0) return null;
-
-                  return (
-                    <div key={building.id} className="space-y-2">
-                      <h3 className="font-semibold text-sm">{building.name}</h3>
-                      <div className="grid grid-cols-3 gap-2 ps-4">
-                        {buildingApartments.map(apartment => {
-                          const isSelected = selectedOwnerApartments.includes(apartment.id);
-
-                          return (
-                            <div
-                              key={apartment.id}
-                              onClick={() => toggleOwnerApartmentSelection(apartment.id)}
-                              className={`
-                                p-2 rounded border text-sm text-center transition-colors cursor-pointer
-                                ${isSelected
-                                  ? 'bg-primary text-primary-foreground border-primary'
-                                  : 'bg-background hover:bg-accent border-border'
-                                }
-                              `}
-                            >
-                              <div>{apartment.apartmentNumber}</div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="flex gap-2">
-                <Button onClick={handleSaveOwnerAssignments} className="flex-1">
-                  {t('saveAssignments')}
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setIsOwnerDialogOpen(false);
-                    setAssigningOwnerUser(null);
-                    setSelectedOwnerApartments([]);
-                  }}
-                >
-                  {t('cancel')}
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-
         {/* Assign Buildings to Moderator Dialog */}
         <Dialog open={isBuildingsDialogOpen} onOpenChange={setIsBuildingsDialogOpen}>
           <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
@@ -1083,68 +924,6 @@ const UserManagement = () => {
                     setIsBuildingsDialogOpen(false);
                     setAssigningBuildingsUser(null);
                     setSelectedBuildings([]);
-                  }}
-                >
-                  {t('cancel')}
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        {/* Assign as Beneficiary Dialog */}
-        <Dialog open={isBeneficiaryDialogOpen} onOpenChange={setIsBeneficiaryDialogOpen}>
-          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>
-                {t('assignAsBeneficiary')} - {assigningBeneficiaryUser?.name}
-              </DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">{t('selectApartmentsAsBeneficiary')}</p>
-              <div className="space-y-2">
-                {buildings.map(building => {
-                  const buildingApartments = apartments.filter(a => a.buildingId === building.id);
-                  if (buildingApartments.length === 0) return null;
-
-                  return (
-                    <div key={building.id} className="space-y-2">
-                      <h3 className="font-semibold text-sm">{building.name}</h3>
-                      <div className="grid grid-cols-3 gap-2 ps-4">
-                        {buildingApartments.map(apartment => {
-                          const isSelected = selectedBeneficiaryApartments.includes(apartment.id);
-
-                          return (
-                            <div
-                              key={apartment.id}
-                              onClick={() => toggleBeneficiaryApartmentSelection(apartment.id)}
-                              className={`
-                                p-2 rounded border text-sm text-center transition-colors cursor-pointer
-                                ${isSelected
-                                  ? 'bg-primary text-primary-foreground border-primary'
-                                  : 'bg-background hover:bg-accent border-border'
-                                }
-                              `}
-                            >
-                              <div>{apartment.apartmentNumber}</div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="flex gap-2">
-                <Button onClick={handleSaveBeneficiaryAssignments} className="flex-1">
-                  {t('saveAssignments')}
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setIsBeneficiaryDialogOpen(false);
-                    setAssigningBeneficiaryUser(null);
-                    setSelectedBeneficiaryApartments([]);
                   }}
                 >
                   {t('cancel')}

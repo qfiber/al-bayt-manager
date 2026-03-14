@@ -3,13 +3,13 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { usePublicSettings } from '@/contexts/PublicSettingsContext';
-import { api } from '@/lib/api';
+import { api, auth } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Building, ShieldX } from 'lucide-react';
+import { Building, ShieldX, Mail } from 'lucide-react';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { LegalFooter } from '@/components/LegalFooter';
 import { CaptchaField } from '@/components/CaptchaField';
@@ -23,6 +23,10 @@ const Register = () => {
   const [organizationName, setOrganizationName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [verificationMode, setVerificationMode] = useState(false);
+  const [verificationToken, setVerificationToken] = useState('');
+  const [verificationCode, setVerificationCode] = useState('');
+  const [verifying, setVerifying] = useState(false);
   const { signUp, user, loading } = useAuth();
   const { t } = useLanguage();
   const { logoUrl, companyName, turnstileEnabled, registrationEnabled } = usePublicSettings();
@@ -83,12 +87,16 @@ const Register = () => {
           return;
         }
       }
-      const { error } = await signUp(email, password, name, phone, organizationName || undefined);
+      const { error, requiresVerification, verificationToken: token } = await signUp(email, password, name, phone, organizationName || undefined);
 
-      if (error) {
+      if (requiresVerification && token) {
+        setVerificationToken(token);
+        setVerificationMode(true);
+        toast({ title: t('success'), description: t('verificationEmailSent') });
+      } else if (error) {
         toast({
           title: t('error'),
-          description: error.message,
+          description: error.message || error,
           variant: 'destructive',
         });
       } else {
@@ -108,6 +116,33 @@ const Register = () => {
     }
 
     setIsLoading(false);
+  };
+
+  const handleVerify = async () => {
+    setVerifying(true);
+    try {
+      await api.post('/auth/verify-email', { token: verificationToken, code: verificationCode });
+      toast({ title: t('success'), description: t('emailVerified') });
+      // Now auto-login
+      const loginResult = await auth.login(email, password);
+      if (!loginResult.requires2FA) {
+        navigate('/dashboard');
+      }
+    } catch (err: any) {
+      toast({ title: t('error'), description: err.message, variant: 'destructive' });
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  const handleResendCode = async () => {
+    try {
+      const result = await api.post('/auth/resend-verification', { token: verificationToken });
+      if (result.token) setVerificationToken(result.token);
+      toast({ title: t('success'), description: t('verificationCodeResent') });
+    } catch (err: any) {
+      toast({ title: t('error'), description: err.message, variant: 'destructive' });
+    }
   };
 
   if (loading) {
@@ -146,95 +181,123 @@ const Register = () => {
         <CardContent>
           {registrationEnabled ? (
             <>
-              <form onSubmit={handleSignUp} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">{t('name')}</Label>
-                  <Input
-                    id="name"
-                    type="text"
-                    placeholder={t('fullName')}
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    required
-                    disabled={isLoading}
-                  />
+              {verificationMode ? (
+                <div className="space-y-4">
+                  <div className="text-center">
+                    <Mail className="w-12 h-12 text-primary mx-auto mb-3" />
+                    <h3 className="font-semibold text-lg">{t('verifyYourEmail')}</h3>
+                    <p className="text-sm text-muted-foreground mt-1">{t('verificationCodeSentTo').replace('{email}', email)}</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>{t('verificationCode')}</Label>
+                    <Input
+                      value={verificationCode}
+                      onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      placeholder="000000"
+                      className="text-center text-2xl tracking-widest"
+                      maxLength={6}
+                    />
+                  </div>
+                  <Button onClick={handleVerify} disabled={verifying || verificationCode.length !== 6} className="w-full">
+                    {verifying ? t('loading') : t('verifyEmail')}
+                  </Button>
+                  <Button variant="ghost" onClick={handleResendCode} className="w-full text-sm">
+                    {t('resendVerificationCode')}
+                  </Button>
                 </div>
+              ) : (
+                <>
+                  <form onSubmit={handleSignUp} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="name">{t('name')}</Label>
+                      <Input
+                        id="name"
+                        type="text"
+                        placeholder={t('fullName')}
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        required
+                        disabled={isLoading}
+                      />
+                    </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="email">{t('email')}</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="email@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                    disabled={isLoading}
-                  />
-                </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="email">{t('email')}</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        placeholder="email@example.com"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        required
+                        disabled={isLoading}
+                      />
+                    </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="phone">{t('phone')}</Label>
-                  <Input
-                    id="phone"
-                    type="tel"
-                    placeholder={t('phone')}
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    required
-                    disabled={isLoading}
-                  />
-                </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="phone">{t('phone')}</Label>
+                      <Input
+                        id="phone"
+                        type="tel"
+                        placeholder={t('phone')}
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        required
+                        disabled={isLoading}
+                      />
+                    </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="organizationName">{t('organizationName')}</Label>
-                  <Input
-                    id="organizationName"
-                    type="text"
-                    placeholder={t('organizationNamePlaceholder')}
-                    value={organizationName}
-                    onChange={(e) => setOrganizationName(e.target.value)}
-                    disabled={isLoading}
-                  />
-                  <p className="text-xs text-muted-foreground">{t('organizationNameHelp')}</p>
-                </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="organizationName">{t('organizationName')}</Label>
+                      <Input
+                        id="organizationName"
+                        type="text"
+                        placeholder={t('organizationNamePlaceholder')}
+                        value={organizationName}
+                        onChange={(e) => setOrganizationName(e.target.value)}
+                        disabled={isLoading}
+                      />
+                      <p className="text-xs text-muted-foreground">{t('organizationNameHelp')}</p>
+                    </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="password">{t('password')}</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    disabled={isLoading}
-                    minLength={16}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    {t('passwordMinLength')}
-                  </p>
-                </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="password">{t('password')}</Label>
+                      <Input
+                        id="password"
+                        type="password"
+                        placeholder="••••••••"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                        disabled={isLoading}
+                        minLength={16}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        {t('passwordMinLength')}
+                      </p>
+                    </div>
 
-                <CaptchaField onToken={setTurnstileToken} />
+                    <CaptchaField onToken={setTurnstileToken} />
 
-                <Button
-                  type="submit"
-                  className="w-full"
-                  disabled={isLoading}
-                >
-                  {isLoading ? t('creatingAccount') : t('createAccount')}
-                </Button>
-              </form>
+                    <Button
+                      type="submit"
+                      className="w-full"
+                      disabled={isLoading}
+                    >
+                      {isLoading ? t('creatingAccount') : t('createAccount')}
+                    </Button>
+                  </form>
 
-              <div className="mt-6 text-center text-sm">
-                <p className="text-muted-foreground">
-                  {t('alreadyHaveAccount')}{' '}
-                  <Link to="/login" className="text-primary hover:underline">
-                    {t('signIn')}
-                  </Link>
-                </p>
-              </div>
+                  <div className="mt-6 text-center text-sm">
+                    <p className="text-muted-foreground">
+                      {t('alreadyHaveAccount')}{' '}
+                      <Link to="/login" className="text-primary hover:underline">
+                        {t('signIn')}
+                      </Link>
+                    </p>
+                  </div>
+                </>
+              )}
             </>
           ) : (
             <div className="text-center py-6 space-y-4">

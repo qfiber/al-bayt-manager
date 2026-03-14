@@ -29,7 +29,7 @@ interface AuthContextType {
     requires2FA?: boolean;
     sessionToken?: string;
   }>;
-  signUp: (email: string, password: string, name: string, phone?: string, organizationName?: string) => Promise<{ error?: any }>;
+  signUp: (email: string, password: string, name: string, phone?: string, organizationName?: string) => Promise<{ error?: any; requiresVerification?: boolean; verificationToken?: string }>;
   signOut: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -92,8 +92,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signUp = async (email: string, password: string, name: string, phone?: string, organizationName?: string) => {
     try {
-      await auth.register(email, password, name, phone, organizationName);
-      // Auto-login after registration
+      const registerResult = await auth.register(email, password, name, phone, organizationName);
+
+      if (registerResult?.requiresVerification) {
+        return { requiresVerification: true, verificationToken: registerResult.verificationToken };
+      }
+
+      // Auto-login after registration (only if no verification needed)
       const loginResult = await auth.login(email, password);
       if (!loginResult.requires2FA) {
         await fetchUser();

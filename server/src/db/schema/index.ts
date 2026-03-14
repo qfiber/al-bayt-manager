@@ -42,3 +42,5 @@ export * from './rate-limit-entries.js';
 export * from './sms-templates.js';
 export * from './sms-template-translations.js';
 export * from './sms-logs.js';
+export * from './leases.js';
+export * from './inspections.js';

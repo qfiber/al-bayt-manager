@@ -1,7 +1,5 @@
 import { pgTable, uuid, varchar, integer, numeric, timestamp, unique } from 'drizzle-orm/pg-core';
 import { buildings } from './buildings.js';
-import { profiles } from './profiles.js';
-
 export const apartments = pgTable('apartments', {
   id: uuid('id').defaultRandom().primaryKey(),
   apartmentNumber: varchar('apartment_number', { length: 50 }).notNull(),
@@ -11,8 +9,6 @@ export const apartments = pgTable('apartments', {
   cachedBalance: numeric('cached_balance', { precision: 12, scale: 2 }).default('0').notNull(),
   subscriptionAmount: numeric('subscription_amount', { precision: 12, scale: 2 }).default('0'),
   subscriptionStatus: varchar('subscription_status', { length: 50 }).default('inactive'),
-  ownerId: uuid('owner_id').references(() => profiles.id, { onDelete: 'set null' }),
-  beneficiaryId: uuid('beneficiary_id').references(() => profiles.id, { onDelete: 'set null' }),
   apartmentType: varchar('apartment_type', { length: 20 }).notNull().default('regular'),
   parentApartmentId: uuid('parent_apartment_id'),
   occupancyStart: timestamp('occupancy_start', { withTimezone: true }),

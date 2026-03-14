@@ -1,7 +1,7 @@
 import { db } from '../config/database.js';
 import {
-  apartments, buildings, profiles, apartmentExpenses, payments,
-  apartmentLedger, userApartments, expenses, paymentAllocations,
+  apartments, buildings, apartmentExpenses, payments,
+  apartmentLedger, userApartments, expenses, paymentAllocations, organizations,
 } from '../db/schema/index.js';
 import { eq, and, inArray, sql, desc, gte, lte } from 'drizzle-orm';
 import { AppError } from '../middleware/error-handler.js';
@@ -10,33 +10,14 @@ import * as occupancyPeriodService from './occupancy-period.service.js';
 import { backfillSubscriptions } from './subscription.service.js';
 import { backfillExpensesForApartment } from './expense.service.js';
 
-/**
- * Helper: look up a profile name by ID.
- */
-async function getProfileName(profileId: string | null, txOrDb: any = db): Promise<string | null> {
-  if (!profileId) return null;
-  const [profile] = await txOrDb.select({ name: profiles.name }).from(profiles).where(eq(profiles.id, profileId)).limit(1);
-  return profile?.name ?? null;
-}
-
 export async function listApartments(buildingId?: string, allowedBuildingIds?: string[], organizationId?: string) {
   let query = db
     .select({
       apartment: apartments,
       buildingName: buildings.name,
-      ownerName: sql<string | null>`owner_profile.name`,
-      beneficiaryName: sql<string | null>`beneficiary_profile.name`,
     })
     .from(apartments)
-    .innerJoin(buildings, eq(apartments.buildingId, buildings.id))
-    .leftJoin(
-      sql`${profiles} AS owner_profile`,
-      sql`${apartments.ownerId} = owner_profile.id`,
-    )
-    .leftJoin(
-      sql`${profiles} AS beneficiary_profile`,
-      sql`${apartments.beneficiaryId} = beneficiary_profile.id`,
-    );
+    .innerJoin(buildings, eq(apartments.buildingId, buildings.id));
 
   const conditions: any[] = [];
   if (organizationId) conditions.push(eq(buildings.organizationId, organizationId));
@@ -65,16 +46,27 @@ export async function createApartment(data: {
   status?: string;
   subscriptionAmount?: string;
   subscriptionStatus?: string;
-  ownerId?: string;
-  beneficiaryId?: string;
   occupancyStart?: Date;
   apartmentType?: string;
   parentApartmentId?: string | null;
 }, userId: string) {
   return await db.transaction(async (tx) => {
     // Verify building exists
-    const [building] = await tx.select({ id: buildings.id }).from(buildings).where(eq(buildings.id, data.buildingId)).limit(1);
+    const [building] = await tx.select().from(buildings).where(eq(buildings.id, data.buildingId)).limit(1);
     if (!building) throw new AppError(404, 'Building not found');
+
+    // Check org apartment limit
+    if (building.organizationId) {
+      const [org] = await tx.select().from(organizations).where(eq(organizations.id, building.organizationId)).limit(1);
+      if (org && org.maxApartments > 0) {
+        const [count] = await tx.select({ count: sql<number>`count(*)::int` }).from(apartments)
+          .innerJoin(buildings, eq(apartments.buildingId, buildings.id))
+          .where(eq(buildings.organizationId, building.organizationId));
+        if (count.count >= org.maxApartments) {
+          throw new AppError(403, 'Apartment limit reached for this organization');
+        }
+      }
+    }
 
     // Validate apartment type and parent relationship
     const aptType = data.apartmentType || 'regular';
@@ -100,11 +92,10 @@ export async function createApartment(data: {
 
     // Create occupancy period if apartment is occupied
     if (apt.status === 'occupied' && apt.occupancyStart) {
-      const tenantName = await getProfileName(apt.ownerId, tx);
       await occupancyPeriodService.createPeriod(
         apt.id,
-        apt.ownerId,
-        tenantName,
+        null,
+        null,
         new Date(apt.occupancyStart),
         tx,
       );
@@ -129,8 +120,6 @@ export async function updateApartment(id: string, data: Partial<{
   status: string;
   subscriptionAmount: string;
   subscriptionStatus: string;
-  ownerId: string | null;
-  beneficiaryId: string | null;
   occupancyStart: Date | null;
   apartmentType: string;
   parentApartmentId: string | null;
@@ -168,11 +157,10 @@ export async function updateApartment(id: string, data: Partial<{
 
     if (!wasOccupied && isNowOccupied && apt.occupancyStart) {
       // Create a new occupancy period
-      const tenantName = await getProfileName(apt.ownerId, tx);
       await occupancyPeriodService.createPeriod(
         apt.id,
-        apt.ownerId,
-        tenantName,
+        null,
+        null,
         new Date(apt.occupancyStart),
         tx,
       );
@@ -264,8 +252,6 @@ export async function terminateOccupancy(id: string, userId: string) {
 
         await tx.update(apartments).set({
           status: 'vacant',
-          ownerId: null,
-          beneficiaryId: null,
           occupancyStart: null,
           updatedAt: new Date(),
         }).where(eq(apartments.id, child.id));
@@ -282,8 +268,6 @@ export async function terminateOccupancy(id: string, userId: string) {
       .update(apartments)
       .set({
         status: 'vacant',
-        ownerId: null,
-        beneficiaryId: null,
         occupancyStart: null,
         updatedAt: new Date(),
       })

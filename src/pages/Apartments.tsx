@@ -34,8 +34,6 @@ interface Apartment {
   subscriptionAmount: string;
   subscriptionStatus: string;
   cachedBalance: string;
-  ownerId: string | null;
-  beneficiaryId: string | null;
   apartmentType: string;
   parentApartmentId: string | null;
 }
@@ -43,8 +41,6 @@ interface Apartment {
 interface ApartmentListItem {
   apartment: Apartment;
   buildingName: string;
-  ownerName: string | null;
-  beneficiaryName: string | null;
 }
 
 interface Building {
@@ -55,11 +51,6 @@ interface Building {
   monthlyFee: string | null;
 }
 
-interface User {
-  id: string;
-  name: string;
-}
-
 const Apartments = () => {
   useRequireAuth('admin');
   const { user, isAdmin, isModerator } = useAuth();
@@ -68,7 +59,6 @@ const Apartments = () => {
   const { toast } = useToast();
   const [apartmentItems, setApartmentItems] = useState<ApartmentListItem[]>([]);
   const [buildings, setBuildings] = useState<Building[]>([]);
-  const [profiles, setProfiles] = useState<User[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingApartment, setEditingApartment] = useState<Apartment | null>(null);
   const [selectedBuildingFilter, setSelectedBuildingFilter] = useState<string>('all');
@@ -93,7 +83,6 @@ const Apartments = () => {
     if (user && isAdmin) {
       fetchBuildings();
       fetchApartments();
-      fetchProfiles();
     }
   }, [user, isAdmin]);
 
@@ -139,15 +128,6 @@ const Apartments = () => {
     try {
       const data = await api.get<ApartmentListItem[]>('/apartments');
       setApartmentItems(data);
-    } catch (err: any) {
-      toast({ title: t('error'), description: err.message, variant: 'destructive' });
-    }
-  };
-
-  const fetchProfiles = async () => {
-    try {
-      const data = await api.get<User[]>('/users');
-      setProfiles(data.map(u => ({ id: u.id, name: u.name })));
     } catch (err: any) {
       toast({ title: t('error'), description: err.message, variant: 'destructive' });
     }
@@ -242,16 +222,6 @@ const Apartments = () => {
     const item = apartmentItems.find(a => a.apartment.buildingId === buildingId);
     if (item) return item.buildingName;
     return buildings.find(b => b.id === buildingId)?.name || t('unknown');
-  };
-
-  const getOwnerName = (apartmentId: string) => {
-    const item = apartmentItems.find(a => a.apartment.id === apartmentId);
-    return item?.ownerName || '-';
-  };
-
-  const getBeneficiaryName = (apartmentId: string) => {
-    const item = apartmentItems.find(a => a.apartment.id === apartmentId);
-    return item?.beneficiaryName || '-';
   };
 
   const getParentApartmentNumber = (parentId: string | null) => {
@@ -580,7 +550,7 @@ const Apartments = () => {
     const q = searchQuery.toLowerCase();
     return apartmentItems
       .filter(a => a.apartment.buildingId === buildingId && !a.apartment.parentApartmentId)
-      .filter(a => !q || a.apartment.apartmentNumber.toLowerCase().includes(q) || a.ownerName?.toLowerCase().includes(q) || a.beneficiaryName?.toLowerCase().includes(q))
+      .filter(a => !q || a.apartment.apartmentNumber.toLowerCase().includes(q))
       .map(a => a.apartment);
   };
 
@@ -615,10 +585,8 @@ const Apartments = () => {
                   item.apartment.apartmentType || 'regular',
                   item.apartment.cachedBalance,
                   item.apartment.subscriptionAmount || '0',
-                  item.ownerName || '',
-                  item.beneficiaryName || '',
                 ]);
-                downloadCsv('apartments.csv', ['Building', 'Apartment #', 'Floor', 'Status', 'Type', 'Balance', 'Subscription', 'Owner', 'Beneficiary'], rows);
+                downloadCsv('apartments.csv', ['Building', 'Apartment #', 'Floor', 'Status', 'Type', 'Balance', 'Subscription'], rows);
               }}
             >
               <Download className="w-4 h-4 me-2" />
@@ -828,7 +796,6 @@ const Apartments = () => {
                             <TableHead className="text-start">{t('apartmentHash')}</TableHead>
                             <TableHead className="text-start">{t('floor')}</TableHead>
                             <TableHead className="text-start">{t('status')}</TableHead>
-                            <TableHead className="text-start">{t('owner')} / {t('beneficiary')}</TableHead>
                             <TableHead className="text-start">{t('monthlySubscription').replace('{currency}', currencySymbol)}</TableHead>
                             <TableHead className="text-start">{t('monthsOccupied')}</TableHead>
                             <TableHead className="text-start">{t('totalDebt')}</TableHead>
@@ -868,12 +835,6 @@ const Apartments = () => {
                                   <span className={`px-2 py-1 rounded text-xs ${apartment.status === 'vacant' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
                                     {t(apartment.status as 'vacant' | 'occupied')}
                                   </span>
-                                </TableCell>
-                                <TableCell className={`text-start ${language === 'ar' || language === 'he' ? 'text-start' : ''}`}>
-                                  <div className="text-sm">
-                                    <div>{t('owner')}: {getOwnerName(apartment.id)}</div>
-                                    <div className="text-muted-foreground">{t('beneficiary')}: {getBeneficiaryName(apartment.id)}</div>
-                                  </div>
                                 </TableCell>
                                 <TableCell className={`text-start ${apartment.status !== 'occupied' ? 'text-muted-foreground' : ''}`}>
                                   {apartment.status === 'occupied' ? formatCurrency(subscriptionAmount) : '-'}

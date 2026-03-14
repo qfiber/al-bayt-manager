@@ -73,3 +73,19 @@ export async function getDashboardData() {
     systemHealth: healthStats.rows[0] as any,
   };
 }
+
+export async function getMonthlyTrends() {
+  const result = await db.execute(sql`
+    SELECT
+      to_char(p.created_at, 'YYYY-MM') AS month,
+      COALESCE(SUM(p.amount::numeric), 0)::text AS revenue,
+      (SELECT count(*)::int FROM apartments WHERE status = 'occupied') AS occupied,
+      (SELECT count(*)::int FROM apartments) AS total_apartments
+    FROM payments p
+    WHERE p.is_canceled = false
+      AND p.created_at > NOW() - INTERVAL '12 months'
+    GROUP BY to_char(p.created_at, 'YYYY-MM')
+    ORDER BY month
+  `);
+  return result.rows;
+}

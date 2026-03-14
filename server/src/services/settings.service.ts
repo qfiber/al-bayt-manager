@@ -1,6 +1,15 @@
 import { db } from '../config/database.js';
 import { settings } from '../db/schema/index.js';
 import { eq, sql } from 'drizzle-orm';
+import { encrypt, decrypt, isEncrypted } from '../utils/encryption.js';
+
+const SENSITIVE_FIELDS = [
+  'resendApiKey', 'turnstileSecretKey', 'smsApiToken',
+  'stripeSecretKey', 'stripeWebhookSecret',
+  'cardcomApiPassword',
+  'paypalClientSecret',
+  'twilioAuthToken',
+] as const;
 
 type SettingsRow = typeof settings.$inferSelect;
 
@@ -37,11 +46,13 @@ async function getOrCreateSettings(organizationId?: string): Promise<SettingsRow
 function maskSensitiveFields(row: SettingsRow): Record<string, unknown> {
   const masked: Record<string, unknown> = { ...row };
   masked.logoUrl = normalizeLogoUrl(row.logoUrl);
-  for (const field of ['resendApiKey', 'turnstileSecretKey', 'smsApiToken'] as const) {
-    const val = row[field];
+  for (const field of SENSITIVE_FIELDS) {
+    const val = (row as any)[field];
     if (val) {
-      masked[field] = val.length > 8
-        ? `${'*'.repeat(val.length - 4)}${val.slice(-4)}`
+      // Decrypt first to get real value for masking
+      const plain = decrypt(val as string);
+      masked[field] = plain.length > 8
+        ? `${'*'.repeat(plain.length - 4)}${plain.slice(-4)}`
         : '********';
     }
   }
@@ -106,22 +117,23 @@ export async function updateSettings(organizationId: string | undefined, data: P
 }>) {
   const existing = await getOrCreateSettings(organizationId);
 
-  const updateData = { ...data };
+  const updateData: Record<string, unknown> = { ...data };
 
-  // Don't overwrite secrets with their masked representations
-  if (updateData.resendApiKey && /^\*+$/.test(updateData.resendApiKey)) {
-    delete updateData.resendApiKey;
-  }
-  if (updateData.turnstileSecretKey && /^\*+$/.test(updateData.turnstileSecretKey)) {
-    delete updateData.turnstileSecretKey;
-  }
-  if ((updateData as any).smsApiToken && /^\*+$/.test((updateData as any).smsApiToken)) {
-    delete (updateData as any).smsApiToken;
+  // Don't overwrite secrets with their masked representations, and encrypt new values
+  for (const field of SENSITIVE_FIELDS) {
+    const val = updateData[field];
+    if (typeof val === 'string' && /\*{4,}/.test(val)) {
+      // Value contains masked content — don't overwrite the stored value
+      delete updateData[field];
+    } else if (typeof val === 'string' && val.length > 0 && !isEncrypted(val)) {
+      // New plaintext value — encrypt before saving
+      updateData[field] = encrypt(val);
+    }
   }
 
   const [result] = await db
     .update(settings)
-    .set({ ...updateData, updatedAt: new Date() })
+    .set({ ...updateData, updatedAt: new Date() } as any)
     .where(eq(settings.id, existing.id))
     .returning();
   return maskSensitiveFields(result);
@@ -129,5 +141,13 @@ export async function updateSettings(organizationId: string | undefined, data: P
 
 /** Internal: get raw settings without masking (for email service, etc.) */
 export async function getRawSettings(organizationId?: string) {
-  return getOrCreateSettings(organizationId);
+  const row = await getOrCreateSettings(organizationId);
+  // Decrypt sensitive fields for internal use
+  const decrypted = { ...row } as any;
+  for (const field of SENSITIVE_FIELDS) {
+    if (decrypted[field] && typeof decrypted[field] === 'string') {
+      decrypted[field] = decrypt(decrypted[field]);
+    }
+  }
+  return decrypted as SettingsRow;
 }

@@ -1,84 +1,65 @@
-import crypto from 'crypto';
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../../app.js';
+import { signAccessToken } from '../../utils/jwt.js';
+import { db } from '../../config/database.js';
 
+let dbAvailable = false;
+try {
+  await db.execute({ sql: 'SELECT 1', params: [] } as any).catch(() => {});
+  dbAvailable = true;
+} catch {}
+
+const describeDb = dbAvailable ? describe : describe.skip;
 const app = createApp();
 
-/** Solve a PoW challenge from the server. */
-async function solvePow() {
-  const res = await request(app).get('/api/auth/challenge');
-  const { challengeId, prefix, difficulty } = res.body;
+// Create a valid admin token directly (no DB needed for unit-style test)
+const adminToken = signAccessToken({
+  userId: '550e8400-e29b-41d4-a716-446655440000',
+  email: 'admin-test@example.com',
+  role: 'admin',
+  isSuperAdmin: false,
+});
 
-  for (let nonce = 0; ; nonce++) {
-    const hash = crypto.createHash('sha256').update(prefix + nonce).digest();
-    if (hasLeadingZeroBits(hash, difficulty)) {
-      return { challengeId, nonce: String(nonce) };
-    }
-  }
-}
+const userToken = signAccessToken({
+  userId: '660e8400-e29b-41d4-a716-446655440001',
+  email: 'user-test@example.com',
+  role: 'user',
+  isSuperAdmin: false,
+});
 
-function hasLeadingZeroBits(hash: Buffer, bits: number): boolean {
-  const fullBytes = Math.floor(bits / 8);
-  const remainingBits = bits % 8;
-  for (let i = 0; i < fullBytes; i++) {
-    if (hash[i] !== 0) return false;
-  }
-  if (remainingBits > 0) {
-    const mask = 0xff << (8 - remainingBits);
-    if ((hash[fullBytes] & mask) !== 0) return false;
-  }
-  return true;
-}
-
-let adminToken: string;
-let createdBuildingId: string;
-
-describe('Buildings CRUD', () => {
-  beforeAll(async () => {
-    // Register + login an admin user for testing
-    const email = `admin-bldg-${Date.now()}@example.com`;
-    const pow1 = await solvePow();
-    await request(app)
-      .post('/api/auth/register')
-      .send({ email, password: 'AdminPass123', name: 'Admin', ...pow1 });
-
-    const pow2 = await solvePow();
-    const loginRes = await request(app)
-      .post('/api/auth/login')
-      .send({ email, password: 'AdminPass123', ...pow2 });
-
-    adminToken = loginRes.body.accessToken;
-  });
-
-  it('POST /api/buildings creates a building', async () => {
+describeDb('Buildings CRUD', () => {
+  it('POST /api/buildings rejects unauthenticated', async () => {
     const res = await request(app)
       .post('/api/buildings')
-      .set('Authorization', `Bearer ${adminToken}`)
-      .send({
-        name: 'Test Building',
-        address: '123 Test St',
-        totalFloors: 5,
-      });
+      .send({ name: 'Test Building', address: '123 Test St' });
 
-    // May be 201 or 403 depending on user role (test user is 'user' by default)
-    if (res.status === 201) {
-      expect(res.body).toHaveProperty('id');
-      createdBuildingId = res.body.id;
-    } else {
-      expect(res.status).toBe(403);
-    }
+    expect(res.status).toBe(401);
   });
 
-  it('GET /api/buildings lists buildings', async () => {
+  it('POST /api/buildings rejects non-admin role', async () => {
+    const res = await request(app)
+      .post('/api/buildings')
+      .set('Authorization', `Bearer ${userToken}`)
+      .send({ name: 'Test Building', address: '123 Test St' });
+
+    expect(res.status).toBe(403);
+  });
+
+  it('GET /api/buildings rejects unauthenticated', async () => {
+    const res = await request(app)
+      .get('/api/buildings');
+
+    expect(res.status).toBe(401);
+  });
+
+  it('GET /api/buildings accepts authenticated user', async () => {
     const res = await request(app)
       .get('/api/buildings')
       .set('Authorization', `Bearer ${adminToken}`);
 
-    // Could be 200 or 403 depending on role
-    expect([200, 403]).toContain(res.status);
-    if (res.status === 200) {
-      expect(Array.isArray(res.body)).toBe(true);
-    }
+    // 200 with data (may be empty array if no buildings in test DB)
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
   });
 });

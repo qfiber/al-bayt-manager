@@ -35,11 +35,14 @@ import Meetings from "./pages/Meetings";
 import DebtCollection from "./pages/DebtCollection";
 import Organizations from "./pages/Organizations";
 import SuperAdminDashboard from "./pages/SuperAdminDashboard";
+import Invoices from "./pages/Invoices";
+import Leases from "./pages/Leases";
 import NotFound from "./pages/NotFound";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfUsage from "./pages/TermsOfUsage";
 import Accessibility from "./pages/Accessibility";
 import { CookieConsentBanner } from "./components/CookieConsentBanner";
+import { ThemeProvider } from "./contexts/ThemeContext";
 
 const queryClient = new QueryClient();
 
@@ -61,6 +64,7 @@ const TitleUpdater = () => {
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
+    <ThemeProvider>
     <BrowserRouter>
       <LanguageProvider>
         <ScrollToTop />
@@ -104,6 +108,8 @@ const App = () => (
               <Route path="/meetings" element={<AppLayout><Meetings /></AppLayout>} />
               <Route path="/debt-collection" element={<AppLayout><DebtCollection /></AppLayout>} />
               <Route path="/organizations" element={<AppLayout><Organizations /></AppLayout>} />
+              <Route path="/invoices" element={<AppLayout><Invoices /></AppLayout>} />
+              <Route path="/leases" element={<AppLayout><Leases /></AppLayout>} />
               <Route path="/super-admin" element={<AppLayout><SuperAdminDashboard /></AppLayout>} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
@@ -113,6 +119,7 @@ const App = () => (
         </PublicSettingsProvider>
       </LanguageProvider>
     </BrowserRouter>
+    </ThemeProvider>
   </QueryClientProvider>
 );
 

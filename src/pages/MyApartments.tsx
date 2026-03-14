@@ -10,9 +10,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Home, Download, Receipt, Clock, AlertTriangle } from 'lucide-react';
+import { Home, Download, Receipt, Clock, AlertTriangle, CreditCard } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
 import { useNavigate } from 'react-router-dom';
 import { formatDate } from '@/lib/utils';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const MyApartments = () => {
   useRequireAuth();
@@ -23,6 +28,15 @@ const MyApartments = () => {
   const navigate = useNavigate();
   const [apartments, setApartments] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [payDialogOpen, setPayDialogOpen] = useState(false);
+  const [payingApartment, setPayingApartment] = useState<any>(null);
+  const [payAmount, setPayAmount] = useState('');
+  const [payMonth, setPayMonth] = useState('');
+  const [payGateway, setPayGateway] = useState<'stripe' | 'cardcom' | 'paypal'>('stripe');
+  const [payLoading, setPayLoading] = useState(false);
+  const [issueDialogOpen, setIssueDialogOpen] = useState(false);
+  const [issueForm, setIssueForm] = useState({ buildingId: '', category: 'other', description: '' });
+  const [issueLoading, setIssueLoading] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -78,6 +92,44 @@ const MyApartments = () => {
     }
   };
 
+  const handlePay = async () => {
+    if (!payingApartment || !payAmount || !payMonth) return;
+    setPayLoading(true);
+    try {
+      const result = await api.post('/payments/checkout', {
+        apartmentId: payingApartment.id,
+        amount: parseFloat(payAmount),
+        month: payMonth,
+        gateway: payGateway,
+      });
+      // Redirect to payment page
+      window.location.href = result.url;
+    } catch (err: any) {
+      toast({ title: t('error'), description: err.message, variant: 'destructive' });
+    } finally {
+      setPayLoading(false);
+    }
+  };
+
+  const handleReportIssue = async () => {
+    if (!issueForm.description.trim() || !issueForm.buildingId) return;
+    setIssueLoading(true);
+    try {
+      await api.post('/issues', {
+        buildingId: issueForm.buildingId,
+        category: issueForm.category,
+        description: issueForm.description,
+      });
+      toast({ title: t('success'), description: t('issueReportedSuccess') });
+      setIssueDialogOpen(false);
+      setIssueForm({ buildingId: '', category: 'other', description: '' });
+    } catch (err: any) {
+      toast({ title: t('error'), description: err.message, variant: 'destructive' });
+    } finally {
+      setIssueLoading(false);
+    }
+  };
+
   const getTotalPaid = (payments: any[]) => {
     return payments.filter((p: any) => !p.isCanceled).reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
   };
@@ -96,7 +148,12 @@ const MyApartments = () => {
             <Home className="w-8 h-8 text-primary" />
             <h1 className="text-3xl font-bold">{t('myApartments')}</h1>
           </div>
-          <Button variant="outline" onClick={() => navigate('/issues')}>
+          <Button variant="outline" onClick={() => {
+            if (apartments.length > 0) {
+              setIssueForm(prev => ({ ...prev, buildingId: apartments[0].buildingId }));
+            }
+            setIssueDialogOpen(true);
+          }}>
             <AlertTriangle className="w-4 h-4 me-2" />
             {t('reportIssue')}
           </Button>
@@ -126,15 +183,32 @@ const MyApartments = () => {
                     <CardDescription>
                       {apartment.buildingName} - {apartment.buildingAddress}
                     </CardDescription>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => window.open(`/api/my-apartments/${apartment.id}/statement/download`)}
-                      className="mt-2 w-fit"
-                    >
-                      <Download className="w-4 h-4 me-2" />
-                      {t('downloadStatement')}
-                    </Button>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => window.open(`/api/my-apartments/${apartment.id}/statement/download`)}
+                        className="w-fit"
+                      >
+                        <Download className="w-4 h-4 me-2" />
+                        {t('downloadStatement')}
+                      </Button>
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={() => {
+                          setPayingApartment(apartment);
+                          setPayAmount(Math.abs(balance) > 0 ? Math.abs(balance).toFixed(2) : subscriptionAmount.toFixed(2));
+                          const now = new Date();
+                          setPayMonth(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`);
+                          setPayDialogOpen(true);
+                        }}
+                        className="w-fit"
+                      >
+                        <CreditCard className="w-4 h-4 me-2" />
+                        {t('payNow')}
+                      </Button>
+                    </div>
                   </CardHeader>
                   <CardContent className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -301,6 +375,87 @@ const MyApartments = () => {
           </div>
         )}
       </div>
+
+      <Dialog open={payDialogOpen} onOpenChange={setPayDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('payNow')} — {t('apartment')} {payingApartment?.apartmentNumber}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>{t('amount')}</Label>
+              <Input type="number" step="0.01" min="0.01" value={payAmount} onChange={(e) => setPayAmount(e.target.value)} />
+            </div>
+            <div>
+              <Label>{t('month')}</Label>
+              <Input type="month" value={payMonth} onChange={(e) => setPayMonth(e.target.value)} />
+            </div>
+            <div>
+              <Label>{t('paymentGateway')}</Label>
+              <Select value={payGateway} onValueChange={(v: any) => setPayGateway(v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="stripe">Stripe</SelectItem>
+                  <SelectItem value="cardcom">CardCom</SelectItem>
+                  <SelectItem value="paypal">PayPal</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button onClick={handlePay} disabled={payLoading} className="w-full">
+              {payLoading ? t('loading') : t('proceedToPayment')}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={issueDialogOpen} onOpenChange={setIssueDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('reportIssue')}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>{t('building')}</Label>
+              <Select value={issueForm.buildingId} onValueChange={(v) => setIssueForm({...issueForm, buildingId: v})}>
+                <SelectTrigger><SelectValue placeholder={t('selectBuilding')} /></SelectTrigger>
+                <SelectContent>
+                  {[...new Map(apartments.map(a => [a.buildingId, a.buildingName])).entries()].map(([id, name]) => (
+                    <SelectItem key={id} value={id}>{name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>{t('category')}</Label>
+              <Select value={issueForm.category} onValueChange={(v) => setIssueForm({...issueForm, category: v})}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="plumbing">{t('plumbing')}</SelectItem>
+                  <SelectItem value="electrical">{t('electrical')}</SelectItem>
+                  <SelectItem value="elevator">{t('elevator')}</SelectItem>
+                  <SelectItem value="water_leak">{t('waterLeak')}</SelectItem>
+                  <SelectItem value="cleaning">{t('cleaning')}</SelectItem>
+                  <SelectItem value="structural">{t('structural')}</SelectItem>
+                  <SelectItem value="safety">{t('safety')}</SelectItem>
+                  <SelectItem value="other">{t('other')}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>{t('description')}</Label>
+              <Textarea
+                value={issueForm.description}
+                onChange={(e) => setIssueForm({...issueForm, description: e.target.value})}
+                placeholder={t('describeIssue')}
+                rows={4}
+              />
+            </div>
+            <Button onClick={handleReportIssue} disabled={issueLoading || !issueForm.description.trim()} className="w-full">
+              {issueLoading ? t('loading') : t('submitIssue')}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

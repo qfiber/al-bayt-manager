@@ -1,8 +1,9 @@
 import { db } from '../config/database.js';
-import { settings, smsLogs } from '../db/schema/index.js';
+import { smsLogs } from '../db/schema/index.js';
 import { eq, and, gte, lte, desc } from 'drizzle-orm';
 import { logger } from '../config/logger.js';
 import { AppError } from '../middleware/error-handler.js';
+import { getRawSettings } from './settings.service.js';
 
 interface SmsResult {
   success: boolean;
@@ -20,7 +21,7 @@ interface SmsResult {
  * Content-Type: application/json
  */
 export async function sendSms(phone: string, message: string, meta?: { templateIdentifier?: string; userId?: string; languageUsed?: string }): Promise<SmsResult> {
-  const [config] = await db.select().from(settings).limit(1);
+  const config = await getRawSettings();
   if (!config?.smsEnabled) {
     throw new AppError(400, 'SMS sending is not configured');
   }

@@ -1,8 +1,10 @@
-import { ReactNode } from 'react';
+import { ReactNode, useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { api } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { usePublicSettings } from '@/contexts/PublicSettingsContext';
+import { useTheme } from '@/contexts/ThemeContext';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { MobileBottomNav } from './MobileBottomNav';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
@@ -26,6 +28,9 @@ import {
   AlertTriangle,
   Wrench,
   User,
+  Moon,
+  Sun,
+  ScrollText,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -53,6 +58,22 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
   const navigate = useNavigate();
   const location = useLocation();
   const isMobile = useIsMobile();
+  const { theme, setTheme, isDark } = useTheme();
+  const [notifCount, setNotifCount] = useState(0);
+
+  useEffect(() => {
+    if (user) {
+      api.get<{ count: number }>('/notifications/count')
+        .then(data => setNotifCount(data.count))
+        .catch(() => {});
+      const interval = setInterval(() => {
+        api.get<{ count: number }>('/notifications/count')
+          .then(data => setNotifCount(data.count))
+          .catch(() => {});
+      }, 60000);
+      return () => clearInterval(interval);
+    }
+  }, [user]);
 
   if (loading) {
     return (
@@ -107,6 +128,8 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
       ]
     : [
         { label: t('maintenanceJobs'), path: '/maintenance', icon: Wrench },
+        { label: t('invoices'), path: '/invoices', icon: FileText },
+        { label: t('leases'), path: '/leases', icon: ScrollText },
         { label: t('users'), path: '/users', icon: Users },
         { label: t('settings'), path: '/settings', icon: Settings },
         { label: t('apiKeys'), path: '/api-keys', icon: Key },
@@ -185,8 +208,30 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
               )}
             </nav>
 
-            {/* End: language + user */}
+            {/* End: theme toggle + notification bell + language + user */}
             <div className="flex items-center gap-2 shrink-0">
+              {/* Theme toggle */}
+              <button
+                onClick={() => setTheme(isDark ? 'light' : 'dark')}
+                className="p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                title={isDark ? 'Light mode' : 'Dark mode'}
+              >
+                {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              </button>
+
+              {/* Notification bell */}
+              <button
+                onClick={() => navigate('/audit-logs')}
+                className="relative p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              >
+                <Bell className="h-4 w-4" />
+                {notifCount > 0 && (
+                  <span className="absolute -top-0.5 -end-0.5 h-4 min-w-[16px] flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold px-1">
+                    {notifCount > 99 ? '99+' : notifCount}
+                  </span>
+                )}
+              </button>
+
               <LanguageSwitcher />
 
               {/* User menu */}
@@ -215,6 +260,24 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
                     <User className="h-4 w-4 me-2" />
                     {t('profile')}
                   </DropdownMenuItem>
+                  {user.organizationId && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={async () => {
+                        try {
+                          const orgs = await api.get<any[]>('/auth/my-organizations');
+                          if (orgs.length <= 1) return;
+                          const currentIdx = orgs.findIndex((o: any) => o.organizationId === user.organizationId);
+                          const nextOrg = orgs[(currentIdx + 1) % orgs.length];
+                          await api.post('/auth/switch-organization', { organizationId: nextOrg.organizationId });
+                          window.location.reload();
+                        } catch {}
+                      }}>
+                        <Building2 className="h-4 w-4 me-2" />
+                        {t('switchOrganization')}
+                      </DropdownMenuItem>
+                    </>
+                  )}
                   <DropdownMenuItem onClick={signOut} className="text-destructive focus:text-destructive">
                     <LogOut className="h-4 w-4 me-2" />
                     {t('logout')}
@@ -245,6 +308,28 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
             </button>
 
             <div className="flex items-center gap-1">
+              {/* Theme toggle (mobile) */}
+              <button
+                onClick={() => setTheme(isDark ? 'light' : 'dark')}
+                className="p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                title={isDark ? 'Light mode' : 'Dark mode'}
+              >
+                {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              </button>
+
+              {/* Notification bell (mobile) */}
+              <button
+                onClick={() => navigate('/audit-logs')}
+                className="relative p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              >
+                <Bell className="h-4 w-4" />
+                {notifCount > 0 && (
+                  <span className="absolute -top-0.5 -end-0.5 h-4 min-w-[16px] flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold px-1">
+                    {notifCount > 99 ? '99+' : notifCount}
+                  </span>
+                )}
+              </button>
+
               <LanguageSwitcher variant="icon" />
 
               {/* User menu */}
@@ -269,6 +354,24 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
                     <User className="h-4 w-4 me-2" />
                     {t('profile')}
                   </DropdownMenuItem>
+                  {user.organizationId && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={async () => {
+                        try {
+                          const orgs = await api.get<any[]>('/auth/my-organizations');
+                          if (orgs.length <= 1) return;
+                          const currentIdx = orgs.findIndex((o: any) => o.organizationId === user.organizationId);
+                          const nextOrg = orgs[(currentIdx + 1) % orgs.length];
+                          await api.post('/auth/switch-organization', { organizationId: nextOrg.organizationId });
+                          window.location.reload();
+                        } catch {}
+                      }}>
+                        <Building2 className="h-4 w-4 me-2" />
+                        {t('switchOrganization')}
+                      </DropdownMenuItem>
+                    </>
+                  )}
                   <DropdownMenuItem onClick={signOut} className="text-destructive focus:text-destructive">
                     <LogOut className="h-4 w-4 me-2" />
                     {t('logout')}

@@ -35,6 +35,18 @@ export const settings = pgTable('settings', {
   cardcomApiPassword: varchar('cardcom_api_password', { length: 500 }),
   // Email verification
   emailVerificationEnabled: boolean('email_verification_enabled').default(false).notNull(),
+  // PayPal payment gateway
+  paypalEnabled: boolean('paypal_enabled').default(false).notNull(),
+  paypalClientId: varchar('paypal_client_id', { length: 500 }),
+  paypalClientSecret: varchar('paypal_client_secret', { length: 500 }),
+  paypalMode: varchar('paypal_mode', { length: 10 }).default('sandbox'), // sandbox or live
+  // Twilio SMS
+  twilioEnabled: boolean('twilio_enabled').default(false).notNull(),
+  twilioAccountSid: varchar('twilio_account_sid', { length: 255 }),
+  twilioAuthToken: varchar('twilio_auth_token', { length: 500 }),
+  twilioPhoneNumber: varchar('twilio_phone_number', { length: 50 }),
+  // Region setting for payment/SMS routing
+  region: varchar('region', { length: 10 }).default('IL').notNull(), // IL = Israel, INTL = International
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });

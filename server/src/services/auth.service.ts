@@ -9,6 +9,8 @@ import { AppError } from '../middleware/error-handler.js';
 import { env } from '../config/env.js';
 import { createTwoFASession, consumeTwoFASession, invalidateTwoFASession } from './twofa-session.service.js';
 import { deleteFile, getAvatarPath } from './storage.service.js';
+import { createVerificationSession } from './email-verification.service.js';
+import * as organizationService from './organization.service.js';
 
 function hashToken(token: string): string {
   return crypto.createHash('sha256').update(token).digest('hex');
@@ -143,7 +145,7 @@ export async function signUp(email: string, password: string, name: string, phon
 
   const passwordHash = await hashPassword(password);
 
-  return await db.transaction(async (tx) => {
+  const user = await db.transaction(async (tx) => {
     const [user] = await tx
       .insert(users)
       .values({ email, passwordHash })
@@ -184,8 +186,24 @@ export async function signUp(email: string, password: string, name: string, phon
       });
     }
 
-    return { id: user.id, email: user.email };
+    return user;
   });
+
+  // Check if email verification is needed
+  const [config] = await db.select().from(settings).limit(1);
+  if (config?.emailVerificationEnabled && config?.resendApiKey) {
+    const { token, code } = createVerificationSession(user.id, email);
+    // Send verification email
+    try {
+      const { sendVerificationEmail } = await import('./email.service.js');
+      await sendVerificationEmail(email, code);
+    } catch {
+      // Don't fail registration if email send fails
+    }
+    return { id: user.id, email: user.email, requiresVerification: true, verificationToken: token };
+  }
+
+  return { id: user.id, email: user.email, requiresVerification: false };
 }
 
 export async function refreshTokensService(token: string) {
@@ -378,15 +396,46 @@ export async function reissueTokens(userId: string) {
 }
 
 /**
- * Super-admin: impersonate a user (login as them)
+ * Switch active organization (reissue tokens with new org context)
  */
-export async function impersonateUser(targetUserId: string) {
-  const [user] = await db.select().from(users).where(eq(users.id, targetUserId)).limit(1);
+export async function switchOrganization(userId: string, organizationId: string) {
+  const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   if (!user) throw new AppError(404, 'User not found');
 
-  const payload = await buildTokenPayload(user.id, user.email);
+  // Verify membership
+  const [membership] = await db.select().from(organizationMembers)
+    .where(and(eq(organizationMembers.userId, userId), eq(organizationMembers.organizationId, organizationId)))
+    .limit(1);
+  if (!membership) throw new AppError(403, 'Not a member of this organization');
+
+  const accessToken = signAccessToken({
+    userId: user.id,
+    email: user.email,
+    role: membership.role,
+    organizationId,
+    isSuperAdmin: user.isSuperAdmin,
+  });
+
+  const refreshToken = await createRefreshToken(userId);
+  return { accessToken, refreshToken };
+}
+
+/**
+ * Super-admin: impersonate a user (login as them)
+ */
+export async function impersonateUser(targetUserId: string, impersonatorUserId: string) {
+  const [target] = await db.select().from(users).where(eq(users.id, targetUserId)).limit(1);
+  if (!target) throw new AppError(404, 'User not found');
+
+  // Prevent impersonating other super-admins
+  if (target.isSuperAdmin) throw new AppError(403, 'Cannot impersonate another super admin');
+
+  // Prevent self-impersonation
+  if (targetUserId === impersonatorUserId) throw new AppError(400, 'Cannot impersonate yourself');
+
+  const payload = await buildTokenPayload(target.id, target.email);
   const accessToken = signAccessToken(payload);
-  const refreshToken = await createRefreshToken(user.id);
+  const refreshToken = await createRefreshToken(target.id);
 
   return { accessToken, refreshToken };
 }
@@ -397,6 +446,11 @@ export async function impersonateUser(targetUserId: string) {
 export async function adminCreateUser(email: string, password: string, name: string, role: string, phone?: string, organizationId?: string) {
   const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
   if (existing) throw new AppError(409, 'Email already registered');
+
+  // Check tenant limit for user role
+  if (organizationId && (role === 'user')) {
+    await organizationService.checkTenantLimit(organizationId);
+  }
 
   const passwordHash = await hashPassword(password);
 

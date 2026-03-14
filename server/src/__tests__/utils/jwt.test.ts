@@ -46,4 +46,32 @@ describe('JWT utilities', () => {
     const token = signAccessToken(payload);
     expect(() => verifyRefreshToken(token)).toThrow();
   });
+
+  describe('SaaS token fields', () => {
+    it('includes organizationId in access token', () => {
+      const saasPayload: TokenPayload = {
+        userId: '550e8400-e29b-41d4-a716-446655440000',
+        email: 'test@example.com',
+        role: 'org_admin',
+        organizationId: '660e8400-e29b-41d4-a716-446655440001',
+        isSuperAdmin: false,
+      };
+      const token = signAccessToken(saasPayload);
+      const decoded = verifyAccessToken(token);
+      expect(decoded.organizationId).toBe(saasPayload.organizationId);
+      expect(decoded.isSuperAdmin).toBe(false);
+    });
+
+    it('includes isSuperAdmin flag', () => {
+      const superPayload: TokenPayload = {
+        userId: '550e8400-e29b-41d4-a716-446655440000',
+        email: 'test@example.com',
+        role: 'admin',
+        isSuperAdmin: true,
+      };
+      const token = signAccessToken(superPayload);
+      const decoded = verifyAccessToken(token);
+      expect(decoded.isSuperAdmin).toBe(true);
+    });
+  });
 });

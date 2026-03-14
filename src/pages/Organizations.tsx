@@ -21,6 +21,10 @@ import { Building2, Plus, Pencil, Trash2, Users, UserPlus, LogIn } from 'lucide-
 interface Organization {
   id: string;
   name: string;
+  defaultLanguage: string;
+  maxBuildings: number;
+  maxApartments: number;
+  maxTenants: number;
   isActive: boolean;
   createdAt: string;
 }
@@ -43,7 +47,7 @@ const Organizations = () => {
   const [orgs, setOrgs] = useState<Organization[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingOrg, setEditingOrg] = useState<Organization | null>(null);
-  const [formData, setFormData] = useState({ name: '' });
+  const [formData, setFormData] = useState({ name: '', defaultLanguage: 'ar', maxBuildings: '0', maxApartments: '0', maxTenants: '0' });
 
   // Members dialog
   const [membersDialogOpen, setMembersDialogOpen] = useState(false);
@@ -71,12 +75,19 @@ const Organizations = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const payload = {
+      name: formData.name,
+      defaultLanguage: formData.defaultLanguage,
+      maxBuildings: parseInt(formData.maxBuildings) || 0,
+      maxApartments: parseInt(formData.maxApartments) || 0,
+      maxTenants: parseInt(formData.maxTenants) || 0,
+    };
     try {
       if (editingOrg) {
-        await api.put(`/organizations/${editingOrg.id}`, formData);
+        await api.put(`/organizations/${editingOrg.id}`, payload);
         toast({ title: t('success'), description: t('organizationUpdated') });
       } else {
-        await api.post('/organizations', formData);
+        await api.post('/organizations', payload);
         toast({ title: t('success'), description: t('organizationCreated') });
       }
       fetchOrgs();
@@ -99,12 +110,18 @@ const Organizations = () => {
 
   const handleEdit = (org: Organization) => {
     setEditingOrg(org);
-    setFormData({ name: org.name });
+    setFormData({
+      name: org.name,
+      defaultLanguage: org.defaultLanguage || 'ar',
+      maxBuildings: String(org.maxBuildings ?? 0),
+      maxApartments: String(org.maxApartments ?? 0),
+      maxTenants: String(org.maxTenants ?? 0),
+    });
     setIsDialogOpen(true);
   };
 
   const resetForm = () => {
-    setFormData({ name: '' });
+    setFormData({ name: '', defaultLanguage: 'ar', maxBuildings: '0', maxApartments: '0', maxTenants: '0' });
     setEditingOrg(null);
     setIsDialogOpen(false);
   };
@@ -183,10 +200,36 @@ const Organizations = () => {
                     <Input
                       id="orgName"
                       value={formData.name}
-                      onChange={(e) => setFormData({ name: e.target.value })}
+                      onChange={(e) => setFormData({...formData, name: e.target.value})}
                       required
                     />
                   </div>
+                  <div>
+                    <Label>{t('defaultLanguage')}</Label>
+                    <Select value={formData.defaultLanguage} onValueChange={(v) => setFormData({...formData, defaultLanguage: v})}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ar">العربية</SelectItem>
+                        <SelectItem value="he">עברית</SelectItem>
+                        <SelectItem value="en">English</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <Label>{t('maxBuildings')}</Label>
+                      <Input type="number" min="0" value={formData.maxBuildings} onChange={(e) => setFormData({...formData, maxBuildings: e.target.value})} placeholder="0 = unlimited" />
+                    </div>
+                    <div>
+                      <Label>{t('maxApartments')}</Label>
+                      <Input type="number" min="0" value={formData.maxApartments} onChange={(e) => setFormData({...formData, maxApartments: e.target.value})} placeholder="0 = unlimited" />
+                    </div>
+                    <div>
+                      <Label>{t('maxTenants')}</Label>
+                      <Input type="number" min="0" value={formData.maxTenants} onChange={(e) => setFormData({...formData, maxTenants: e.target.value})} placeholder="0 = unlimited" />
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">{t('limitZeroUnlimited')}</p>
                   <div className="flex gap-2">
                     <Button type="submit" className="flex-1">
                       {editingOrg ? t('update') : t('create')}
@@ -210,17 +253,25 @@ const Organizations = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead className="text-start">{t('nameLabel')}</TableHead>
+                  <TableHead className="text-start">{t('language')}</TableHead>
+                  <TableHead className="text-start">{t('maxBuildings')}</TableHead>
+                  <TableHead className="text-start">{t('maxApartments')}</TableHead>
                   <TableHead className="text-start">{t('status')}</TableHead>
                   <TableHead className="text-start">{t('actions')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {paginated.length === 0 ? (
-                  <TableEmptyRow colSpan={3} message={t('noOrganizationsFound')} />
+                  <TableEmptyRow colSpan={6} message={t('noOrganizationsFound')} />
                 ) : (
                   paginated.map((org) => (
                     <TableRow key={org.id}>
                       <TableCell className="font-medium text-start">{org.name}</TableCell>
+                      <TableCell className="text-start">
+                        {org.defaultLanguage === 'ar' ? 'العربية' : org.defaultLanguage === 'he' ? 'עברית' : 'English'}
+                      </TableCell>
+                      <TableCell className="text-start">{org.maxBuildings === 0 ? '∞' : org.maxBuildings}</TableCell>
+                      <TableCell className="text-start">{org.maxApartments === 0 ? '∞' : org.maxApartments}</TableCell>
                       <TableCell className="text-start">
                         <Badge variant={org.isActive ? 'default' : 'secondary'}>
                           {org.isActive ? t('active') : t('inactive')}

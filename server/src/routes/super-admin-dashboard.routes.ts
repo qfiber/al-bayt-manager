@@ -11,3 +11,10 @@ superAdminDashboardRoutes.get('/dashboard', requireAuth, requireSuperAdmin, asyn
     res.json(result);
   } catch (err) { next(err); }
 });
+
+superAdminDashboardRoutes.get('/trends', requireAuth, requireSuperAdmin, async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const result = await dashboardService.getMonthlyTrends();
+    res.json(result);
+  } catch (err) { next(err); }
+});

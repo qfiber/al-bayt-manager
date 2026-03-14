@@ -1,8 +1,9 @@
 import { db } from '../config/database.js';
 import { logger } from '../config/logger.js';
-import { emailTemplates, emailTemplateTranslations, emailLogs, settings } from '../db/schema/index.js';
+import { emailTemplates, emailTemplateTranslations, emailLogs } from '../db/schema/index.js';
 import { eq, and, desc, gte, lte } from 'drizzle-orm';
 import { AppError } from '../middleware/error-handler.js';
+import { getRawSettings } from './settings.service.js';
 
 /** Escape HTML special characters to prevent injection in email bodies */
 function escapeHtml(str: string): string {
@@ -250,7 +251,7 @@ export async function sendEmail(data: {
   variables?: Record<string, string>;
 }) {
   // Get settings for SMTP config
-  const [config] = await db.select().from(settings).limit(1);
+  const config = await getRawSettings();
   if (!config?.smtpEnabled || !config?.resendApiKey) {
     await logEmailAttempt(data.templateIdentifier, data.recipientEmail, data.userId, 'skipped', 'SMTP not enabled', data.preferredLanguage);
     throw new AppError(400, 'Email sending is not configured');
@@ -346,6 +347,75 @@ export async function sendOtpEmail(recipientEmail: string, otp: string, language
     recipientEmail,
     preferredLanguage: language,
     variables: { otp },
+  });
+}
+
+export async function sendVerificationEmail(email: string, code: string) {
+  const config = await getRawSettings();
+  if (!config?.resendApiKey) return;
+
+  const { Resend } = await import('resend');
+  const resend = new Resend(config.resendApiKey);
+
+  await resend.emails.send({
+    from: `${config.smtpFromName || 'Al-Bayt Manager'} <${config.smtpFromEmail || 'noreply@example.com'}>`,
+    to: email,
+    subject: 'Verify your email address',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <h2>Email Verification</h2>
+        <p>Your verification code is:</p>
+        <div style="background: #f4f4f4; padding: 20px; text-align: center; font-size: 32px; letter-spacing: 8px; font-weight: bold; border-radius: 8px; margin: 20px 0;">
+          ${code}
+        </div>
+        <p>This code expires in 15 minutes.</p>
+        <p style="color: #666; font-size: 12px;">If you didn't request this, please ignore this email.</p>
+      </div>
+    `,
+  });
+}
+
+export async function sendInspectionNotificationEmail(email: string, data: {
+  tenantName: string;
+  title: string;
+  description: string;
+  scheduledAt: string;
+  type: string;
+}) {
+  const config = await getRawSettings();
+  if (!config?.resendApiKey) return;
+
+  const { Resend } = await import('resend');
+  const resend = new Resend(config.resendApiKey);
+
+  const typeLabels: Record<string, string> = {
+    inspection: 'Inspection / فحص / בדיקה',
+    maintenance: 'Maintenance / صيانة / תחזוקה',
+    visit: 'Visit / زيارة / ביקור',
+  };
+
+  const date = new Date(data.scheduledAt).toLocaleString('en-GB', {
+    dateStyle: 'full',
+    timeStyle: 'short',
+  });
+
+  await resend.emails.send({
+    from: `${config.smtpFromName || 'Al-Bayt Manager'} <${config.smtpFromEmail || 'noreply@example.com'}>`,
+    to: email,
+    subject: `${typeLabels[data.type] || data.type}: ${data.title}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <h2>${typeLabels[data.type] || data.type}</h2>
+        <p>Dear ${escapeHtml(data.tenantName)},</p>
+        <p>You are being notified about an upcoming ${data.type}:</p>
+        <div style="background: #f4f4f4; padding: 15px; border-radius: 8px; margin: 15px 0;">
+          <p><strong>${escapeHtml(data.title)}</strong></p>
+          <p>Date: ${date}</p>
+          ${data.description ? `<p>${escapeHtml(data.description)}</p>` : ''}
+        </div>
+        <p style="color: #666; font-size: 12px;">${config.companyName || 'Al-Bayt Manager'}</p>
+      </div>
+    `,
   });
 }
 

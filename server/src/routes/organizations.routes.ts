@@ -12,11 +12,19 @@ export const organizationRoutes = Router();
 
 const createOrgSchema = z.object({
   name: z.string().min(1).max(255),
+  defaultLanguage: z.enum(['ar', 'he', 'en']).optional(),
+  maxBuildings: z.number().int().min(0).max(10000).optional(),
+  maxApartments: z.number().int().min(0).max(100000).optional(),
+  maxTenants: z.number().int().min(0).max(100000).optional(),
 });
 
 const updateOrgSchema = z.object({
   name: z.string().min(1).max(255).optional(),
   isActive: z.boolean().optional(),
+  defaultLanguage: z.enum(['ar', 'he', 'en']).optional(),
+  maxBuildings: z.number().int().min(0).max(10000).optional(),
+  maxApartments: z.number().int().min(0).max(100000).optional(),
+  maxTenants: z.number().int().min(0).max(100000).optional(),
 });
 
 const idParams = z.object({ id: z.string().uuid() });
@@ -91,9 +99,9 @@ organizationRoutes.delete('/:id/members/:userId', requireAuth, requireSuperAdmin
 });
 
 // Impersonate a user (login as them) — super-admin only
-organizationRoutes.post('/impersonate/:userId', requireAuth, requireSuperAdmin, async (req: Request, res: Response, next: NextFunction) => {
+organizationRoutes.post('/impersonate/:userId', requireAuth, requireSuperAdmin, auditLog('login', 'users'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const result = await authService.impersonateUser(req.params.userId as string);
+    const result = await authService.impersonateUser(req.params.userId as string, req.user!.userId);
     setAuthCookies(res, result.accessToken, result.refreshToken);
     res.json({ success: true });
   } catch (err) { next(err); }

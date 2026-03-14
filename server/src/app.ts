@@ -36,7 +36,13 @@ import { debtCollectionRoutes } from './routes/debt-collection.routes.js';
 import { v1Routes } from './routes/v1/index.js';
 import { organizationRoutes } from './routes/organizations.routes.js';
 import { superAdminDashboardRoutes } from './routes/super-admin-dashboard.routes.js';
+import { apiDocsRoutes } from './routes/api-docs.routes.js';
+import { onlinePaymentRoutes } from './routes/online-payments.routes.js';
+import { notificationInboxRoutes } from './routes/notifications.routes.js';
+import { leaseRoutes } from './routes/leases.routes.js';
+import { inspectionRoutes } from './routes/inspections.routes.js';
 import { dbRateLimit, cleanupRateLimitEntries } from './middleware/db-rate-limit.js';
+import { sanitizeBody } from './middleware/sanitize.js';
 
 export function createApp() {
   const app = express();
@@ -53,7 +59,11 @@ export function createApp() {
     genReqId: () => crypto.randomUUID(),
     autoLogging: { ignore: (req) => req.url === '/api/health' },
   }));
+  // Raw body for Stripe webhooks (must be before json parser)
+  app.use('/api/payments/stripe-webhook', express.raw({ type: 'application/json' }));
   app.use(express.json());
+  // Sanitize all request body strings (strip HTML to prevent XSS)
+  app.use(sanitizeBody);
   app.use(cookieParser());
 
   // Public uploads (logos) — no auth, served by Express in dev, nginx in prod
@@ -74,14 +84,28 @@ export function createApp() {
   app.use('/api', dbRateLimit({ prefix: 'api', windowMs: 60 * 1000, max: 100 }));
   app.use('/api/v1', dbRateLimit({ prefix: 'v1', windowMs: 60 * 1000, max: 60 }));
 
+  // Stricter rate limits for write-heavy/sensitive routes
+  app.use('/api/buildings', dbRateLimit({ prefix: 'buildings', windowMs: 60 * 1000, max: 30 }));
+  app.use('/api/apartments', dbRateLimit({ prefix: 'apartments', windowMs: 60 * 1000, max: 30 }));
+  app.use('/api/payments', dbRateLimit({ prefix: 'payments', windowMs: 60 * 1000, max: 30 }));
+  app.use('/api/expenses', dbRateLimit({ prefix: 'expenses', windowMs: 60 * 1000, max: 30 }));
+  app.use('/api/users', dbRateLimit({ prefix: 'users', windowMs: 60 * 1000, max: 20 }));
+  app.use('/api/organizations', dbRateLimit({ prefix: 'orgs', windowMs: 60 * 1000, max: 20 }));
+  app.use('/api/super-admin', dbRateLimit({ prefix: 'super-admin', windowMs: 60 * 1000, max: 30 }));
+  app.use('/api/upload', dbRateLimit({ prefix: 'upload', windowMs: 60 * 1000, max: 10 }));
+
   // Cleanup stale rate limit entries every hour
   setInterval(() => cleanupRateLimitEntries().catch(() => {}), 3600000);
+
+  // API documentation (no auth required)
+  app.use('/api/docs', apiDocsRoutes);
 
   // Routes
   app.use('/api/auth', authRoutes);
   app.use('/api/buildings', buildingRoutes);
   app.use('/api/apartments', apartmentRoutes);
   app.use('/api/payments', paymentRoutes);
+  app.use('/api/payments', onlinePaymentRoutes);
   app.use('/api/expenses', expenseRoutes);
   app.use('/api/apartment-expenses', apartmentExpenseRoutes);
   app.use('/api/my-apartments', myApartmentRoutes);
@@ -103,6 +127,9 @@ export function createApp() {
   app.use('/api/debt-collection', debtCollectionRoutes);
   app.use('/api/organizations', organizationRoutes);
   app.use('/api/super-admin', superAdminDashboardRoutes);
+  app.use('/api/notifications', notificationInboxRoutes);
+  app.use('/api/leases', leaseRoutes);
+  app.use('/api/inspections', inspectionRoutes);
   app.use('/api/v1', v1Routes);
 
   // Health check

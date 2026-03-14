@@ -99,24 +99,11 @@ export async function getUser(id: string) {
     .innerJoin(buildings, eq(moderatorBuildings.buildingId, buildings.id))
     .where(eq(moderatorBuildings.userId, id));
 
-  // Get owner/beneficiary assignments
-  const ownerApartments = await db
-    .select({ id: apartments.id, apartmentNumber: apartments.apartmentNumber, buildingId: apartments.buildingId })
-    .from(apartments)
-    .where(eq(apartments.ownerId, id));
-
-  const beneficiaryApartments = await db
-    .select({ id: apartments.id, apartmentNumber: apartments.apartmentNumber, buildingId: apartments.buildingId })
-    .from(apartments)
-    .where(eq(apartments.beneficiaryId, id));
-
   return {
     ...user,
     role: role?.role || 'user',
     apartments: aptAssignments,
     buildings: buildingAssignments,
-    ownerApartments,
-    beneficiaryApartments,
   };
 }
 
@@ -183,40 +170,6 @@ export async function updateUserApartmentAssignments(userId: string, apartmentId
 export async function deleteUser(id: string) {
   const [user] = await db.delete(users).where(eq(users.id, id)).returning();
   if (!user) throw new AppError(404, 'User not found');
-  return { success: true };
-}
-
-export async function updateOwnerAssignments(userId: string, apartmentIds: string[]) {
-  // Clear existing owner assignments for this user
-  await db
-    .update(apartments)
-    .set({ ownerId: null })
-    .where(eq(apartments.ownerId, userId));
-
-  // Set new assignments
-  if (apartmentIds.length > 0) {
-    await db
-      .update(apartments)
-      .set({ ownerId: userId })
-      .where(inArray(apartments.id, apartmentIds));
-  }
-
-  return { success: true };
-}
-
-export async function updateBeneficiaryAssignments(userId: string, apartmentIds: string[]) {
-  await db
-    .update(apartments)
-    .set({ beneficiaryId: null })
-    .where(eq(apartments.beneficiaryId, userId));
-
-  if (apartmentIds.length > 0) {
-    await db
-      .update(apartments)
-      .set({ beneficiaryId: userId })
-      .where(inArray(apartments.id, apartmentIds));
-  }
-
   return { success: true };
 }
 

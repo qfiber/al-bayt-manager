@@ -45,6 +45,15 @@ interface SettingsData {
   cardcomApiName: string | null;
   cardcomApiPassword: string | null;
   emailVerificationEnabled: boolean;
+  paypalEnabled: boolean;
+  paypalClientId: string | null;
+  paypalClientSecret: string | null;
+  paypalMode: string | null;
+  twilioEnabled: boolean;
+  twilioAccountSid: string | null;
+  twilioAuthToken: string | null;
+  twilioPhoneNumber: string | null;
+  region: string;
 }
 
 interface LogoFile {
@@ -117,6 +126,15 @@ const Settings = () => {
   const [cardcomApiName, setCardcomApiName] = useState('');
   const [cardcomApiPassword, setCardcomApiPassword] = useState('');
   const [emailVerificationEnabled, setEmailVerificationEnabled] = useState(false);
+  const [paypalEnabled, setPaypalEnabled] = useState(false);
+  const [paypalClientId, setPaypalClientId] = useState('');
+  const [paypalClientSecret, setPaypalClientSecret] = useState('');
+  const [paypalMode, setPaypalMode] = useState('sandbox');
+  const [twilioEnabled, setTwilioEnabled] = useState(false);
+  const [twilioAccountSid, setTwilioAccountSid] = useState('');
+  const [twilioAuthToken, setTwilioAuthToken] = useState('');
+  const [twilioPhoneNumber, setTwilioPhoneNumber] = useState('');
+  const [region, setRegion] = useState('IL');
 
   const applySettingsToForm = useCallback((data: SettingsData) => {
     setSettings(data);
@@ -151,6 +169,15 @@ const Settings = () => {
     setCardcomApiName(data.cardcomApiName || '');
     setCardcomApiPassword(data.cardcomApiPassword || '');
     setEmailVerificationEnabled(data.emailVerificationEnabled ?? false);
+    setPaypalEnabled(data.paypalEnabled ?? false);
+    setPaypalClientId(data.paypalClientId || '');
+    setPaypalClientSecret(data.paypalClientSecret || '');
+    setPaypalMode(data.paypalMode || 'sandbox');
+    setTwilioEnabled(data.twilioEnabled ?? false);
+    setTwilioAccountSid(data.twilioAccountSid || '');
+    setTwilioAuthToken(data.twilioAuthToken || '');
+    setTwilioPhoneNumber(data.twilioPhoneNumber || '');
+    setRegion(data.region || 'IL');
   }, []);
 
   useEffect(() => {
@@ -249,6 +276,15 @@ const Settings = () => {
         cardcomApiName: cardcomApiName || null,
         cardcomApiPassword: cardcomApiPassword || null,
         emailVerificationEnabled,
+        paypalEnabled,
+        paypalClientId: paypalClientId || null,
+        paypalClientSecret: paypalClientSecret || null,
+        paypalMode,
+        twilioEnabled,
+        twilioAccountSid: twilioAccountSid || null,
+        twilioAuthToken: twilioAuthToken || null,
+        twilioPhoneNumber: twilioPhoneNumber || null,
+        region,
       });
 
       toast({ title: t('success'), description: t('settingsUpdated') });
@@ -898,6 +934,102 @@ const Settings = () => {
                   <p className="text-xs text-muted-foreground">{t('cardcomComingSoon')}</p>
                 </div>
               )}
+            </CardContent>
+          </Card>
+
+          {/* PayPal Payment Gateway */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CreditCard className="w-5 h-5" />
+                {t('paypalConfiguration')}
+              </CardTitle>
+              <CardDescription>{t('paypalConfigDesc')}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between mb-4">
+                <Label>{t('enablePaypal')}</Label>
+                <Switch checked={paypalEnabled} onCheckedChange={setPaypalEnabled} />
+              </div>
+              {paypalEnabled && (
+                <div className="space-y-4">
+                  <div>
+                    <Label>{t('paypalClientId')}</Label>
+                    <Input value={paypalClientId} onChange={(e) => setPaypalClientId(e.target.value)} placeholder="AX..." />
+                  </div>
+                  <div>
+                    <Label>{t('paypalClientSecret')}</Label>
+                    <Input type="password" value={paypalClientSecret} onChange={(e) => setPaypalClientSecret(e.target.value)} />
+                  </div>
+                  <div>
+                    <Label>{t('paypalMode')}</Label>
+                    <Select value={paypalMode} onValueChange={setPaypalMode}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="sandbox">Sandbox</SelectItem>
+                        <SelectItem value="live">Live</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Twilio SMS */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <MessageSquare className="w-5 h-5" />
+                {t('twilioConfiguration')}
+              </CardTitle>
+              <CardDescription>{t('twilioConfigDesc')}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between mb-4">
+                <Label>{t('enableTwilio')}</Label>
+                <Switch checked={twilioEnabled} onCheckedChange={setTwilioEnabled} />
+              </div>
+              {twilioEnabled && (
+                <div className="space-y-4">
+                  <div>
+                    <Label>{t('twilioAccountSid')}</Label>
+                    <Input value={twilioAccountSid} onChange={(e) => setTwilioAccountSid(e.target.value)} placeholder="AC..." />
+                  </div>
+                  <div>
+                    <Label>{t('twilioAuthToken')}</Label>
+                    <Input type="password" value={twilioAuthToken} onChange={(e) => setTwilioAuthToken(e.target.value)} />
+                  </div>
+                  <div>
+                    <Label>{t('twilioPhoneNumber')}</Label>
+                    <Input value={twilioPhoneNumber} onChange={(e) => setTwilioPhoneNumber(e.target.value)} placeholder="+1234567890" />
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Region */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Globe className="w-5 h-5" />
+                {t('regionConfiguration')}
+              </CardTitle>
+              <CardDescription>{t('regionConfigDesc')}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div>
+                <Label>{t('region')}</Label>
+                <Select value={region} onValueChange={setRegion}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="IL">{t('regionIsrael')}</SelectItem>
+                    <SelectItem value="INTL">{t('regionInternational')}</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-2">{t('regionHelp')}</p>
+              </div>
             </CardContent>
           </Card>
 

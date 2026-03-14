@@ -20,6 +20,7 @@ const envSchema = z.object({
   CORS_ORIGIN: z.string().default('http://localhost:8080'),
   POW_DIFFICULTY: z.coerce.number().default(19),
   POW_CHALLENGE_TTL_MS: z.coerce.number().default(300000),
+  ENCRYPTION_KEY: z.string().min(32).optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

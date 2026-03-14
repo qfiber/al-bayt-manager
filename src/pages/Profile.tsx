@@ -28,6 +28,7 @@ import {
   X,
   Package,
   Car,
+  Download,
 } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
 
@@ -804,6 +805,20 @@ const Profile = () => {
           </CardContent>
         </Card>
       )}
+
+      {/* Data Privacy / GDPR Export */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm">{t('dataPrivacy')}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground mb-3">{t('gdprExportDesc')}</p>
+          <Button variant="outline" size="sm" onClick={() => window.open('/api/auth/my-data/export')}>
+            <Download className="w-4 h-4 me-2" />
+            {t('downloadMyData')}
+          </Button>
+        </CardContent>
+      </Card>
 
       {/* My Reported Issues */}
       {!dataLoading && (

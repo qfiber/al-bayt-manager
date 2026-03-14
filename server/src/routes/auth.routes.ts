@@ -14,7 +14,7 @@ import { sendOtpEmail } from '../services/email.service.js';
 import { comparePassword } from '../utils/bcrypt.js';
 import { verifyTotpCode } from '../utils/totp.js';
 import { db } from '../config/database.js';
-import { users, refreshTokens, totpFactors } from '../db/schema/index.js';
+import { users, refreshTokens, totpFactors, settings, organizationMembers, organizations, profiles } from '../db/schema/index.js';
 import { eq, and } from 'drizzle-orm';
 
 export const authRoutes = Router();
@@ -115,6 +115,14 @@ authRoutes.post('/login', authRateLimit, requirePow, validate(loginSchema), asyn
     // Successful login — clear failed attempts
     await clearFailedAttempts(email);
 
+    // Check email verification
+    const [loginUser] = await db.select({ emailConfirmed: users.emailConfirmed }).from(users).where(eq(users.email, email)).limit(1);
+    const [loginConfig] = await db.select({ emailVerificationEnabled: settings.emailVerificationEnabled }).from(settings).limit(1);
+    if (loginConfig?.emailVerificationEnabled && !loginUser?.emailConfirmed) {
+      res.status(403).json({ error: 'Email not verified. Please check your email for the verification code.' });
+      return;
+    }
+
     if (result.requires2FA) {
       res.json({ requires2FA: true, sessionToken: result.sessionToken });
       return;
@@ -166,6 +174,48 @@ authRoutes.post('/register', authRateLimit, requirePow, validate(registerSchema)
   } catch (err) { next(err); }
 });
 
+const verifyEmailSchema = z.object({
+  token: z.string().min(1),
+  code: z.string().length(6),
+});
+
+const resendVerificationSchema = z.object({
+  token: z.string().min(1),
+});
+
+authRoutes.post('/verify-email', validate(verifyEmailSchema), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { verifyCode } = await import('../services/email-verification.service.js');
+    const { userId } = verifyCode(req.body.token, req.body.code);
+
+    // Mark email as confirmed
+    await db.update(users).set({ emailConfirmed: true }).where(eq(users.id, userId));
+
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message || 'Verification failed' });
+  }
+});
+
+authRoutes.post('/resend-verification', authRateLimit, validate(resendVerificationSchema), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { getSessionByToken, createVerificationSession } = await import('../services/email-verification.service.js');
+    const existing = getSessionByToken(req.body.token);
+    if (!existing) { res.status(400).json({ error: 'Session expired, please register again' }); return; }
+
+    const { token, code } = createVerificationSession(existing.userId, existing.email);
+
+    try {
+      const { sendVerificationEmail } = await import('../services/email.service.js');
+      await sendVerificationEmail(existing.email, code);
+    } catch {
+      // Don't fail if email send fails
+    }
+
+    res.json({ success: true, token });
+  } catch (err) { next(err); }
+});
+
 authRoutes.post('/refresh', refreshRateLimit, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const refreshToken = req.cookies?.refresh_token as string | undefined;
@@ -200,6 +250,33 @@ authRoutes.get('/me', requireAuth, async (req: Request, res: Response, next: Nex
   } catch (err) { next(err); }
 });
 
+authRoutes.get('/my-organizations', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const memberships = await db
+      .select({
+        organizationId: organizationMembers.organizationId,
+        role: organizationMembers.role,
+        name: organizations.name,
+      })
+      .from(organizationMembers)
+      .innerJoin(organizations, eq(organizationMembers.organizationId, organizations.id))
+      .where(eq(organizationMembers.userId, req.user!.userId));
+    res.json(memberships);
+  } catch (err) { next(err); }
+});
+
+const switchOrgSchema = z.object({
+  organizationId: z.string().uuid(),
+});
+
+authRoutes.post('/switch-organization', requireAuth, validate(switchOrgSchema), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const result = await authService.switchOrganization(req.user!.userId, req.body.organizationId);
+    setAuthCookies(res, result.accessToken, result.refreshToken);
+    res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
 authRoutes.post('/2fa/enroll', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await authService.enrollTotp(req.user!.userId);
@@ -225,6 +302,33 @@ authRoutes.get('/2fa/factors', requireAuth, async (req: Request, res: Response, 
   try {
     const result = await authService.getFactors(req.user!.userId);
     res.json(result);
+  } catch (err) { next(err); }
+});
+
+// GDPR: Download personal data
+authRoutes.get('/my-data/export', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId;
+
+    // Gather all user data
+    const [user] = await db.select({ id: users.id, email: users.email, createdAt: users.createdAt }).from(users).where(eq(users.id, userId)).limit(1);
+    const [profile] = await db.select().from(profiles).where(eq(profiles.id, userId)).limit(1);
+
+    const { userApartments: userAptTable } = await import('../db/schema/index.js');
+    const aptAssignments = await db.select().from(userAptTable).where(eq(userAptTable.userId, userId));
+    const orgMemberships = await db.select().from(organizationMembers).where(eq(organizationMembers.userId, userId));
+
+    const exportData = {
+      exportDate: new Date().toISOString(),
+      user: { id: user?.id, email: user?.email, createdAt: user?.createdAt },
+      profile,
+      apartmentAssignments: aptAssignments,
+      organizationMemberships: orgMemberships,
+    };
+
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', 'attachment; filename="my-data-export.json"');
+    res.json(exportData);
   } catch (err) { next(err); }
 });
 

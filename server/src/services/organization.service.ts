@@ -1,6 +1,6 @@
 import { db } from '../config/database.js';
 import { organizations, organizationMembers, users, profiles, settings } from '../db/schema/index.js';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
 import { AppError } from '../middleware/error-handler.js';
 
 export async function listOrganizations() {
@@ -13,7 +13,13 @@ export async function getOrganization(id: string) {
   return org;
 }
 
-export async function createOrganization(data: { name: string }) {
+export async function createOrganization(data: {
+  name: string;
+  defaultLanguage?: string;
+  maxBuildings?: number;
+  maxApartments?: number;
+  maxTenants?: number;
+}) {
   return await db.transaction(async (tx) => {
     const [org] = await tx.insert(organizations).values(data).returning();
 
@@ -27,7 +33,14 @@ export async function createOrganization(data: { name: string }) {
   });
 }
 
-export async function updateOrganization(id: string, data: Partial<{ name: string; isActive: boolean }>) {
+export async function updateOrganization(id: string, data: Partial<{
+  name: string;
+  isActive: boolean;
+  defaultLanguage: string;
+  maxBuildings: number;
+  maxApartments: number;
+  maxTenants: number;
+}>) {
   const [org] = await db.update(organizations).set({ ...data, updatedAt: new Date() }).where(eq(organizations.id, id)).returning();
   if (!org) throw new AppError(404, 'Organization not found');
   return org;
@@ -90,4 +103,26 @@ export async function updateMemberRole(organizationId: string, userId: string, r
     .returning();
   if (!member) throw new AppError(404, 'Member not found');
   return member;
+}
+
+export async function countOrgTenants(organizationId: string): Promise<number> {
+  // Count distinct users who are members of this org with role 'user'
+  const [result] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(organizationMembers)
+    .where(and(
+      eq(organizationMembers.organizationId, organizationId),
+      eq(organizationMembers.role, 'user'),
+    ));
+  return result?.count || 0;
+}
+
+export async function checkTenantLimit(organizationId: string): Promise<void> {
+  const [org] = await db.select().from(organizations).where(eq(organizations.id, organizationId)).limit(1);
+  if (!org || org.maxTenants === 0) return; // 0 = unlimited
+
+  const count = await countOrgTenants(organizationId);
+  if (count >= org.maxTenants) {
+    throw new AppError(403, 'Tenant limit reached for this organization');
+  }
 }

@@ -56,8 +56,6 @@ v1Routes.get('/apartments/:id', async (req: Request, res: Response, next: NextFu
         status: apartments.status,
         cachedBalance: apartments.cachedBalance,
         subscriptionAmount: apartments.subscriptionAmount,
-        ownerId: apartments.ownerId,
-        beneficiaryId: apartments.beneficiaryId,
         subscriptionStatus: apartments.subscriptionStatus,
         createdAt: apartments.createdAt,
       })

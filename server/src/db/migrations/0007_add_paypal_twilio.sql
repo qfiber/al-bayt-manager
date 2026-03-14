@@ -1,0 +1,14 @@
+-- PayPal fields
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS paypal_enabled BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS paypal_client_id VARCHAR(500);
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS paypal_client_secret VARCHAR(500);
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS paypal_mode VARCHAR(10) DEFAULT 'sandbox';
+
+-- Twilio SMS fields
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS twilio_enabled BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS twilio_account_sid VARCHAR(255);
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS twilio_auth_token VARCHAR(500);
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS twilio_phone_number VARCHAR(50);
+
+-- Region setting
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS region VARCHAR(10) NOT NULL DEFAULT 'IL';

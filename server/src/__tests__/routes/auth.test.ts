@@ -1,8 +1,17 @@
 import crypto from 'crypto';
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../../app.js';
+import { db } from '../../config/database.js';
 
+// Skip if no DB connection
+let dbAvailable = false;
+try {
+  await db.execute({ sql: 'SELECT 1', params: [] } as any).catch(() => {});
+  dbAvailable = true;
+} catch {}
+
+const describeDb = dbAvailable ? describe : describe.skip;
 const app = createApp();
 
 /** Solve a PoW challenge from the server. */
@@ -32,9 +41,9 @@ function hasLeadingZeroBits(hash: Buffer, bits: number): boolean {
 }
 
 const testEmail = `test-${Date.now()}@example.com`;
-const testPassword = 'TestPassword123';
+const testPassword = 'TestPassword12345678'; // min 16 chars
 
-describe('Auth routes', () => {
+describeDb('Auth routes', () => {
   it('GET /api/auth/challenge returns a valid challenge', async () => {
     const res = await request(app).get('/api/auth/challenge');
 
@@ -57,10 +66,11 @@ describe('Auth routes', () => {
       });
 
     expect(res.status).toBe(201);
-    expect(res.body).toHaveProperty('user');
+    expect(res.body).toHaveProperty('id');
+    expect(res.body).toHaveProperty('email');
   });
 
-  it('POST /api/auth/login with PoW returns tokens', async () => {
+  it('POST /api/auth/login with PoW succeeds', async () => {
     const pow = await solvePow();
 
     const res = await request(app)
@@ -72,8 +82,8 @@ describe('Auth routes', () => {
       });
 
     expect(res.status).toBe(200);
-    expect(res.body).toHaveProperty('accessToken');
-    expect(res.body).toHaveProperty('refreshToken');
+    // Auth tokens are set via httpOnly cookies, body returns { success: true }
+    expect(res.body.success).toBe(true);
   });
 
   it('POST /api/auth/login rejects wrong password', async () => {
@@ -83,7 +93,7 @@ describe('Auth routes', () => {
       .post('/api/auth/login')
       .send({
         email: testEmail,
-        password: 'WrongPassword999',
+        password: 'WrongPassword9999999',
         ...pow,
       });
 

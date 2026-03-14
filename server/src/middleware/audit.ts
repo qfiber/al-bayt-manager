@@ -3,7 +3,7 @@ import { db } from '../config/database.js';
 import { logger } from '../config/logger.js';
 import { auditLogs } from '../db/schema/index.js';
 
-type AuditAction = 'create' | 'update' | 'delete' | 'role_change' | 'password_change' | 'api_key_created' | 'api_key_deleted';
+type AuditAction = 'login' | 'logout' | 'signup' | 'create' | 'update' | 'delete' | 'role_change' | 'password_change' | 'api_key_created' | 'api_key_deleted' | 'failed_login' | 'account_locked' | 'rate_limited' | 'unauthorized_access';
 
 // Fields that should never appear in audit logs
 const SENSITIVE_FIELDS = [

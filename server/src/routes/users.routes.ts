@@ -100,20 +100,6 @@ userRoutes.post('/:id/disable-2fa', requireAuth, requireRole('admin'), validate(
   } catch (err) { next(err); }
 });
 
-userRoutes.put('/:id/owner-assignments', requireAuth, requireRole('admin'), validate({ params: idParams, body: assignmentSchema }), auditLog('update', 'apartments'), async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const result = await userService.updateOwnerAssignments(req.params.id as string, req.body.ids);
-    res.json(result);
-  } catch (err) { next(err); }
-});
-
-userRoutes.put('/:id/beneficiary-assignments', requireAuth, requireRole('admin'), validate({ params: idParams, body: assignmentSchema }), auditLog('update', 'apartments'), async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const result = await userService.updateBeneficiaryAssignments(req.params.id as string, req.body.ids);
-    res.json(result);
-  } catch (err) { next(err); }
-});
-
 userRoutes.put('/:id/building-assignments', requireAuth, requireRole('admin'), validate({ params: idParams, body: assignmentSchema }), auditLog('role_change', 'moderator_buildings'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await userService.updateBuildingAssignments(req.params.id as string, req.body.ids);

@@ -74,7 +74,7 @@ export default function ApiKeys() {
     if (!newKeyName.trim()) {
       toast({
         title: t('error'),
-        description: language === 'ar' ? 'الرجاء إدخال اسم للمفتاح' : 'Please enter a name for the key',
+        description: t('apiKeysEnterName'),
         variant: "destructive",
       });
       return;
@@ -92,7 +92,7 @@ export default function ApiKeys() {
 
       toast({
         title: t('success'),
-        description: language === 'ar' ? 'تم إنشاء مفتاح API بنجاح' : 'API key created successfully',
+        description: t('apiKeyCreatedSuccess'),
       });
     } catch (error: any) {
       toast({ title: t('error'), description: error.message, variant: "destructive" });
@@ -103,7 +103,7 @@ export default function ApiKeys() {
     navigator.clipboard.writeText(text);
     toast({
       title: t('success'),
-      description: language === 'ar' ? 'تم النسخ إلى الحافظة' : 'Copied to clipboard',
+      description: t('copiedToClipboard'),
     });
   };
 
@@ -113,9 +113,7 @@ export default function ApiKeys() {
       fetchApiKeys();
       toast({
         title: t('success'),
-        description: language === 'ar'
-          ? (currentStatus ? 'تم تعطيل المفتاح' : 'تم تفعيل المفتاح')
-          : (currentStatus ? 'Key disabled' : 'Key enabled'),
+        description: currentStatus ? t('keyDisabled') : t('keyEnabled'),
       });
     } catch (error: any) {
       toast({ title: t('error'), description: error.message, variant: "destructive" });
@@ -123,7 +121,7 @@ export default function ApiKeys() {
   };
 
   const deleteKey = async (id: string) => {
-    if (!confirm(language === 'ar' ? 'هل أنت متأكد من حذف هذا المفتاح؟' : 'Are you sure you want to delete this key?')) {
+    if (!confirm(t('confirmDeleteKey'))) {
       return;
     }
 
@@ -132,7 +130,7 @@ export default function ApiKeys() {
       fetchApiKeys();
       toast({
         title: t('success'),
-        description: language === 'ar' ? 'تم حذف المفتاح' : 'Key deleted',
+        description: t('keyDeleted'),
       });
     } catch (error: any) {
       toast({ title: t('error'), description: error.message, variant: "destructive" });
@@ -149,22 +147,20 @@ export default function ApiKeys() {
     <div className="container mx-auto px-3 py-4 sm:p-6 space-y-6" dir={language === 'ar' ? 'rtl' : 'ltr'}>
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">
-          {language === 'ar' ? 'مفاتيح API' : 'API Keys'}
+          {t('apiKeys')}
         </h1>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>{language === 'ar' ? 'معلومات API' : 'API Information'}</CardTitle>
+          <CardTitle>{t('apiInformation')}</CardTitle>
           <CardDescription>
-            {language === 'ar'
-              ? 'استخدم مفاتيح API للوصول إلى البيانات من التطبيقات الخارجية'
-              : 'Use API keys to access data from external applications'}
+            {t('apiInformationDesc')}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
-            <Label>{language === 'ar' ? 'عنوان API الأساسي' : 'Base API URL'}</Label>
+            <Label>{t('baseApiUrl')}</Label>
             <div className="flex gap-2 mt-2" dir="ltr">
               <Input value={apiBaseUrl} readOnly className="font-mono text-sm text-left" />
               <Button size="sm" variant="outline" onClick={() => copyToClipboard(apiBaseUrl)}>
@@ -173,64 +169,60 @@ export default function ApiKeys() {
             </div>
           </div>
           <div className="space-y-2">
-            <p className="font-semibold text-sm">{language === 'ar' ? 'نقاط النهاية المتاحة:' : 'Available Endpoints:'}</p>
+            <p className="font-semibold text-sm">{t('availableEndpoints')}</p>
             <div className="bg-muted p-4 rounded-lg space-y-3" dir="ltr">
               <div className="space-y-1">
                 <p className="font-mono text-sm font-semibold text-left">/apartments</p>
                 <p className="text-xs text-muted-foreground text-left">
-                  {language === 'ar'
-                    ? 'جميع الشقق مع اسم المستخدم ورقم الهاتف والرصيد الإجمالي'
-                    : 'All apartments with user name, phone, and total credit'}
+                  {t('endpointApartmentsDesc')}
                 </p>
               </div>
               <div className="space-y-1">
                 <p className="font-mono text-sm font-semibold text-left">/apartments/{'{id}'}</p>
                 <p className="text-xs text-muted-foreground text-left">
-                  {language === 'ar'
-                    ? 'شقة محددة مع أشهر الإشغال، الديون الإجمالية، وتفاصيل الديون لكل شهر'
-                    : 'Specific apartment with months occupied, total debt, and month-by-month debt details'}
+                  {t('endpointApartmentByIdDesc')}
                 </p>
               </div>
               <div className="space-y-1">
                 <p className="font-mono text-sm font-semibold text-left">/buildings</p>
                 <p className="text-xs text-muted-foreground text-left">
-                  {language === 'ar' ? 'جميع المباني' : 'All buildings'}
+                  {t('endpointBuildingsDesc')}
                 </p>
               </div>
               <div className="space-y-1">
                 <p className="font-mono text-sm font-semibold text-left">/expenses</p>
                 <p className="text-xs text-muted-foreground text-left">
-                  {language === 'ar' ? 'جميع المصروفات مع معلومات المبنى' : 'All expenses with building information'}
+                  {t('endpointExpensesDesc')}
                 </p>
               </div>
               <div className="space-y-1">
                 <p className="font-mono text-sm font-semibold text-left">/payments</p>
                 <p className="text-xs text-muted-foreground text-left">
-                  {language === 'ar' ? 'جميع الدفعات مع معلومات الشقة' : 'All payments with apartment information'}
+                  {t('endpointPaymentsDesc')}
                 </p>
               </div>
               <div className="space-y-1">
                 <p className="font-mono text-sm font-semibold text-left">/users</p>
                 <p className="text-xs text-muted-foreground text-left">
-                  {language === 'ar' ? 'جميع ملفات المستخدمين' : 'All user profiles'}
+                  {t('endpointUsersDesc')}
                 </p>
               </div>
               <div className="space-y-1">
                 <p className="font-mono text-sm font-semibold text-left">/user-apartments</p>
                 <p className="text-xs text-muted-foreground text-left">
-                  {language === 'ar' ? 'تعيينات الشقق للمستخدمين' : 'User apartment assignments'}
+                  {t('endpointUserApartmentsDesc')}
                 </p>
               </div>
             </div>
           </div>
           <div className="space-y-2">
             <p className="font-semibold text-sm">
-              {language === 'ar' ? 'أمثلة على استخدام curl:' : 'Example curl usage:'}
+              {t('exampleCurlUsage')}
             </p>
             <div className="space-y-2">
               <div>
                 <p className="text-xs text-muted-foreground mb-1 text-left" dir="ltr">
-                  {language === 'ar' ? 'جميع الشقق:' : 'All apartments:'}
+                  {t('allApartmentsExample')}
                 </p>
                 <code className="block bg-muted p-4 rounded text-sm font-mono text-left" dir="ltr">
                   curl -H "x-api-key: YOUR_API_KEY" {apiBaseUrl}/apartments
@@ -238,7 +230,7 @@ export default function ApiKeys() {
               </div>
               <div>
                 <p className="text-xs text-muted-foreground mb-1 text-left" dir="ltr">
-                  {language === 'ar' ? 'شقة محددة:' : 'Specific apartment:'}
+                  {t('specificApartmentExample')}
                 </p>
                 <code className="block bg-muted p-4 rounded text-sm font-mono text-left" dir="ltr">
                   curl -H "x-api-key: YOUR_API_KEY" {apiBaseUrl}/apartments/APARTMENT_ID
@@ -252,16 +244,16 @@ export default function ApiKeys() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <div className="space-y-1.5">
-            <CardTitle>{language === 'ar' ? 'مفاتيح API' : 'API Keys'}</CardTitle>
+            <CardTitle>{t('apiKeys')}</CardTitle>
             <CardDescription>
-              {language === 'ar' ? 'إدارة مفاتيح الوصول للقراءة فقط' : 'Manage read-only access keys'}
+              {t('manageReadOnlyKeys')}
             </CardDescription>
           </div>
           <div className="flex gap-2 items-center">
             <SearchInput value={search} onChange={handleSearch} />
             <Button onClick={() => setIsDialogOpen(true)}>
             <Plus className="h-4 w-4 me-2" />
-            {language === 'ar' ? 'إنشاء مفتاح جديد' : 'Create New Key'}
+            {t('createNewKey')}
           </Button>
           </div>
         </CardHeader>
@@ -269,31 +261,29 @@ export default function ApiKeys() {
           <Table dir="rtl">
             <TableHeader>
               <TableRow>
-                <TableHead className="text-start">{language === 'ar' ? 'الاسم' : 'Name'}</TableHead>
-                <TableHead className="text-start">{language === 'ar' ? 'الحالة' : 'Status'}</TableHead>
-                <TableHead className="text-start">{language === 'ar' ? 'آخر استخدام' : 'Last Used'}</TableHead>
-                <TableHead className="text-start">{language === 'ar' ? 'تاريخ الإنشاء' : 'Created'}</TableHead>
-                <TableHead className="text-start">{language === 'ar' ? 'الإجراءات' : 'Actions'}</TableHead>
+                <TableHead className="text-start">{t('name')}</TableHead>
+                <TableHead className="text-start">{t('statusLabel')}</TableHead>
+                <TableHead className="text-start">{t('lastUsed')}</TableHead>
+                <TableHead className="text-start">{t('created')}</TableHead>
+                <TableHead className="text-start">{t('actions')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {paginated.length === 0 ? (
-                <TableEmptyRow colSpan={5} message={language === 'ar' ? 'لا توجد مفاتيح API' : 'No API keys yet'} />
+                <TableEmptyRow colSpan={5} message={t('noApiKeysYet')} />
               ) : (
                 paginated.map((key) => (
                   <TableRow key={key.id}>
                     <TableCell className="font-medium text-start">{key.name}</TableCell>
                     <TableCell className="text-start">
                       <Badge variant={key.isActive ? "default" : "secondary"}>
-                        {key.isActive
-                          ? (language === 'ar' ? 'نشط' : 'Active')
-                          : (language === 'ar' ? 'معطل' : 'Disabled')}
+                        {key.isActive ? t('activeStatus') : t('disabledStatus')}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-start">
                       {key.lastUsedAt
                         ? formatDateTime(key.lastUsedAt)
-                        : (language === 'ar' ? 'لم يستخدم' : 'Never')}
+                        : t('neverUsed')}
                     </TableCell>
                     <TableCell className="text-start">
                       {formatDateTime(key.createdAt)}
@@ -305,9 +295,7 @@ export default function ApiKeys() {
                           variant="outline"
                           onClick={() => toggleKeyStatus(key.id, key.isActive)}
                         >
-                          {key.isActive
-                            ? (language === 'ar' ? 'تعطيل' : 'Disable')
-                            : (language === 'ar' ? 'تفعيل' : 'Enable')}
+                          {key.isActive ? t('disableKey') : t('enableKey')}
                         </Button>
                         <Button
                           size="sm"
@@ -337,29 +325,27 @@ export default function ApiKeys() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {language === 'ar' ? 'إنشاء مفتاح API جديد' : 'Create New API Key'}
+              {t('createNewApiKey')}
             </DialogTitle>
             <DialogDescription>
-              {language === 'ar'
-                ? 'أدخل اسماً وصفياً لهذا المفتاح'
-                : 'Enter a descriptive name for this key'}
+              {t('enterDescriptiveName')}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
               <Label htmlFor="keyName">
-                {language === 'ar' ? 'اسم المفتاح' : 'Key Name'}
+                {t('keyName')}
               </Label>
               <Input
                 id="keyName"
                 value={newKeyName}
                 onChange={(e) => setNewKeyName(e.target.value)}
-                placeholder={language === 'ar' ? 'مثال: مفتاح n8n' : 'e.g., n8n Integration'}
+                placeholder={t('keyNamePlaceholder')}
               />
             </div>
             <Button onClick={generateApiKey} className="w-full">
               <Key className="h-4 w-4 me-2" />
-              {language === 'ar' ? 'إنشاء المفتاح' : 'Generate Key'}
+              {t('generateKey')}
             </Button>
           </div>
         </DialogContent>
@@ -369,12 +355,10 @@ export default function ApiKeys() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {language === 'ar' ? 'مفتاح API الخاص بك' : 'Your API Key'}
+              {t('yourApiKey')}
             </DialogTitle>
             <DialogDescription>
-              {language === 'ar'
-                ? 'احفظ هذا المفتاح الآن. لن تتمكن من رؤيته مرة أخرى!'
-                : 'Save this key now. You will not be able to see it again!'}
+              {t('saveKeyNow')}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -387,7 +371,7 @@ export default function ApiKeys() {
               variant="outline"
             >
               <Copy className="h-4 w-4 me-2" />
-              {language === 'ar' ? 'نسخ المفتاح' : 'Copy Key'}
+              {t('copyKey')}
             </Button>
           </div>
         </DialogContent>
