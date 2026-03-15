@@ -77,17 +77,35 @@ export async function generateSignature(
     UTF8out: 'True',
   });
 
-  const res = await fetch(`${HYP_BASE_URL}?${queryParams.toString()}`);
+  const url = `${HYP_BASE_URL}?${queryParams.toString()}`;
+  logger.info({ masof: hyp.masof, amount: params.amount, order: params.order }, 'HYP APISign request');
+
+  const res = await fetch(url);
   const text = await res.text();
 
-  // Parse response — HYP returns key=value pairs
+  logger.info({ status: res.status, responseLength: text.length, responsePreview: text.substring(0, 500) }, 'HYP APISign response');
+
+  // HYP may return query string format, JSON, or HTML
+  let signature = '';
+  let ccode = '';
+
+  // Try query string format first
   const responseParams = new URLSearchParams(text);
-  const signature = responseParams.get('Sign') || responseParams.get('sign') || '';
-  const ccode = responseParams.get('CCode') || responseParams.get('ccode') || '';
+  signature = responseParams.get('Sign') || responseParams.get('sign') || '';
+  ccode = responseParams.get('CCode') || responseParams.get('ccode') || '';
+
+  // Try JSON format
+  if (!signature) {
+    try {
+      const json = JSON.parse(text);
+      signature = json.Sign || json.sign || '';
+      ccode = String(json.CCode ?? json.ccode ?? '');
+    } catch {}
+  }
 
   if (!signature) {
-    logger.error({ response: text, ccode }, 'HYP APISign failed');
-    throw new AppError(502, `HYP signature generation failed: CCode=${ccode}`);
+    logger.error({ response: text, ccode, httpStatus: res.status }, 'HYP APISign failed');
+    throw new AppError(502, `HYP signature generation failed: CCode=${ccode}. Response: ${text.substring(0, 200)}`);
   }
 
   return signature;
