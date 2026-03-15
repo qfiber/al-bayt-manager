@@ -12,6 +12,9 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { useCurrency } from '@/contexts/PublicSettingsContext';
 import { Settings as SettingsIcon, Save, Globe, Upload, Shield, Mail, Bell, DollarSign, Building2, MessageSquare, CreditCard, Palette, FileText } from 'lucide-react';
 
 interface SettingsData {
@@ -1171,6 +1174,9 @@ const Settings = () => {
             </CardContent>
           </Card>
 
+          {/* Subscription Management */}
+          <SubscriptionSection />
+
           {/* Save Button */}
           <div className="flex justify-end gap-3">
             <Button
@@ -1188,6 +1194,137 @@ const Settings = () => {
         </div>
       </div>
     </div>
+  );
+};
+
+// Subscription management sub-component
+const SubscriptionSection = () => {
+  const { t } = useLanguage();
+  const { formatCurrency } = useCurrency();
+  const { toast } = useToast();
+  const [subscription, setSubscription] = useState<any>(null);
+  const [plans, setPlans] = useState<any[]>([]);
+  const [showChangePlan, setShowChangePlan] = useState(false);
+  const [selectedCycle, setSelectedCycle] = useState('monthly');
+
+  useEffect(() => {
+    api.get('/subscriptions/current').then(setSubscription).catch(() => {});
+    api.get('/subscriptions/plans').then(setPlans).catch(() => {});
+  }, []);
+
+  if (!subscription) return null;
+
+  const status = subscription.subscription?.status;
+  const currentPlanId = subscription.subscription?.planId;
+  const trialEnd = subscription.subscription?.trialEndDate;
+  const periodEnd = subscription.subscription?.currentPeriodEnd;
+
+  const endDate = status === 'trial' ? trialEnd : periodEnd;
+  const daysLeft = endDate ? Math.max(0, Math.ceil((new Date(endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))) : null;
+
+  const handleChangePlan = async (planId: string, cycle: string) => {
+    try {
+      const result = await api.post('/subscriptions/hyp-checkout', { planId, billingCycle: cycle });
+      if (result.url) { window.location.href = result.url; return; }
+    } catch {}
+    try {
+      const result = await api.post('/subscriptions/cardcom-checkout', { planId, billingCycle: cycle });
+      if (result.url) { window.location.href = result.url; return; }
+    } catch {}
+    toast({ title: t('error'), description: t('noPaymentGatewayConfigured'), variant: 'destructive' });
+  };
+
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CreditCard className="w-5 h-5" />
+            {t('subscriptionManagement')}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">{t('currentPlan')}: {subscription.planName || '-'}</p>
+              <p className="text-xs text-muted-foreground">
+                {status === 'trial' && daysLeft !== null ? t('trialEndsIn').replace('{days}', String(daysLeft)) :
+                 status === 'active' ? `${t('billingCycle')}: ${subscription.subscription?.billingCycle || '-'}` :
+                 status === 'past_due' ? t('subscriptionExpired') : status}
+              </p>
+            </div>
+            <Badge variant={status === 'active' ? 'default' : status === 'trial' ? 'outline' : 'destructive'}>
+              {status}
+            </Badge>
+          </div>
+
+          {subscription.maxBuildings != null && (
+            <div className="grid grid-cols-2 gap-4 text-sm border-t pt-3">
+              <div>
+                <span className="text-muted-foreground">{t('maxBuildings')}</span>
+                <p className="font-medium">{subscription.maxBuildings === 0 ? '∞' : subscription.maxBuildings}</p>
+              </div>
+              <div>
+                <span className="text-muted-foreground">{t('maxApartmentsPerBuilding')}</span>
+                <p className="font-medium">{subscription.maxApartmentsPerBuilding === 0 ? '∞' : subscription.maxApartmentsPerBuilding}</p>
+              </div>
+            </div>
+          )}
+
+          <Button variant="outline" onClick={() => setShowChangePlan(true)} className="w-full">
+            {t('changePlan')}
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Dialog open={showChangePlan} onOpenChange={setShowChangePlan}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{t('changePlan')}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex justify-center">
+              <div className="inline-flex bg-muted rounded-full p-1">
+                {['monthly', 'semi_annual', 'yearly'].map(cycle => (
+                  <button key={cycle} onClick={() => setSelectedCycle(cycle)}
+                    className={`px-4 py-1.5 rounded-full text-sm ${selectedCycle === cycle ? 'bg-background shadow font-medium' : 'text-muted-foreground'}`}>
+                    {cycle === 'monthly' ? t('monthly') : cycle === 'semi_annual' ? t('semiAnnual') : t('yearly')}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {plans.filter(p => p.isActive && !p.isCustom).map(plan => {
+                const isCurrent = plan.id === currentPlanId;
+                const price = selectedCycle === 'yearly' && plan.yearlyPrice ? parseFloat(plan.yearlyPrice) :
+                  selectedCycle === 'semi_annual' && plan.semiAnnualPrice ? parseFloat(plan.semiAnnualPrice) :
+                  parseFloat(plan.monthlyPrice);
+
+                return (
+                  <div key={plan.id} className={`border rounded-xl p-4 ${isCurrent ? 'border-primary bg-primary/5' : ''}`}>
+                    <h3 className="font-semibold">{plan.name}</h3>
+                    <p className="text-2xl font-bold mt-2">{formatCurrency(price)}</p>
+                    <p className="text-xs text-muted-foreground">
+                      / {selectedCycle === 'monthly' ? t('monthly').toLowerCase() : selectedCycle === 'semi_annual' ? t('semiAnnual').toLowerCase() : t('yearly').toLowerCase()}
+                    </p>
+                    <div className="text-xs text-muted-foreground mt-3 space-y-1">
+                      <p>{plan.maxBuildings} {t('buildings')}</p>
+                      <p>{plan.maxApartmentsPerBuilding} {t('maxApartmentsPerBuilding')}</p>
+                    </div>
+                    <Button size="sm" className="w-full mt-3" variant={isCurrent ? 'outline' : 'default'}
+                      disabled={isCurrent}
+                      onClick={() => handleChangePlan(plan.id, selectedCycle)}>
+                      {isCurrent ? t('currentPlan') : t('selectPlan')}
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
 
