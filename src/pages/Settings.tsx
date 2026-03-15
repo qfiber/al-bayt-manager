@@ -262,7 +262,7 @@ const Settings = () => {
         logoUrl = await uploadLogo();
       }
 
-      await api.put('/settings', {
+      const updated = await api.put<SettingsData>('/settings', {
         companyName: companyName || null,
         systemLanguage,
         ...(logoUrl ? { logoUrl } : {}),
@@ -306,6 +306,9 @@ const Settings = () => {
         accentColor,
       });
 
+      // Apply updated data directly from PUT response — don't re-fetch
+      if (updated) applySettingsToForm(updated);
+
       toast({ title: t('success'), description: t('settingsUpdated') });
 
       if (systemLanguage !== language) {
@@ -313,7 +316,6 @@ const Settings = () => {
       }
 
       await refresh();
-      await fetchSettings();
       setLogoFile({ file: null, preview: null });
     } catch (error: any) {
       toast({ title: t('error'), description: error.message, variant: 'destructive' });
@@ -941,6 +943,7 @@ const Settings = () => {
                   <div>
                     <Label>{t('cardcomApiName')}</Label>
                     <Input
+                      type="password"
                       value={cardcomApiName}
                       onChange={(e) => setCardcomApiName(e.target.value)}
                     />

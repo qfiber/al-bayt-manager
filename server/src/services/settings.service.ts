@@ -6,6 +6,7 @@ import { encrypt, decrypt, isEncrypted } from '../utils/encryption.js';
 const SENSITIVE_FIELDS = [
   'resendApiKey', 'turnstileSecretKey', 'smsApiToken',
   'stripeSecretKey', 'stripeWebhookSecret',
+  'cardcomApiName',
   'cardcomApiPassword',
   'paypalClientSecret',
   'twilioAuthToken',

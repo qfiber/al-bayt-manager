@@ -54,8 +54,13 @@ organizationRoutes.get('/by-subdomain/:subdomain', async (req: Request, res: Res
       .where(eq(organizations.subdomain, subdomain))
       .limit(1);
 
-    if (!org || !org.isActive) {
+    if (!org) {
       res.status(404).json({ error: 'Organization not found' });
+      return;
+    }
+
+    if (!org.isActive) {
+      res.status(403).json({ error: 'Organization is suspended', suspended: true });
       return;
     }
 

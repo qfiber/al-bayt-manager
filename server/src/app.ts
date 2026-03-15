@@ -80,6 +80,13 @@ export function createApp() {
   // Resolve organization from subdomain
   app.use(resolveSubdomain);
 
+  // Prevent caching of API responses
+  app.use('/api', (_req, res, next) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    next();
+  });
+
   // Public uploads (logos) — no auth, served by Express in dev, nginx in prod
   app.use('/public-uploads', (_req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
