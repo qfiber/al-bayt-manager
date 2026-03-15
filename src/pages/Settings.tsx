@@ -1212,12 +1212,10 @@ const SubscriptionSection = () => {
     api.get('/subscriptions/plans').then(setPlans).catch(() => {});
   }, []);
 
-  if (!subscription) return null;
-
-  const status = subscription.subscription?.status;
-  const currentPlanId = subscription.subscription?.planId;
-  const trialEnd = subscription.subscription?.trialEndDate;
-  const periodEnd = subscription.subscription?.currentPeriodEnd;
+  const status = subscription?.subscription?.status;
+  const currentPlanId = subscription?.subscription?.planId;
+  const trialEnd = subscription?.subscription?.trialEndDate;
+  const periodEnd = subscription?.subscription?.currentPeriodEnd;
 
   const endDate = status === 'trial' ? trialEnd : periodEnd;
   const daysLeft = endDate ? Math.max(0, Math.ceil((new Date(endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))) : null;
@@ -1246,27 +1244,30 @@ const SubscriptionSection = () => {
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium">{t('currentPlan')}: {subscription.planName || '-'}</p>
+              <p className="text-sm font-medium">{t('currentPlan')}: {subscription?.planName || t('noPlan')}</p>
               <p className="text-xs text-muted-foreground">
-                {status === 'trial' && daysLeft !== null ? t('trialEndsIn').replace('{days}', String(daysLeft)) :
-                 status === 'active' ? `${t('billingCycle')}: ${subscription.subscription?.billingCycle || '-'}` :
+                {!status ? t('selectPlanToStart') :
+                 status === 'trial' && daysLeft !== null ? t('trialEndsIn').replace('{days}', String(daysLeft)) :
+                 status === 'active' ? `${t('billingCycle')}: ${subscription?.subscription?.billingCycle || '-'}` :
                  status === 'past_due' ? t('subscriptionExpired') : status}
               </p>
             </div>
-            <Badge variant={status === 'active' ? 'default' : status === 'trial' ? 'outline' : 'destructive'}>
-              {status}
-            </Badge>
+            {status && (
+              <Badge variant={status === 'active' ? 'default' : status === 'trial' ? 'outline' : 'destructive'}>
+                {status}
+              </Badge>
+            )}
           </div>
 
-          {subscription.maxBuildings != null && (
+          {subscription?.maxBuildings != null && (
             <div className="grid grid-cols-2 gap-4 text-sm border-t pt-3">
               <div>
                 <span className="text-muted-foreground">{t('maxBuildings')}</span>
-                <p className="font-medium">{subscription.maxBuildings === 0 ? '∞' : subscription.maxBuildings}</p>
+                <p className="font-medium">{subscription?.maxBuildings === 0 ? '∞' : subscription?.maxBuildings}</p>
               </div>
               <div>
                 <span className="text-muted-foreground">{t('maxApartmentsPerBuilding')}</span>
-                <p className="font-medium">{subscription.maxApartmentsPerBuilding === 0 ? '∞' : subscription.maxApartmentsPerBuilding}</p>
+                <p className="font-medium">{subscription?.maxApartmentsPerBuilding === 0 ? '∞' : subscription?.maxApartmentsPerBuilding}</p>
               </div>
             </div>
           )}
@@ -1296,13 +1297,15 @@ const SubscriptionSection = () => {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               {plans.filter(p => p.isActive && !p.isCustom).map(plan => {
-                const isCurrent = plan.id === currentPlanId;
+                const isSamePlan = plan.id === currentPlanId;
+                const currentCycle = subscription?.subscription?.billingCycle;
+                const isExactMatch = isSamePlan && selectedCycle === currentCycle;
                 const price = selectedCycle === 'yearly' && plan.yearlyPrice ? parseFloat(plan.yearlyPrice) :
                   selectedCycle === 'semi_annual' && plan.semiAnnualPrice ? parseFloat(plan.semiAnnualPrice) :
                   parseFloat(plan.monthlyPrice);
 
                 return (
-                  <div key={plan.id} className={`border rounded-xl p-4 ${isCurrent ? 'border-primary bg-primary/5' : ''}`}>
+                  <div key={plan.id} className={`border rounded-xl p-4 ${isSamePlan ? 'border-primary bg-primary/5' : ''}`}>
                     <h3 className="font-semibold">{plan.name}</h3>
                     <p className="text-2xl font-bold mt-2">{formatCurrency(price)}</p>
                     <p className="text-xs text-muted-foreground">
@@ -1312,10 +1315,10 @@ const SubscriptionSection = () => {
                       <p>{plan.maxBuildings} {t('buildings')}</p>
                       <p>{plan.maxApartmentsPerBuilding} {t('maxApartmentsPerBuilding')}</p>
                     </div>
-                    <Button size="sm" className="w-full mt-3" variant={isCurrent ? 'outline' : 'default'}
-                      disabled={isCurrent}
+                    <Button size="sm" className="w-full mt-3" variant={isExactMatch ? 'outline' : 'default'}
+                      disabled={isExactMatch}
                       onClick={() => handleChangePlan(plan.id, selectedCycle)}>
-                      {isCurrent ? t('currentPlan') : t('selectPlan')}
+                      {isExactMatch ? t('currentPlan') : isSamePlan ? t('changeCycle') : t('selectPlan')}
                     </Button>
                   </div>
                 );

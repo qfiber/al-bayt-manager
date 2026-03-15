@@ -12,23 +12,41 @@ interface HypConfig {
 }
 
 async function getHypConfig(organizationId?: string): Promise<HypConfig> {
-  // Try org-specific settings first, then fall back to global settings
-  let config = organizationId ? await getRawSettings(organizationId) : await getRawSettings();
-
-  if (!config?.hypEnabled && organizationId) {
-    // Org doesn't have HYP — try global/platform settings (for SaaS billing)
-    config = await getRawSettings();
+  // Try org-specific settings first
+  if (organizationId) {
+    const orgConfig = await getRawSettings(organizationId);
+    if (orgConfig?.hypEnabled && orgConfig.hypKey && orgConfig.hypPassP) {
+      return {
+        masof: orgConfig.hypMasof || HYP_TEST_MASOF,
+        key: orgConfig.hypKey,
+        passP: orgConfig.hypPassP,
+      };
+    }
   }
 
-  if (!config?.hypEnabled) throw new AppError(400, 'HYP is not configured');
+  // Fall back: search ALL settings rows for one with HYP configured
+  const { db: database } = await import('../config/database.js');
+  const { settings: settingsTable } = await import('../db/schema/index.js');
+  const { eq } = await import('drizzle-orm');
 
-  const masof = config.hypMasof || HYP_TEST_MASOF;
-  const key = config.hypKey || '';
-  const passP = config.hypPassP || '';
+  const allSettings = await database.select().from(settingsTable).where(eq(settingsTable.hypEnabled, true)).limit(1);
+  if (allSettings.length > 0) {
+    const config = allSettings[0];
+    // Decrypt sensitive fields
+    const { decrypt } = await import('../utils/encryption.js');
+    const key = config.hypKey ? decrypt(config.hypKey) : '';
+    const passP = config.hypPassP ? decrypt(config.hypPassP) : '';
 
-  if (!key || !passP) throw new AppError(400, 'HYP credentials not configured');
+    if (key && passP) {
+      return {
+        masof: config.hypMasof || HYP_TEST_MASOF,
+        key,
+        passP,
+      };
+    }
+  }
 
-  return { masof, key, passP };
+  throw new AppError(400, 'HYP is not configured. Enable HYP and enter credentials in Settings.');
 }
 
 /**
