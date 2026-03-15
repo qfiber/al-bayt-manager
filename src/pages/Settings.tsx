@@ -310,16 +310,16 @@ const Settings = () => {
     );
   }
 
-  const defaultTab = isSuperAdmin ? 'general' : 'general';
+  const isRtl = language === 'ar' || language === 'he';
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/10">
+    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/10" dir={isRtl ? 'rtl' : 'ltr'}>
       <div className="container mx-auto px-3 py-4 sm:p-6 max-w-4xl">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')}>
-              <ArrowLeft className="w-5 h-5" />
+              <ArrowLeft className={`w-5 h-5 ${isRtl ? 'rotate-180' : ''}`} />
             </Button>
             <div>
               <h1 className="text-xl font-bold flex items-center gap-2">
@@ -330,31 +330,31 @@ const Settings = () => {
             </div>
           </div>
           <Button onClick={handleSave} disabled={isSaving} size="sm">
-            {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+            {isSaving ? <Loader2 className="w-4 h-4 animate-spin me-2" /> : <Save className="w-4 h-4 me-2" />}
             {t('save')}
           </Button>
         </div>
 
-        <Tabs defaultValue={defaultTab} className="space-y-6">
+        <Tabs defaultValue="general" className="space-y-6">
           <TabsList className="w-full flex flex-wrap h-auto gap-1 bg-muted/50 p-1">
             <TabsTrigger value="general" className="flex-1 min-w-[80px] text-xs sm:text-sm">
-              <Building2 className="w-3.5 h-3.5 mr-1.5 hidden sm:inline" />{t('general')}
+              <Building2 className="w-3.5 h-3.5 me-1.5 hidden sm:inline" />{t('general')}
             </TabsTrigger>
             {isSuperAdmin && (
               <>
                 <TabsTrigger value="security" className="flex-1 min-w-[80px] text-xs sm:text-sm">
-                  <Shield className="w-3.5 h-3.5 mr-1.5 hidden sm:inline" />{t('security')}
+                  <Shield className="w-3.5 h-3.5 me-1.5 hidden sm:inline" />{t('security')}
                 </TabsTrigger>
                 <TabsTrigger value="communications" className="flex-1 min-w-[80px] text-xs sm:text-sm">
-                  <Mail className="w-3.5 h-3.5 mr-1.5 hidden sm:inline" />{t('communications')}
+                  <Mail className="w-3.5 h-3.5 me-1.5 hidden sm:inline" />{t('communications')}
                 </TabsTrigger>
                 <TabsTrigger value="payments" className="flex-1 min-w-[80px] text-xs sm:text-sm">
-                  <CreditCard className="w-3.5 h-3.5 mr-1.5 hidden sm:inline" />{t('payments')}
+                  <CreditCard className="w-3.5 h-3.5 me-1.5 hidden sm:inline" />{t('payments')}
                 </TabsTrigger>
               </>
             )}
             <TabsTrigger value="subscription" className="flex-1 min-w-[80px] text-xs sm:text-sm">
-              <DollarSign className="w-3.5 h-3.5 mr-1.5 hidden sm:inline" />{t('subscription')}
+              <DollarSign className="w-3.5 h-3.5 me-1.5 hidden sm:inline" />{t('subscription')}
             </TabsTrigger>
           </TabsList>
 
