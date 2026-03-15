@@ -134,15 +134,20 @@ export async function createPaymentUrl(
 ): Promise<{ url: string; signature: string }> {
   const hyp = await getHypConfig(organizationId);
 
-  // Step 1: Get signature
-  const signature = await generateSignature(organizationId, {
-    amount: params.amount,
-    order: params.order,
-    currency: params.currency,
-    maxInstallments: params.maxInstallments,
-  });
+  // Try to get signature — if it fails (902), proceed without signing
+  let signature = '';
+  try {
+    signature = await generateSignature(organizationId, {
+      amount: params.amount,
+      order: params.order,
+      currency: params.currency,
+      maxInstallments: params.maxInstallments,
+    });
+  } catch (err) {
+    logger.warn({ err }, 'HYP APISign failed — proceeding without signature');
+  }
 
-  // Step 2: Build payment URL
+  // Build payment URL
   const queryParams = new URLSearchParams({
     action: 'pay',
     Masof: hyp.masof,
@@ -150,7 +155,6 @@ export async function createPaymentUrl(
     PassP: hyp.passP,
     Amount: params.amount.toFixed(2),
     Order: params.order,
-    Sign: signature,
     Coin: String(params.currency || 1),
     Tash: String(params.maxInstallments || 1),
     UTF8: 'True',
@@ -160,6 +164,9 @@ export async function createPaymentUrl(
     Info: params.description,
     PageLang: params.locale === 'he' ? 'HEB' : 'ENG',
   });
+
+  // Only add Sign if we got a valid signature
+  if (signature) queryParams.set('Sign', signature);
 
   // EZCount invoice auto-generation
   if (params.sendInvoice !== false) {
@@ -237,11 +244,17 @@ export async function createRecurringPayment(
 ): Promise<{ url: string; signature: string }> {
   const hyp = await getHypConfig(organizationId);
 
-  const signature = await generateSignature(organizationId, {
-    amount: params.amount,
-    order: params.order,
-    currency: params.currency,
-  });
+  // Try signing — proceed without if it fails
+  let signature = '';
+  try {
+    signature = await generateSignature(organizationId, {
+      amount: params.amount,
+      order: params.order,
+      currency: params.currency,
+    });
+  } catch {
+    logger.warn('HYP APISign failed for recurring — proceeding without signature');
+  }
 
   const queryParams = new URLSearchParams({
     action: 'pay',
@@ -250,7 +263,6 @@ export async function createRecurringPayment(
     PassP: hyp.passP,
     Amount: params.amount.toFixed(2),
     Order: params.order,
-    Sign: signature,
     Coin: String(params.currency || 1),
     UTF8: 'True',
     UTF8out: 'True',
@@ -264,6 +276,9 @@ export async function createRecurringPayment(
     freq: String(params.frequencyMonths || 1),
     OnlyOnApprove: 'True',
   });
+
+  // Only add Sign if we got a valid signature
+  if (signature) queryParams.set('Sign', signature);
 
   if (params.firstDate) queryParams.set('FirstDate', params.firstDate);
 
