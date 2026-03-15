@@ -187,6 +187,7 @@ subscriptionRoutes.post('/cardcom-checkout', requireAuth, requireOrgScope, requi
     const body = {
       TerminalNumber: parseInt(config.cardcomTerminalNumber),
       ApiName: config.cardcomApiName || '',
+      ApiPassword: config.cardcomApiPassword || '',
       Operation: 'ChargeOnly',
       Amount: amount,
       ProductName: `${plan.name} Plan - ${billingCycle}`,
@@ -204,11 +205,18 @@ subscriptionRoutes.post('/cardcom-checkout', requireAuth, requireOrgScope, requi
       body: JSON.stringify(body),
     });
 
-    if (!cardcomRes.ok) throw new Error(`CardCom API error: ${cardcomRes.status}`);
     const data = await cardcomRes.json() as any;
-    if (!data.LowProfileId) throw new Error(`CardCom failed: ${data.Description || JSON.stringify(data)}`);
+    if (!cardcomRes.ok || !data.LowProfileId) {
+      const logger = (await import('../config/logger.js')).default;
+      logger.error({ status: cardcomRes.status, response: data, terminal: config.cardcomTerminalNumber }, 'CardCom LowProfile/Create failed');
+      throw new Error(`CardCom failed: ${data.Description || data.Message || JSON.stringify(data)}`);
+    }
 
-    res.json({ url: data.Url || `https://secure.cardcom.solutions/external/LowProfile/${data.LowProfileId}` });
+    res.json({
+      lowProfileId: data.LowProfileId,
+      url: data.Url || `https://secure.cardcom.solutions/external/LowProfile/${data.LowProfileId}`,
+      isIsrael: country === 'IL',
+    });
   } catch (err) { next(err); }
 });
 
@@ -236,6 +244,7 @@ subscriptionRoutes.post('/generate-payment-link', requireAuth, requireSuperAdmin
     const body = {
       TerminalNumber: parseInt(config.cardcomTerminalNumber),
       ApiName: config.cardcomApiName || '',
+      ApiPassword: config.cardcomApiPassword || '',
       Operation: 'ChargeOnly',
       Amount: amount,
       ProductName: `${plan.name} Plan - ${billingCycle}`,
@@ -253,9 +262,12 @@ subscriptionRoutes.post('/generate-payment-link', requireAuth, requireSuperAdmin
       body: JSON.stringify(body),
     });
 
-    if (!cardcomRes.ok) throw new Error(`CardCom API error: ${cardcomRes.status}`);
     const data = await cardcomRes.json() as any;
-    if (!data.LowProfileId) throw new Error(`CardCom failed: ${data.Description || JSON.stringify(data)}`);
+    if (!cardcomRes.ok || !data.LowProfileId) {
+      const logger = (await import('../config/logger.js')).default;
+      logger.error({ status: cardcomRes.status, response: data, terminal: config.cardcomTerminalNumber }, 'CardCom LowProfile/Create failed');
+      throw new Error(`CardCom failed: ${data.Description || data.Message || JSON.stringify(data)}`);
+    }
 
     const url = data.Url || `https://secure.cardcom.solutions/external/LowProfile/${data.LowProfileId}`;
     res.json({ url, amount });

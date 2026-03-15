@@ -1,4 +1,5 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
+import { CardComPayment } from '@/components/CardComPayment';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -161,6 +162,7 @@ const Dashboard = () => {
   const [subscription, setSubscription] = useState<any>(null);
   const [availablePlans, setAvailablePlans] = useState<any[]>([]);
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
+  const [dashPayment, setDashPayment] = useState<{ lowProfileId: string; planName: string; amount: number; isIsrael: boolean } | null>(null);
 
   // Tenant dashboard state
   const [tenantApartments, setTenantApartments] = useState<any[]>([]);
@@ -716,21 +718,17 @@ const Dashboard = () => {
                       disabled={subscription?.subscription?.planId === plan.id && subscription?.subscription?.billingCycle === cycle}
                       onClick={async () => {
                         try {
-                          // SaaS payments via CardCom
-                          try {
-                            const result = await api.post('/subscriptions/cardcom-checkout', { planId: plan.id, billingCycle: cycle });
-                            if (result.url) {
-                              window.location.href = result.url;
-                              return;
-                            }
-                          } catch {
-                            // CardCom not configured
+                          const result = await api.post('/subscriptions/cardcom-checkout', { planId: plan.id, billingCycle: cycle });
+                          if (result.lowProfileId) {
+                            const price = cycle === 'yearly' && plan.yearlyPrice ? parseFloat(plan.yearlyPrice) :
+                              cycle === 'semi_annual' && plan.semiAnnualPrice ? parseFloat(plan.semiAnnualPrice) :
+                              parseFloat(plan.monthlyPrice);
+                            setDashPayment({ lowProfileId: result.lowProfileId, planName: plan.name, amount: price, isIsrael: result.isIsrael ?? false });
+                            return;
                           }
-
-                          // No Israeli payment gateway worked
                           toast.error(t('noPaymentGatewayConfigured'));
                         } catch {
-                          toast.error(t('error'));
+                          toast.error(t('noPaymentGatewayConfigured'));
                         }
                       }}
                     >
@@ -743,6 +741,24 @@ const Dashboard = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      <CardComPayment
+        open={!!dashPayment}
+        onOpenChange={(open) => { if (!open) setDashPayment(null); }}
+        lowProfileId={dashPayment?.lowProfileId || null}
+        planName={dashPayment?.planName || ''}
+        amount={dashPayment?.amount || 0}
+        isIsrael={dashPayment?.isIsrael}
+        onSuccess={() => {
+          setDashPayment(null);
+          setShowUpgradeDialog(false);
+          toast.success(t('subscriptionActivated'));
+          api.get('/subscriptions/current').then(setSubscription).catch(() => {});
+        }}
+        onError={(msg) => {
+          toast.error(msg);
+        }}
+      />
 
       {/* KPI Cards */}
       {dataLoading ? (
