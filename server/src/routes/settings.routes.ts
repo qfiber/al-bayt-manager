@@ -23,7 +23,7 @@ const updateSettingsSchema = z.object({
   turnstileSecretKey: z.string().max(255).nullable().optional(),
   registrationEnabled: z.boolean().optional(),
   ntfyEnabled: z.boolean().optional(),
-  ntfyServerUrl: z.string().url().max(500).nullable().optional(),
+  ntfyServerUrl: z.string().max(500).nullable().optional(),
   smsEnabled: z.boolean().optional(),
   smsProvider: z.string().max(50).nullable().optional(),
   smsApiToken: z.string().max(500).nullable().optional(),
@@ -31,6 +31,40 @@ const updateSettingsSchema = z.object({
   smsSenderName: z.string().max(11).nullable().optional(),
   currencyCode: z.string().min(3).max(3).optional(),
   currencySymbol: z.string().min(1).max(5).optional(),
+  // Payment gateways
+  stripeEnabled: z.boolean().optional(),
+  stripePublishableKey: z.string().max(500).nullable().optional(),
+  stripeSecretKey: z.string().max(500).nullable().optional(),
+  stripeWebhookSecret: z.string().max(500).nullable().optional(),
+  cardcomEnabled: z.boolean().optional(),
+  cardcomTerminalNumber: z.string().max(50).nullable().optional(),
+  cardcomApiName: z.string().max(255).nullable().optional(),
+  cardcomApiPassword: z.string().max(500).nullable().optional(),
+  // HYP
+  hypEnabled: z.boolean().optional(),
+  hypMasof: z.string().max(20).nullable().optional(),
+  hypKey: z.string().max(255).nullable().optional(),
+  hypPassP: z.string().max(255).nullable().optional(),
+  // PayPal
+  paypalEnabled: z.boolean().optional(),
+  paypalClientId: z.string().max(500).nullable().optional(),
+  paypalClientSecret: z.string().max(500).nullable().optional(),
+  paypalMode: z.string().max(10).nullable().optional(),
+  // Twilio
+  twilioEnabled: z.boolean().optional(),
+  twilioAccountSid: z.string().max(255).nullable().optional(),
+  twilioAuthToken: z.string().max(500).nullable().optional(),
+  twilioPhoneNumber: z.string().max(50).nullable().optional(),
+  // EZCount
+  ezCountApiKey: z.string().max(500).nullable().optional(),
+  ezCountApiEmail: z.string().max(255).nullable().optional(),
+  // Email verification
+  emailVerificationEnabled: z.boolean().optional(),
+  // Region
+  region: z.string().max(10).optional(),
+  // Branding
+  primaryColor: z.string().max(20).nullable().optional(),
+  accentColor: z.string().max(20).nullable().optional(),
 });
 
 const testSmsSchema = z.object({
