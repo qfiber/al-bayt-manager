@@ -38,10 +38,15 @@ async function request<T = any>(
     headers['Content-Type'] = 'application/json';
   }
 
+  // Prevent any browser/proxy/SW caching of API requests
+  headers['Cache-Control'] = 'no-cache, no-store';
+  headers['Pragma'] = 'no-cache';
+
   let res = await fetch(`${API_URL}${path}`, {
     ...options,
     headers,
     credentials: 'include',
+    cache: 'no-store',
   });
 
   // Auto-refresh on 401 (skip for auth endpoints — let the actual error through)
@@ -52,6 +57,7 @@ async function request<T = any>(
         ...options,
         headers,
         credentials: 'include',
+        cache: 'no-store',
       });
     } else {
       // Only redirect from authenticated pages

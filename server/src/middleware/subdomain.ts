@@ -3,9 +3,9 @@ import { db } from '../config/database.js';
 import { organizations } from '../db/schema/index.js';
 import { eq } from 'drizzle-orm';
 
-// Cache org lookups for 5 minutes to avoid DB hits on every request
+// Cache org lookups for 30 seconds to avoid DB hits on every request
 const orgCache = new Map<string, { org: any; expiresAt: number }>();
-const CACHE_TTL = 5 * 60 * 1000;
+const CACHE_TTL = 30 * 1000;
 
 declare global {
   namespace Express {

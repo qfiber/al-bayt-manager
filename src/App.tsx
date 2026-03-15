@@ -57,7 +57,16 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import { SubdomainProvider } from "./contexts/SubdomainContext";
 import { getOrgSubdomain, isMainDomain, isAppSubdomain } from './lib/subdomain';
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 0,
+      gcTime: 0,
+      refetchOnWindowFocus: true,
+      retry: 1,
+    },
+  },
+});
 
 const ScrollToTop = () => {
   const { pathname } = useLocation();

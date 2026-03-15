@@ -56,6 +56,10 @@ export default defineConfig(({ mode }) => ({
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
         // Do NOT cache API responses — they must always be fresh
         navigateFallbackDenylist: [/^\/api\//],
+        // Clean up old caches from previous service worker versions
+        cleanupOutdatedCaches: true,
+        // Never cache API requests in the service worker
+        runtimeCaching: [],
       },
     }),
   ].filter(Boolean),
