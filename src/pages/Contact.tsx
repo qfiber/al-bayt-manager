@@ -9,10 +9,13 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Send, Mail, Globe, CheckCircle } from 'lucide-react';
 import { MarketingLayout } from '@/components/MarketingLayout';
+import { useSeo } from '@/hooks/use-seo';
 
 const Contact = () => {
   const navigate = useNavigate();
   const { t } = useLanguage();
+
+  useSeo({ title: `${t('contactNav')} — Al-Bayt Manager`, description: t('landingHeroSubtitle'), path: '/contact' });
   const { toast } = useToast();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');

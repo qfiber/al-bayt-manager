@@ -4,11 +4,12 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePublicSettings } from '@/contexts/PublicSettingsContext';
 import { Button } from '@/components/ui/button';
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { Building2, Menu, X, ArrowRight, Mail, Globe } from 'lucide-react';
 
 export const MarketingLayout = ({ children }: { children: ReactNode }) => {
   const navigate = useNavigate();
-  const { t, language, setLanguage } = useLanguage();
+  const { t, language } = useLanguage();
   const { user } = useAuth();
   const { companyName, logoUrl } = usePublicSettings();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -55,12 +56,8 @@ export const MarketingLayout = ({ children }: { children: ReactNode }) => {
             </nav>
 
             <div className="flex items-center gap-3">
-              <div className="hidden sm:flex gap-1">
-                {(['ar', 'he', 'en'] as const).map(lang => (
-                  <button key={lang} onClick={() => setLanguage(lang)}
-                    className={`text-xs px-2 py-1 rounded-md transition-colors ${language === lang ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900' : 'text-gray-500 hover:text-gray-900'}`}
-                  >{lang === 'ar' ? 'ع' : lang === 'he' ? 'עב' : 'EN'}</button>
-                ))}
+              <div className="hidden sm:block">
+                <LanguageSwitcher />
               </div>
               {user ? (
                 <Button onClick={() => navigate('/dashboard')} className="bg-gradient-to-r from-blue-600 to-indigo-600">{t('dashboard')}</Button>

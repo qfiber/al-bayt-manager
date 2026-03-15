@@ -3,20 +3,55 @@ import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePublicSettings } from '@/contexts/PublicSettingsContext';
+import { useTheme } from '@/contexts/ThemeContext';
 import { Button } from '@/components/ui/button';
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import {
   Building2, CreditCard, BarChart3, Users, Wrench, FileText,
   ArrowRight, Menu, X, Shield, Globe, Clock, Zap, Mail,
+  Moon, Sun, Home, PieChart, CheckCircle2,
 } from 'lucide-react';
+import { useSeo } from '@/hooks/use-seo';
 
 const LandingPage = () => {
   const navigate = useNavigate();
-  const { t, language, setLanguage } = useLanguage();
+  const { t, language } = useLanguage();
   const { user, loading } = useAuth();
   const { companyName, logoUrl } = usePublicSettings();
+  const { isDark, setTheme } = useTheme();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'SoftwareApplication',
+    name: companyName || 'Al-Bayt Manager',
+    applicationCategory: 'BusinessApplication',
+    operatingSystem: 'Web',
+    description: t('landingHeroSubtitle'),
+    url: 'https://albayt.cloud',
+    provider: {
+      '@type': 'Organization',
+      name: 'qFiber LTD',
+      url: 'https://qfiber.co.il',
+    },
+    offers: {
+      '@type': 'Offer',
+      priceCurrency: 'ILS',
+      price: '0',
+      description: t('landingBadge'),
+    },
+  };
+
+  useSeo({
+    title: `${companyName || 'Al-Bayt Manager'} — ${t('landingHeroTitle')}`,
+    description: t('landingHeroSubtitle'),
+    path: '/',
+    jsonLd,
+  });
+
   if (loading) return null;
+
+  const isRtl = language === 'ar' || language === 'he';
 
   const navLinks = [
     { label: t('features'), href: '#features' },
@@ -27,8 +62,8 @@ const LandingPage = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-950">
-      {/* Header - Sticky with glassmorphism */}
+    <div className="min-h-screen bg-white dark:bg-gray-950" dir={isRtl ? 'rtl' : 'ltr'}>
+      {/* Header */}
       <header className="fixed top-0 w-full z-50 bg-white/80 dark:bg-gray-950/80 backdrop-blur-xl border-b border-gray-100 dark:border-gray-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
@@ -66,23 +101,14 @@ const LandingPage = () => {
             </nav>
 
             {/* Right side */}
-            <div className="flex items-center gap-3">
-              {/* Language switcher */}
-              <div className="hidden sm:flex gap-1">
-                {(['ar', 'he', 'en'] as const).map(lang => (
-                  <button
-                    key={lang}
-                    onClick={() => setLanguage(lang)}
-                    className={`text-xs px-2 py-1 rounded-md transition-colors ${
-                      language === lang
-                        ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
-                        : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
-                    }`}
-                  >
-                    {lang === 'ar' ? 'ع' : lang === 'he' ? 'עב' : 'EN'}
-                  </button>
-                ))}
+            <div className="flex items-center gap-2">
+              <div className="hidden sm:block">
+                <LanguageSwitcher variant="icon" />
               </div>
+
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setTheme(isDark ? 'light' : 'dark')}>
+                {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              </Button>
 
               {user ? (
                 <Button onClick={() => navigate('/dashboard')} className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700">
@@ -99,7 +125,6 @@ const LandingPage = () => {
                 </>
               )}
 
-              {/* Mobile menu button */}
               <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="md:hidden p-2">
                 {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
               </button>
@@ -108,7 +133,7 @@ const LandingPage = () => {
 
           {/* Mobile menu */}
           {mobileMenuOpen && (
-            <div className="md:hidden pb-4 border-t border-gray-100 dark:border-gray-800 mt-2 pt-4">
+            <div className="md:hidden pb-4 border-t border-gray-100 dark:border-gray-800 mt-2 pt-4 space-y-2">
               {navLinks.map(link => (
                 <a
                   key={link.href}
@@ -122,12 +147,8 @@ const LandingPage = () => {
                   {link.label}
                 </a>
               ))}
-              <div className="flex gap-1 mt-3">
-                {(['ar', 'he', 'en'] as const).map(lang => (
-                  <button key={lang} onClick={() => { setLanguage(lang); setMobileMenuOpen(false); }}
-                    className={`text-xs px-3 py-1 rounded ${language === lang ? 'bg-gray-900 text-white' : 'text-gray-500'}`}
-                  >{lang === 'ar' ? 'ع' : lang === 'he' ? 'עב' : 'EN'}</button>
-                ))}
+              <div className="flex items-center gap-2 pt-2">
+                <LanguageSwitcher />
               </div>
             </div>
           )}
@@ -136,7 +157,6 @@ const LandingPage = () => {
 
       {/* Hero */}
       <section className="relative pt-32 pb-20 sm:pt-40 sm:pb-32 overflow-hidden">
-        {/* Background decoration */}
         <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-950 dark:via-blue-950/20 dark:to-indigo-950/20" />
         <div className="absolute top-20 right-0 w-96 h-96 bg-blue-400/10 rounded-full blur-3xl" />
         <div className="absolute bottom-0 left-0 w-80 h-80 bg-indigo-400/10 rounded-full blur-3xl" />
@@ -159,27 +179,36 @@ const LandingPage = () => {
             <Button size="lg" onClick={() => navigate('/register')}
               className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-lg px-8 py-6 rounded-xl shadow-lg shadow-blue-500/25 gap-2">
               {t('landingGetStarted')}
-              <ArrowRight className="w-5 h-5 rtl:rotate-180" />
+              <ArrowRight className={`w-5 h-5 ${isRtl ? 'rotate-180' : ''}`} />
             </Button>
             <Button size="lg" variant="outline" onClick={() => navigate('/pricing')}
               className="text-lg px-8 py-6 rounded-xl border-2">
               {t('viewPricing')}
             </Button>
           </div>
+        </div>
+      </section>
 
-          {/* Stats */}
-          <div className="mt-16 grid grid-cols-2 sm:grid-cols-4 gap-6 max-w-3xl mx-auto">
+      {/* Who Is It For */}
+      <section className="py-16 sm:py-24 bg-white dark:bg-gray-950">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-14">
+            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white">{t('whoIsItForTitle')}</h2>
+            <p className="mt-4 text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">{t('whoIsItForSubtitle')}</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {[
-              { value: '1000+', label: t('statBuildings') },
-              { value: '5000+', label: t('statApartments') },
-              { value: '99.9%', label: t('statUptime') },
-              { value: '24/7', label: t('statSupport') },
-            ].map(stat => (
-              <div key={stat.label} className="text-center">
-                <p className="text-3xl sm:text-4xl font-extrabold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-                  {stat.value}
-                </p>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{stat.label}</p>
+              { icon: Home, title: t('forLandlords'), desc: t('forLandlordsDesc'), color: 'from-blue-500 to-blue-600' },
+              { icon: Building2, title: t('forPropertyManagers'), desc: t('forPropertyManagersDesc'), color: 'from-emerald-500 to-emerald-600' },
+              { icon: Users, title: t('forBuildingCommittees'), desc: t('forBuildingCommitteesDesc'), color: 'from-violet-500 to-violet-600' },
+            ].map((item, i) => (
+              <div key={i} className="text-center p-8 rounded-2xl bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-800">
+                <div className={`inline-flex p-4 rounded-2xl bg-gradient-to-br ${item.color} shadow-lg mb-5`}>
+                  <item.icon className="w-7 h-7 text-white" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">{item.title}</h3>
+                <p className="text-gray-600 dark:text-gray-400 text-sm leading-relaxed">{item.desc}</p>
               </div>
             ))}
           </div>
@@ -187,7 +216,7 @@ const LandingPage = () => {
       </section>
 
       {/* Features */}
-      <section id="features" className="py-20 sm:py-28 bg-white dark:bg-gray-950">
+      <section id="features" className="py-20 sm:py-28 bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-950">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white">{t('landingFeaturesTitle')}</h2>
@@ -203,7 +232,7 @@ const LandingPage = () => {
               { icon: Wrench, title: t('landingFeatureMaintenance'), desc: t('landingFeatureMaintenanceDesc'), color: 'from-rose-500 to-rose-600' },
               { icon: FileText, title: t('landingFeatureDocuments'), desc: t('landingFeatureDocumentsDesc'), color: 'from-cyan-500 to-cyan-600' },
             ].map((feature, i) => (
-              <div key={i} className="group relative p-8 rounded-2xl bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-800 hover:border-blue-200 dark:hover:border-blue-800 transition-all hover:shadow-xl hover:-translate-y-1">
+              <div key={i} className="group relative p-8 rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 hover:border-blue-200 dark:hover:border-blue-800 transition-all hover:shadow-xl hover:-translate-y-1">
                 <div className={`inline-flex p-3 rounded-xl bg-gradient-to-br ${feature.color} shadow-lg`}>
                   <feature.icon className="w-6 h-6 text-white" />
                 </div>
@@ -216,14 +245,13 @@ const LandingPage = () => {
       </section>
 
       {/* How It Works */}
-      <section id="how-it-works" className="py-20 sm:py-28 bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-950">
+      <section id="how-it-works" className="py-20 sm:py-28 bg-white dark:bg-gray-950">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white">{t('howItWorksTitle')}</h2>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative">
-            {/* Connector line (desktop) */}
             <div className="hidden md:block absolute top-16 left-[16.67%] right-[16.67%] h-0.5 bg-gradient-to-r from-blue-300 via-indigo-300 to-purple-300 dark:from-blue-700 dark:via-indigo-700 dark:to-purple-700" />
 
             {[
@@ -243,6 +271,33 @@ const LandingPage = () => {
         </div>
       </section>
 
+      {/* Product Preview */}
+      <section className="py-20 sm:py-28 bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-950">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-14">
+            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white">{t('productPreviewTitle')}</h2>
+            <p className="mt-4 text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">{t('productPreviewSubtitle')}</p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {[
+              { icon: PieChart, title: t('previewDashboard'), desc: t('previewDashboardDesc') },
+              { icon: CreditCard, title: t('previewPayments'), desc: t('previewPaymentsDesc') },
+              { icon: FileText, title: t('previewReports'), desc: t('previewReportsDesc') },
+              { icon: Shield, title: t('previewSecurity'), desc: t('previewSecurityDesc') },
+            ].map((item, i) => (
+              <div key={i} className="p-6 rounded-xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 text-center">
+                <div className="inline-flex p-3 rounded-lg bg-blue-50 dark:bg-blue-950/50 mb-4">
+                  <item.icon className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                </div>
+                <h3 className="font-semibold text-gray-900 dark:text-white mb-1">{item.title}</h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{item.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* Trust / Security */}
       <section className="py-16 bg-white dark:bg-gray-950">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -255,7 +310,7 @@ const LandingPage = () => {
             ].map((item, i) => (
               <div key={i} className="flex flex-col items-center gap-3">
                 <div className="p-3 rounded-full bg-gray-50 dark:bg-gray-900">
-                  <item.icon className="w-6 h-6 text-blue-600" />
+                  <item.icon className="w-6 h-6 text-blue-600 dark:text-blue-400" />
                 </div>
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{item.label}</span>
               </div>
@@ -276,7 +331,7 @@ const LandingPage = () => {
                 <Button size="lg" onClick={() => navigate('/register')}
                   className="bg-white text-blue-600 hover:bg-gray-100 text-lg px-8 py-6 rounded-xl gap-2 font-semibold">
                   {t('landingCreateAccount')}
-                  <ArrowRight className="w-5 h-5 rtl:rotate-180" />
+                  <ArrowRight className={`w-5 h-5 ${isRtl ? 'rotate-180' : ''}`} />
                 </Button>
                 <Button size="lg" variant="outline" onClick={() => navigate('/contact')}
                   className="border-white/30 text-white hover:bg-white/10 text-lg px-8 py-6 rounded-xl">
@@ -307,9 +362,9 @@ const LandingPage = () => {
             <div>
               <h4 className="font-semibold text-gray-900 dark:text-white mb-3">{t('product')}</h4>
               <ul className="space-y-2 text-sm text-gray-500 dark:text-gray-400">
-                <li><a href="#features" className="hover:text-gray-900 dark:hover:text-white">{t('features')}</a></li>
-                <li><a href="/pricing" onClick={(e) => { e.preventDefault(); navigate('/pricing'); }} className="hover:text-gray-900 dark:hover:text-white">{t('pricingNav')}</a></li>
-                <li><a href="/faq" onClick={(e) => { e.preventDefault(); navigate('/faq'); }} className="hover:text-gray-900 dark:hover:text-white">{t('faqNav')}</a></li>
+                <li><a href="#features" className="hover:text-gray-900 dark:hover:text-white transition-colors">{t('features')}</a></li>
+                <li><button onClick={() => navigate('/pricing')} className="hover:text-gray-900 dark:hover:text-white transition-colors">{t('pricingNav')}</button></li>
+                <li><button onClick={() => navigate('/faq')} className="hover:text-gray-900 dark:hover:text-white transition-colors">{t('faqNav')}</button></li>
               </ul>
             </div>
 
@@ -317,10 +372,10 @@ const LandingPage = () => {
             <div>
               <h4 className="font-semibold text-gray-900 dark:text-white mb-3">{t('company')}</h4>
               <ul className="space-y-2 text-sm text-gray-500 dark:text-gray-400">
-                <li><a href="/contact" onClick={(e) => { e.preventDefault(); navigate('/contact'); }} className="hover:text-gray-900 dark:hover:text-white">{t('contactNav')}</a></li>
-                <li><a href="/privacy-policy" className="hover:text-gray-900 dark:hover:text-white">{t('privacyPolicy')}</a></li>
-                <li><a href="/terms" className="hover:text-gray-900 dark:hover:text-white">{t('termsOfUsage')}</a></li>
-                <li><a href="/accessibility" className="hover:text-gray-900 dark:hover:text-white">{t('accessibility')}</a></li>
+                <li><button onClick={() => navigate('/contact')} className="hover:text-gray-900 dark:hover:text-white transition-colors">{t('contactNav')}</button></li>
+                <li><button onClick={() => navigate('/privacy-policy')} className="hover:text-gray-900 dark:hover:text-white transition-colors">{t('privacyPolicy')}</button></li>
+                <li><button onClick={() => navigate('/terms')} className="hover:text-gray-900 dark:hover:text-white transition-colors">{t('termsOfUsage')}</button></li>
+                <li><button onClick={() => navigate('/accessibility')} className="hover:text-gray-900 dark:hover:text-white transition-colors">{t('accessibility')}</button></li>
               </ul>
             </div>
 
@@ -328,8 +383,8 @@ const LandingPage = () => {
             <div>
               <h4 className="font-semibold text-gray-900 dark:text-white mb-3">{t('contactNav')}</h4>
               <ul className="space-y-2 text-sm text-gray-500 dark:text-gray-400">
-                <li className="flex items-center gap-2"><Mail className="w-4 h-4" /> info@albayt.cloud</li>
-                <li className="flex items-center gap-2"><Globe className="w-4 h-4" /> albayt.cloud</li>
+                <li className="flex items-center gap-2"><Mail className="w-4 h-4 shrink-0" /> info@qfiber.co.il</li>
+                <li className="flex items-center gap-2"><Globe className="w-4 h-4 shrink-0" /> qfiber.co.il</li>
               </ul>
             </div>
           </div>

@@ -79,6 +79,8 @@ const TitleUpdater = () => {
 
   useEffect(() => {
     document.title = t('siteTitle');
+    document.documentElement.lang = language;
+    document.documentElement.dir = language === 'ar' || language === 'he' ? 'rtl' : 'ltr';
   }, [language, t]);
 
   return null;

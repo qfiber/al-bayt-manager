@@ -4,11 +4,14 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { ChevronDown } from 'lucide-react';
 import { MarketingLayout } from '@/components/MarketingLayout';
+import { useSeo } from '@/hooks/use-seo';
 
 const FAQ = () => {
   const navigate = useNavigate();
   const { t } = useLanguage();
   const [openIndex, setOpenIndex] = useState<number | null>(null);
+
+  useSeo({ title: `${t('faqNav')} — Al-Bayt Manager`, description: t('landingHeroSubtitle'), path: '/faq' });
 
   const faqs = [
     { q: t('faq1Q'), a: t('faq1A') },

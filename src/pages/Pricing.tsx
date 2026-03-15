@@ -5,6 +5,7 @@ import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Check } from 'lucide-react';
 import { MarketingLayout } from '@/components/MarketingLayout';
+import { useSeo } from '@/hooks/use-seo';
 
 interface Plan {
   id: string; name: string; slug: string;
@@ -18,6 +19,8 @@ const Pricing = () => {
   const { t } = useLanguage();
   const [plans, setPlans] = useState<Plan[]>([]);
   const [cycle, setCycle] = useState<'monthly' | 'yearly'>('monthly');
+
+  useSeo({ title: `${t('pricingNav')} — Al-Bayt Manager`, description: t('landingHeroSubtitle'), path: '/pricing' });
 
   useEffect(() => {
     api.get<Plan[]>('/subscriptions/plans').then(data => setPlans((data || []).filter(p => p.isActive))).catch(() => {});
