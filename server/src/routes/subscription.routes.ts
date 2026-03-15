@@ -207,7 +207,7 @@ subscriptionRoutes.post('/cardcom-checkout', requireAuth, requireOrgScope, requi
 
     const data = await cardcomRes.json() as any;
     if (!cardcomRes.ok || !data.LowProfileId) {
-      const logger = (await import('../config/logger.js')).default;
+      const { logger } = await import('../config/logger.js');
       logger.error({ status: cardcomRes.status, response: data, terminal: config.cardcomTerminalNumber }, 'CardCom LowProfile/Create failed');
       throw new Error(`CardCom failed: ${data.Description || data.Message || JSON.stringify(data)}`);
     }
@@ -264,7 +264,7 @@ subscriptionRoutes.post('/generate-payment-link', requireAuth, requireSuperAdmin
 
     const data = await cardcomRes.json() as any;
     if (!cardcomRes.ok || !data.LowProfileId) {
-      const logger = (await import('../config/logger.js')).default;
+      const { logger } = await import('../config/logger.js');
       logger.error({ status: cardcomRes.status, response: data, terminal: config.cardcomTerminalNumber }, 'CardCom LowProfile/Create failed');
       throw new Error(`CardCom failed: ${data.Description || data.Message || JSON.stringify(data)}`);
     }
