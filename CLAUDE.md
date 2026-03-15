@@ -25,9 +25,11 @@ Multi-tenant building management system for managing residential buildings, apar
 ## Development
 ```bash
 # Frontend
-npm run dev       # Start dev server on port 8080
-npm run build     # Production build
-npm run lint      # ESLint
+npm run dev              # Start dev server on port 8080
+npm run build            # Production build + prerender public pages for SEO
+npm run build:no-prerender  # Production build without prerendering (faster)
+npm run prerender        # Prerender only (after a build)
+npm run lint             # ESLint
 
 # Backend (from server/)
 npm run dev              # Start dev server with tsx watch (port 4010)
@@ -40,6 +42,27 @@ npm run db:studio        # Open Drizzle Studio IDE
 npm run create-admin     # CLI to create admin user
 npm run test             # Run tests with vitest
 ```
+
+## SEO & Prerendering
+
+Public pages are prerendered at build time for search engines and AI crawlers using Puppeteer. The prerender script (`scripts/prerender.mjs`) visits each public route, captures the fully rendered HTML, and saves it to `dist/prerendered/`.
+
+Nginx detects bot user agents (Googlebot, GPTBot, ClaudeBot, etc.) and serves the prerendered HTML instead of the SPA shell.
+
+**Prerendered routes:** `/`, `/pricing`, `/faq`, `/contact`, `/privacy-policy`, `/terms`, `/login`, `/register`
+
+**Server dependencies for prerendering (Puppeteer/Chrome):**
+```bash
+sudo apt-get install -y libatk1.0-0 libatk-bridge2.0-0 libcups2 libxdamage1 \
+  libxrandr2 libgbm1 libpango-1.0-0 libcairo2 libasound2 libnspr4 libnss3 \
+  libxss1 libxtst6 libxkbcommon0 libxcomposite1 libxfixes3 libxcursor1 \
+  libxi6 libxrender1 libfontconfig1 libdbus-1-3
+```
+
+**SEO files:**
+- `public/sitemap.xml` — sitemap for all public pages
+- `public/robots.txt` — blocks crawler access to app routes (`/dashboard`, `/settings`, etc.)
+- `src/hooks/use-seo.ts` — hook for per-page title, meta description, canonical URL, and JSON-LD structured data
 
 ## Project Structure
 ```

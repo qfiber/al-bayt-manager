@@ -104,7 +104,7 @@ async function prerender() {
       await page.goto(url, { waitUntil: 'networkidle0', timeout: 15000 });
 
       // Wait a bit for React to finish rendering
-      await page.waitForTimeout(1000);
+      await new Promise(r => setTimeout(r, 1500));
 
       const html = await page.content();
 
