@@ -186,6 +186,7 @@ const LandingPage = () => {
               {t('viewPricing')}
             </Button>
           </div>
+          <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">{t('landingCtaMicro')}</p>
         </div>
       </section>
 
@@ -271,29 +272,83 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* Product Preview */}
-      <section className="py-20 sm:py-28 bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-950">
+      {/* Product Preview — Visual Dashboard Mockup */}
+      <section className="py-20 sm:py-28 bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-950 overflow-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-14">
             <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white">{t('productPreviewTitle')}</h2>
             <p className="mt-4 text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">{t('productPreviewSubtitle')}</p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {[
-              { icon: PieChart, title: t('previewDashboard'), desc: t('previewDashboardDesc') },
-              { icon: CreditCard, title: t('previewPayments'), desc: t('previewPaymentsDesc') },
-              { icon: FileText, title: t('previewReports'), desc: t('previewReportsDesc') },
-              { icon: Shield, title: t('previewSecurity'), desc: t('previewSecurityDesc') },
-            ].map((item, i) => (
-              <div key={i} className="p-6 rounded-xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 text-center">
-                <div className="inline-flex p-3 rounded-lg bg-blue-50 dark:bg-blue-950/50 mb-4">
-                  <item.icon className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+          {/* Mock Dashboard UI */}
+          <div className="relative mx-auto max-w-5xl">
+            <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-2xl overflow-hidden">
+              {/* Title bar */}
+              <div className="flex items-center gap-2 px-4 py-3 bg-gray-100 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                <div className="flex gap-1.5">
+                  <div className="w-3 h-3 rounded-full bg-red-400" />
+                  <div className="w-3 h-3 rounded-full bg-yellow-400" />
+                  <div className="w-3 h-3 rounded-full bg-green-400" />
                 </div>
-                <h3 className="font-semibold text-gray-900 dark:text-white mb-1">{item.title}</h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400">{item.desc}</p>
+                <div className="flex-1 text-center">
+                  <div className="inline-block px-4 py-1 rounded-md bg-white dark:bg-gray-700 text-xs text-gray-500 dark:text-gray-400">
+                    albayt.cloud/dashboard
+                  </div>
+                </div>
               </div>
-            ))}
+
+              {/* Dashboard content */}
+              <div className="p-6 space-y-5">
+                {/* KPI row */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  {[
+                    { label: t('previewDashboard'), value: '12', sub: t('buildings'), color: 'text-blue-600 dark:text-blue-400' },
+                    { label: t('previewPayments'), value: '₪48,250', sub: t('thisMonth'), color: 'text-emerald-600 dark:text-emerald-400' },
+                    { label: t('occupancyRate'), value: '94%', sub: t('occupied'), color: 'text-violet-600 dark:text-violet-400' },
+                    { label: t('openIssues'), value: '3', sub: t('pending'), color: 'text-amber-600 dark:text-amber-400' },
+                  ].map((kpi, i) => (
+                    <div key={i} className="rounded-xl border border-gray-100 dark:border-gray-700 p-4 bg-gray-50/50 dark:bg-gray-800/50">
+                      <p className="text-xs text-gray-500 dark:text-gray-400">{kpi.label}</p>
+                      <p className={`text-2xl font-bold mt-1 ${kpi.color}`}>{kpi.value}</p>
+                      <p className="text-[10px] text-gray-400 dark:text-gray-500">{kpi.sub}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Chart + table row */}
+                <div className="grid grid-cols-1 sm:grid-cols-5 gap-4">
+                  {/* Mini chart mockup */}
+                  <div className="sm:col-span-3 rounded-xl border border-gray-100 dark:border-gray-700 p-4 bg-gray-50/50 dark:bg-gray-800/50">
+                    <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-3">{t('previewReports')}</p>
+                    <div className="flex items-end gap-1 h-24">
+                      {[40, 65, 45, 80, 60, 90, 70, 85, 55, 95, 75, 88].map((h, i) => (
+                        <div key={i} className="flex-1 rounded-t-sm bg-gradient-to-t from-blue-500 to-indigo-500 dark:from-blue-400 dark:to-indigo-400 opacity-80" style={{ height: `${h}%` }} />
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Mini table mockup */}
+                  <div className="sm:col-span-2 rounded-xl border border-gray-100 dark:border-gray-700 p-4 bg-gray-50/50 dark:bg-gray-800/50">
+                    <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-3">{t('recentPayments')}</p>
+                    <div className="space-y-2">
+                      {[
+                        { apt: 'A-101', amount: '₪2,400', status: 'text-emerald-500' },
+                        { apt: 'B-205', amount: '₪1,800', status: 'text-emerald-500' },
+                        { apt: 'C-304', amount: '₪3,100', status: 'text-amber-500' },
+                      ].map((row, i) => (
+                        <div key={i} className="flex items-center justify-between text-xs">
+                          <span className="text-gray-600 dark:text-gray-400">{row.apt}</span>
+                          <span className={`font-medium ${row.status}`}>{row.amount}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Glow effect behind the mockup */}
+            <div className="absolute -inset-4 bg-gradient-to-r from-blue-400/20 via-indigo-400/20 to-purple-400/20 rounded-3xl blur-2xl -z-10" />
           </div>
         </div>
       </section>
@@ -338,6 +393,7 @@ const LandingPage = () => {
                   {t('contactUs')}
                 </Button>
               </div>
+              <p className="mt-4 text-sm text-blue-200">{t('landingCtaMicro')}</p>
             </div>
           </div>
         </div>
