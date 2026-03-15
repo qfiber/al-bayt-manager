@@ -151,8 +151,6 @@ export async function createPaymentUrl(
   const queryParams = new URLSearchParams({
     action: 'pay',
     Masof: hyp.masof,
-    KEY: hyp.key,
-    PassP: hyp.passP,
     Amount: params.amount.toFixed(2),
     Order: params.order,
     Coin: String(params.currency || 1),
@@ -165,8 +163,13 @@ export async function createPaymentUrl(
     PageLang: params.locale === 'he' ? 'HEB' : 'ENG',
   });
 
-  // Only add Sign if we got a valid signature
-  if (signature) queryParams.set('Sign', signature);
+  // Use signature if available, otherwise fall back to KEY+PassP
+  if (signature) {
+    queryParams.set('signature', signature);
+  } else {
+    queryParams.set('KEY', hyp.key);
+    queryParams.set('PassP', hyp.passP);
+  }
 
   // EZCount invoice auto-generation
   if (params.sendInvoice !== false) {
@@ -259,8 +262,6 @@ export async function createRecurringPayment(
   const queryParams = new URLSearchParams({
     action: 'pay',
     Masof: hyp.masof,
-    KEY: hyp.key,
-    PassP: hyp.passP,
     Amount: params.amount.toFixed(2),
     Order: params.order,
     Coin: String(params.currency || 1),
@@ -277,8 +278,13 @@ export async function createRecurringPayment(
     OnlyOnApprove: 'True',
   });
 
-  // Only add Sign if we got a valid signature
-  if (signature) queryParams.set('Sign', signature);
+  // Use signature if available, otherwise fall back to KEY+PassP
+  if (signature) {
+    queryParams.set('signature', signature);
+  } else {
+    queryParams.set('KEY', hyp.key);
+    queryParams.set('PassP', hyp.passP);
+  }
 
   if (params.firstDate) queryParams.set('FirstDate', params.firstDate);
 

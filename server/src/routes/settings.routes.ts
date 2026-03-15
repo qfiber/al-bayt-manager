@@ -81,14 +81,14 @@ settingsRoutes.get('/public', async (req: Request, res: Response, next: NextFunc
 
 settingsRoutes.get('/', requireAuth, requireRole('admin'), requireOrgScope, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const result = await settingsService.getSettings(req.organizationId);
+    const result = await settingsService.getSettings(req.organizationId, req.user?.isSuperAdmin === true);
     res.json(result);
   } catch (err) { next(err); }
 });
 
 settingsRoutes.put('/', requireAuth, requireRole('admin'), requireOrgScope, validate(updateSettingsSchema), auditLog('update', 'settings'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const result = await settingsService.updateSettings(req.organizationId, req.body);
+    const result = await settingsService.updateSettings(req.organizationId, req.body, req.user?.isSuperAdmin === true);
     res.json(result);
   } catch (err) { next(err); }
 });

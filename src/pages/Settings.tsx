@@ -93,7 +93,7 @@ function isMaskedValue(val: string): boolean {
 const Settings = () => {
   useRequireAuth('admin');
 
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, isSuperAdmin } = useAuth();
   const { t, language, setLanguage } = useLanguage();
   const { refresh } = usePublicSettings();
   const navigate = useNavigate();
@@ -497,6 +497,9 @@ const Settings = () => {
               </div>
             </CardContent>
           </Card>
+
+          {/* Platform Settings — Super Admin Only */}
+          {isSuperAdmin && (<>
 
           {/* Security Settings */}
           <Card>
@@ -1144,6 +1147,8 @@ const Settings = () => {
               <p className="text-xs text-muted-foreground mt-2">{t('emailVerificationHelp')}</p>
             </CardContent>
           </Card>
+
+          </>)}
 
           {/* Branding */}
           <Card>

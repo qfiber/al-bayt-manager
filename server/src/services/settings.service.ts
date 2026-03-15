@@ -14,6 +14,28 @@ const SENSITIVE_FIELDS = [
   'hypKey',
 ] as const;
 
+/** Fields that only the SaaS super-admin may view or modify.
+ *  Org-admins (landlords) must NEVER see these — they belong to the platform operator. */
+export const SUPER_ADMIN_ONLY_FIELDS = [
+  // Payment gateways
+  'stripeEnabled', 'stripePublishableKey', 'stripeSecretKey', 'stripeWebhookSecret',
+  'cardcomEnabled', 'cardcomTerminalNumber', 'cardcomApiName', 'cardcomApiPassword',
+  'hypEnabled', 'hypMasof', 'hypKey', 'hypPassP',
+  'paypalEnabled', 'paypalClientId', 'paypalClientSecret', 'paypalMode',
+  // Invoicing
+  'ezCountApiKey', 'ezCountApiEmail',
+  // Twilio (platform-level SMS)
+  'twilioEnabled', 'twilioAccountSid', 'twilioAuthToken', 'twilioPhoneNumber',
+  // CAPTCHA (platform-level)
+  'turnstileEnabled', 'turnstileSiteKey', 'turnstileSecretKey',
+  // Email service (platform-level)
+  'smtpEnabled', 'smtpFromEmail', 'smtpFromName', 'resendApiKey',
+  // Registration (platform-level)
+  'registrationEnabled',
+  // Email verification (platform-level)
+  'emailVerificationEnabled',
+] as const;
+
 type SettingsRow = typeof settings.$inferSelect;
 
 /** Rewrite legacy /api/uploads/logos/X URLs to /public-uploads/logos/X */
@@ -62,9 +84,19 @@ function maskSensitiveFields(row: SettingsRow): Record<string, unknown> {
   return masked;
 }
 
-export async function getSettings(organizationId?: string) {
+/** Strip super-admin-only fields from a settings object */
+function stripSuperAdminFields(obj: Record<string, unknown>): Record<string, unknown> {
+  const filtered = { ...obj };
+  for (const field of SUPER_ADMIN_ONLY_FIELDS) {
+    delete filtered[field];
+  }
+  return filtered;
+}
+
+export async function getSettings(organizationId?: string, isSuperAdmin = false) {
   const row = await getOrCreateSettings(organizationId);
-  return maskSensitiveFields(row);
+  const masked = maskSensitiveFields(row);
+  return isSuperAdmin ? masked : stripSuperAdminFields(masked);
 }
 
 export async function getPublicSettings(organizationId?: string) {
@@ -98,31 +130,17 @@ export async function getPublicSettings(organizationId?: string) {
   return { ...result, logoUrl: normalizeLogoUrl(result.logoUrl) };
 }
 
-export async function updateSettings(organizationId: string | undefined, data: Partial<{
-  companyName: string | null;
-  systemLanguage: string;
-  logoUrl: string | null;
-  smtpEnabled: boolean;
-  smtpFromEmail: string | null;
-  smtpFromName: string | null;
-  resendApiKey: string | null;
-  turnstileEnabled: boolean;
-  turnstileSiteKey: string | null;
-  turnstileSecretKey: string | null;
-  registrationEnabled: boolean;
-  ntfyEnabled: boolean;
-  ntfyServerUrl: string | null;
-  smsEnabled: boolean;
-  smsProvider: string | null;
-  smsApiToken: string | null;
-  smsUsername: string | null;
-  smsSenderName: string | null;
-  currencyCode: string;
-  currencySymbol: string;
-}>) {
+export async function updateSettings(organizationId: string | undefined, data: Record<string, unknown>, isSuperAdmin = false) {
   const existing = await getOrCreateSettings(organizationId);
 
   const updateData: Record<string, unknown> = { ...data };
+
+  // Strip super-admin-only fields if caller is not super-admin
+  if (!isSuperAdmin) {
+    for (const field of SUPER_ADMIN_ONLY_FIELDS) {
+      delete updateData[field];
+    }
+  }
 
   // Don't overwrite secrets with their masked representations, and encrypt new values
   for (const field of SENSITIVE_FIELDS) {
