@@ -91,14 +91,14 @@ export async function generateSignature(
 
   // Try query string format first
   const responseParams = new URLSearchParams(text);
-  signature = responseParams.get('Sign') || responseParams.get('sign') || '';
+  signature = responseParams.get('Sign') || responseParams.get('sign') || responseParams.get('signature') || '';
   ccode = responseParams.get('CCode') || responseParams.get('ccode') || '';
 
   // Try JSON format
   if (!signature) {
     try {
       const json = JSON.parse(text);
-      signature = json.Sign || json.sign || '';
+      signature = json.Sign || json.sign || json.signature || '';
       ccode = String(json.CCode ?? json.ccode ?? '');
     } catch {}
   }
@@ -316,7 +316,7 @@ export async function getInvoiceUrl(
   const signRes = await fetch(`${HYP_BASE_URL}?${signParams.toString()}`);
   const signText = await signRes.text();
   const signResponse = new URLSearchParams(signText);
-  const signature = signResponse.get('Sign') || '';
+  const signature = signResponse.get('Sign') || signResponse.get('sign') || signResponse.get('signature') || '';
 
   // Build print URL
   const printParams = new URLSearchParams({
