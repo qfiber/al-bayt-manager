@@ -10,8 +10,6 @@ const SENSITIVE_FIELDS = [
   'paypalClientSecret',
   'twilioAuthToken',
   'ezCountApiKey',
-  'hypPassP',
-  'hypKey',
 ] as const;
 
 /** Fields that only the SaaS super-admin may view or modify.
@@ -20,7 +18,6 @@ export const SUPER_ADMIN_ONLY_FIELDS = [
   // Payment gateways
   'stripeEnabled', 'stripePublishableKey', 'stripeSecretKey', 'stripeWebhookSecret',
   'cardcomEnabled', 'cardcomTerminalNumber', 'cardcomApiName', 'cardcomApiPassword',
-  'hypEnabled', 'hypMasof', 'hypKey', 'hypPassP',
   'paypalEnabled', 'paypalClientId', 'paypalClientSecret', 'paypalMode',
   // Invoicing
   'ezCountApiKey', 'ezCountApiEmail',

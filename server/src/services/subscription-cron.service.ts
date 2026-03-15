@@ -87,28 +87,44 @@ async function sendPaymentReminders() {
 
     if (admins.length === 0 || !planId) continue;
 
-    // Generate payment link
+    // Generate CardCom payment link
     try {
-      const { createPaymentUrl } = await import('./hyp.service.js');
       const plan = await (await import('./subscription.plan.service.js')).getPlan(planId);
       const amount = parseFloat(plan.monthlyPrice);
       if (amount <= 0) continue;
 
-      // Use SITE_URL or fallback
-      const siteUrl = process.env.CORS_ORIGIN || 'https://albayt.cloud';
-      const successUrl = `${siteUrl}/api/subscriptions/hyp-success?orgId=${orgId}&planId=${planId}&billingCycle=${sub.billingCycle}`;
-      const errorUrl = `${siteUrl}/dashboard?subscription=failed`;
+      const { getRawSettings: getRaw } = await import('./settings.service.js');
+      const cardcomConfig = await getRaw();
+      if (!cardcomConfig?.cardcomEnabled || !cardcomConfig.cardcomTerminalNumber) continue;
 
-      const result = await createPaymentUrl(orgId, {
-        amount,
-        order: `sub|${orgId}|${planId}|${sub.billingCycle}`,
-        description: `${planName} Plan Renewal`,
-        successUrl, errorUrl,
-        locale: 'he',
-        currency: 1,
-        sendInvoice: true,
-        invoiceDescription: `${planName} Plan - ${sub.billingCycle}`,
+      const siteUrl = process.env.CORS_ORIGIN || 'https://albayt.cloud';
+      const successUrl = `${siteUrl}/dashboard?subscription=success`;
+      const failedUrl = `${siteUrl}/dashboard?subscription=failed`;
+      const webhookUrl = `${siteUrl}/api/subscriptions/cardcom-webhook`;
+
+      const cardcomBody = {
+        TerminalNumber: parseInt(cardcomConfig.cardcomTerminalNumber),
+        ApiName: cardcomConfig.cardcomApiName || '',
+        Operation: 'ChargeOnly',
+        Amount: amount,
+        ProductName: `${planName} Plan - ${sub.billingCycle}`,
+        Language: 'he',
+        ISOCoinId: 1,
+        ReturnValue: JSON.stringify({ orgId, planId, billingCycle: sub.billingCycle }),
+        SuccessRedirectUrl: successUrl,
+        FailedRedirectUrl: failedUrl,
+        WebHookUrl: webhookUrl,
+      };
+
+      const cardcomRes = await fetch('https://secure.cardcom.solutions/api/v11/LowProfile/Create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(cardcomBody),
       });
+      const cardcomData = await cardcomRes.json() as any;
+      if (!cardcomData.LowProfileId) continue;
+
+      const result = { url: cardcomData.Url || `https://secure.cardcom.solutions/external/LowProfile/${cardcomData.LowProfileId}` };
 
       // Send email with payment link
       const { getRawSettings } = await import('./settings.service.js');

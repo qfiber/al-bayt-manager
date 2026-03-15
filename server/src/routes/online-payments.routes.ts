@@ -13,7 +13,7 @@ const checkoutSchema = z.object({
   apartmentId: z.string().uuid(),
   amount: z.number().positive(),
   month: z.string().regex(/^\d{4}-\d{2}$/),
-  gateway: z.enum(['stripe', 'cardcom', 'paypal', 'hyp']),
+  gateway: z.enum(['stripe', 'cardcom', 'paypal']),
 });
 
 // Create checkout session (tenant-facing)
@@ -50,19 +50,6 @@ onlinePaymentRoutes.post('/checkout', requireAuth, validate(checkoutSchema), asy
     } else if (gateway === 'cardcom') {
       const result = await paymentGateway.createCardcomSession(orgId, apartmentId, amount, month, successUrl, cancelUrl, locale);
       res.json(result);
-    } else if (gateway === 'hyp') {
-      const { createPaymentUrl } = await import('../services/hyp.service.js');
-      const result = await createPaymentUrl(orgId, {
-        amount,
-        order: `${apartmentId}|${month}|${Date.now()}`,
-        description: `Payment - Apt (${month})`,
-        successUrl,
-        errorUrl: cancelUrl,
-        locale,
-        sendInvoice: true,
-        invoiceDescription: `Rent Payment (${month})`,
-      });
-      res.json({ url: result.url });
     }
   } catch (err) { next(err); }
 });
@@ -115,41 +102,3 @@ onlinePaymentRoutes.post('/cardcom-webhook', async (req: Request, res: Response,
   } catch (err) { next(err); }
 });
 
-// HYP payment callback (redirect after payment)
-onlinePaymentRoutes.get('/hyp-success', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { Id, CCode, Amount, ACode, Order, Sign } = req.query as Record<string, string>;
-    const orgId = req.user!.organizationId;
-
-    if (!orgId || CCode !== '0') {
-      res.redirect('/my-apartments?payment=failed');
-      return;
-    }
-
-    // Verify signature
-    const { verifyPaymentResponse } = await import('../services/hyp.service.js');
-    const verified = await verifyPaymentResponse(orgId, {
-      id: Id, ccode: CCode, amount: Amount, acode: ACode, order: Order, sign: Sign,
-    });
-
-    if (!verified) {
-      res.redirect('/my-apartments?payment=failed');
-      return;
-    }
-
-    // Extract apartmentId and month from Order (format: apartmentId|month|timestamp)
-    const parts = (Order || '').split('|');
-    const apartmentId = parts[0] || '';
-    const month = parts[1] || '';
-
-    // Create payment record using Amount from query
-    if (apartmentId && month && parseFloat(Amount) > 0) {
-      const { createPayment } = await import('../services/payment.service.js');
-      await createPayment({ apartmentId, month, amount: parseFloat(Amount) }, 'system');
-    }
-
-    res.redirect('/my-apartments?payment=success');
-  } catch {
-    res.redirect('/my-apartments?payment=error');
-  }
-});

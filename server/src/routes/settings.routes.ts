@@ -40,11 +40,6 @@ const updateSettingsSchema = z.object({
   cardcomTerminalNumber: z.string().max(50).nullable().optional(),
   cardcomApiName: z.string().max(255).nullable().optional(),
   cardcomApiPassword: z.string().max(500).nullable().optional(),
-  // HYP
-  hypEnabled: z.boolean().optional(),
-  hypMasof: z.string().max(20).nullable().optional(),
-  hypKey: z.string().max(255).nullable().optional(),
-  hypPassP: z.string().max(255).nullable().optional(),
   // PayPal
   paypalEnabled: z.boolean().optional(),
   paypalClientId: z.string().max(500).nullable().optional(),

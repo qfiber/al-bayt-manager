@@ -59,10 +59,6 @@ interface SettingsData {
   region: string;
   ezCountApiKey: string | null;
   ezCountApiEmail: string | null;
-  hypEnabled: boolean;
-  hypMasof: string | null;
-  hypKey: string | null;
-  hypPassP: string | null;
   primaryColor: string | null;
   accentColor: string | null;
 }
@@ -148,10 +144,6 @@ const Settings = () => {
   const [region, setRegion] = useState('IL');
   const [ezCountApiKey, setEzCountApiKey] = useState('');
   const [ezCountApiEmail, setEzCountApiEmail] = useState('');
-  const [hypEnabled, setHypEnabled] = useState(false);
-  const [hypMasof, setHypMasof] = useState('');
-  const [hypKey, setHypKey] = useState('');
-  const [hypPassP, setHypPassP] = useState('');
   const [primaryColor, setPrimaryColor] = useState('#3b82f6');
   const [accentColor, setAccentColor] = useState('#6366f1');
 
@@ -199,10 +191,6 @@ const Settings = () => {
     setRegion(data.region || 'IL');
     setEzCountApiKey(data.ezCountApiKey || '');
     setEzCountApiEmail(data.ezCountApiEmail || '');
-    setHypEnabled(data.hypEnabled ?? false);
-    setHypMasof(data.hypMasof || '');
-    setHypKey(data.hypKey || '');
-    setHypPassP(data.hypPassP || '');
     setPrimaryColor(data.primaryColor || '#3b82f6');
     setAccentColor(data.accentColor || '#6366f1');
   }, []);
@@ -314,10 +302,6 @@ const Settings = () => {
         region,
         ezCountApiKey: ezCountApiKey || null,
         ezCountApiEmail: ezCountApiEmail || null,
-        hypEnabled,
-        hypMasof: hypMasof || null,
-        hypKey: hypKey || null,
-        hypPassP: hypPassP || null,
         primaryColor,
         accentColor,
       });
@@ -1068,40 +1052,6 @@ const Settings = () => {
             </CardContent>
           </Card>
 
-          {/* HYP Payment Gateway */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CreditCard className="w-5 h-5" />
-                {t('hypConfiguration')}
-              </CardTitle>
-              <CardDescription>{t('hypConfigDesc')}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between mb-4">
-                <Label>{t('enableHyp')}</Label>
-                <Switch checked={hypEnabled} onCheckedChange={setHypEnabled} />
-              </div>
-              {hypEnabled && (
-                <div className="space-y-4">
-                  <div>
-                    <Label>{t('hypMasof')}</Label>
-                    <Input value={hypMasof} onChange={(e) => setHypMasof(e.target.value)} placeholder="0010131918" />
-                  </div>
-                  <div>
-                    <Label>{t('hypKey')}</Label>
-                    <Input type="password" value={hypKey} onChange={(e) => setHypKey(e.target.value)} />
-                  </div>
-                  <div>
-                    <Label>{t('hypPassP')}</Label>
-                    <Input type="password" value={hypPassP} onChange={(e) => setHypPassP(e.target.value)} />
-                  </div>
-                  <p className="text-xs text-muted-foreground">{t('hypTestMode')}</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
           {/* Region */}
           <Card>
             <CardHeader>
@@ -1226,10 +1176,6 @@ const SubscriptionSection = () => {
   const daysLeft = endDate ? Math.max(0, Math.ceil((new Date(endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))) : null;
 
   const handleChangePlan = async (planId: string, cycle: string) => {
-    try {
-      const result = await api.post('/subscriptions/hyp-checkout', { planId, billingCycle: cycle });
-      if (result.url) { window.location.href = result.url; return; }
-    } catch {}
     try {
       const result = await api.post('/subscriptions/cardcom-checkout', { planId, billingCycle: cycle });
       if (result.url) { window.location.href = result.url; return; }

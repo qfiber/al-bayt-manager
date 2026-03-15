@@ -33,7 +33,7 @@ const MyApartments = () => {
   const [payingApartment, setPayingApartment] = useState<any>(null);
   const [payAmount, setPayAmount] = useState('');
   const [payMonth, setPayMonth] = useState('');
-  const [payGateway, setPayGateway] = useState<'stripe' | 'cardcom' | 'paypal' | 'hyp'>('hyp');
+  const [payGateway, setPayGateway] = useState<'stripe' | 'cardcom' | 'paypal'>('cardcom');
   const [payLoading, setPayLoading] = useState(false);
   const [issueDialogOpen, setIssueDialogOpen] = useState(false);
   const [issueForm, setIssueForm] = useState({ buildingId: '', category: 'other', description: '' });
@@ -565,9 +565,8 @@ const MyApartments = () => {
               <Select value={payGateway} onValueChange={(v: any) => setPayGateway(v)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="hyp">HYP</SelectItem>
-                  <SelectItem value="stripe">Stripe</SelectItem>
                   <SelectItem value="cardcom">CardCom</SelectItem>
+                  <SelectItem value="stripe">Stripe</SelectItem>
                   <SelectItem value="paypal">PayPal</SelectItem>
                 </SelectContent>
               </Select>

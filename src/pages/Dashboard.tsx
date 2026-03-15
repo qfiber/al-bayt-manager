@@ -716,18 +716,7 @@ const Dashboard = () => {
                       disabled={subscription?.subscription?.planId === plan.id && subscription?.subscription?.billingCycle === cycle}
                       onClick={async () => {
                         try {
-                          // SaaS payments: HYP (primary) → CardCom (fallback)
-                          // Stripe is for tenant payments only, not SaaS billing
-                          try {
-                            const result = await api.post('/subscriptions/hyp-checkout', { planId: plan.id, billingCycle: cycle });
-                            if (result.url) {
-                              window.location.href = result.url;
-                              return;
-                            }
-                          } catch {
-                            // HYP not configured — try CardCom
-                          }
-
+                          // SaaS payments via CardCom
                           try {
                             const result = await api.post('/subscriptions/cardcom-checkout', { planId: plan.id, billingCycle: cycle });
                             if (result.url) {
@@ -735,7 +724,7 @@ const Dashboard = () => {
                               return;
                             }
                           } catch {
-                            // CardCom not configured either
+                            // CardCom not configured
                           }
 
                           // No Israeli payment gateway worked

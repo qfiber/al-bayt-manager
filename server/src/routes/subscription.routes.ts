@@ -157,11 +157,10 @@ subscriptionRoutes.post('/stripe-webhook', async (req: Request, res: Response, n
   } catch (err) { next(err); }
 });
 
-// ---- HYP subscription (Israeli landlord self-service) ----
+// ---- CardCom subscription (landlord self-service) ----
 
-// HYP checkout for SaaS subscription
-// Israeli cards → HK recurring, International → one-time payment
-subscriptionRoutes.post('/hyp-checkout', requireAuth, requireOrgScope, requireRole('admin'), async (req: Request, res: Response, next: NextFunction) => {
+// CardCom checkout for SaaS subscription
+subscriptionRoutes.post('/cardcom-checkout', requireAuth, requireOrgScope, requireRole('admin'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!req.organizationId) { res.status(400).json({ error: 'No org context' }); return; }
     const { planId, billingCycle } = req.body;
@@ -173,44 +172,47 @@ subscriptionRoutes.post('/hyp-checkout', requireAuth, requireOrgScope, requireRo
 
     const country = (req.headers['cf-ipcountry'] as string || '').toUpperCase();
     const locale = country === 'IL' ? 'he' : 'en';
-    const isIsrael = country === 'IL';
+
+    const { getRawSettings } = await import('../services/settings.service.js');
+    const config = await getRawSettings();
+    if (!config?.cardcomEnabled || !config.cardcomTerminalNumber) {
+      throw new Error('CardCom is not configured');
+    }
 
     const baseUrl = `${req.protocol}://${req.get('host')}`;
-    const successUrl = `${baseUrl}/api/subscriptions/hyp-success?orgId=${req.organizationId}&planId=${planId}&billingCycle=${billingCycle}`;
-    const errorUrl = `${baseUrl}/dashboard?subscription=failed`;
+    const successUrl = `${baseUrl}/dashboard?subscription=success`;
+    const failedUrl = `${baseUrl}/dashboard?subscription=failed`;
+    const webhookUrl = `${baseUrl}/api/subscriptions/cardcom-webhook`;
 
-    if (isIsrael) {
-      // Israeli cards: use HK recurring billing
-      const monthsInCycle = billingCycle === 'yearly' ? 12 : billingCycle === 'semi_annual' ? 6 : 1;
-      const { createRecurringPayment } = await import('../services/hyp.service.js');
-      const result = await createRecurringPayment(req.organizationId, {
-        amount,
-        order: `sub|${req.organizationId}|${planId}|${billingCycle}`,
-        description: `${plan.name} Plan Subscription`,
-        successUrl, errorUrl,
-        installmentCount: 12,
-        frequencyMonths: monthsInCycle,
-        locale, currency: 1,
-      });
-      res.json({ url: result.url });
-    } else {
-      // International cards: one-time payment (no HK)
-      const { createPaymentUrl } = await import('../services/hyp.service.js');
-      const result = await createPaymentUrl(req.organizationId, {
-        amount,
-        order: `sub|${req.organizationId}|${planId}|${billingCycle}`,
-        description: `${plan.name} Plan Subscription`,
-        successUrl, errorUrl,
-        locale, currency: 2, // USD for international
-        sendInvoice: true,
-        invoiceDescription: `${plan.name} Plan - ${billingCycle}`,
-      });
-      res.json({ url: result.url });
-    }
+    const body = {
+      TerminalNumber: parseInt(config.cardcomTerminalNumber),
+      ApiName: config.cardcomApiName || '',
+      Operation: 'ChargeOnly',
+      Amount: amount,
+      ProductName: `${plan.name} Plan - ${billingCycle}`,
+      Language: locale,
+      ISOCoinId: 1, // ILS
+      ReturnValue: JSON.stringify({ orgId: req.organizationId, planId, billingCycle }),
+      SuccessRedirectUrl: successUrl,
+      FailedRedirectUrl: failedUrl,
+      WebHookUrl: webhookUrl,
+    };
+
+    const cardcomRes = await fetch('https://secure.cardcom.solutions/api/v11/LowProfile/Create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    if (!cardcomRes.ok) throw new Error(`CardCom API error: ${cardcomRes.status}`);
+    const data = await cardcomRes.json() as any;
+    if (!data.LowProfileId) throw new Error(`CardCom failed: ${data.Description || JSON.stringify(data)}`);
+
+    res.json({ url: data.Url || `https://secure.cardcom.solutions/external/LowProfile/${data.LowProfileId}` });
   } catch (err) { next(err); }
 });
 
-// Super-admin: generate a payment link for a specific org (manual invoicing)
+// Super-admin: generate a CardCom payment link for a specific org (manual invoicing)
 subscriptionRoutes.post('/generate-payment-link', requireAuth, requireSuperAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { organizationId, planId, billingCycle } = req.body;
@@ -220,47 +222,64 @@ subscriptionRoutes.post('/generate-payment-link', requireAuth, requireSuperAdmin
     if (billingCycle === 'semi_annual' && plan.semiAnnualPrice) amount = parseFloat(plan.semiAnnualPrice);
     if (billingCycle === 'yearly' && plan.yearlyPrice) amount = parseFloat(plan.yearlyPrice);
 
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
-    const successUrl = `${baseUrl}/api/subscriptions/hyp-success?orgId=${organizationId}&planId=${planId}&billingCycle=${billingCycle}`;
-    const errorUrl = `${baseUrl}/dashboard?subscription=failed`;
+    const { getRawSettings } = await import('../services/settings.service.js');
+    const config = await getRawSettings();
+    if (!config?.cardcomEnabled || !config.cardcomTerminalNumber) {
+      throw new Error('CardCom is not configured');
+    }
 
-    const { createPaymentUrl } = await import('../services/hyp.service.js');
-    const result = await createPaymentUrl(organizationId, {
-      amount,
-      order: `sub|${organizationId}|${planId}|${billingCycle}`,
-      description: `${plan.name} Plan Subscription`,
-      successUrl, errorUrl,
-      locale: 'en',
-      currency: 2,
-      sendInvoice: true,
-      invoiceDescription: `${plan.name} Plan - ${billingCycle}`,
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const successUrl = `${baseUrl}/dashboard?subscription=success`;
+    const failedUrl = `${baseUrl}/dashboard?subscription=failed`;
+    const webhookUrl = `${baseUrl}/api/subscriptions/cardcom-webhook`;
+
+    const body = {
+      TerminalNumber: parseInt(config.cardcomTerminalNumber),
+      ApiName: config.cardcomApiName || '',
+      Operation: 'ChargeOnly',
+      Amount: amount,
+      ProductName: `${plan.name} Plan - ${billingCycle}`,
+      Language: 'en',
+      ISOCoinId: 1,
+      ReturnValue: JSON.stringify({ orgId: organizationId, planId, billingCycle }),
+      SuccessRedirectUrl: successUrl,
+      FailedRedirectUrl: failedUrl,
+      WebHookUrl: webhookUrl,
+    };
+
+    const cardcomRes = await fetch('https://secure.cardcom.solutions/api/v11/LowProfile/Create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
     });
 
-    res.json({ url: result.url, amount });
+    if (!cardcomRes.ok) throw new Error(`CardCom API error: ${cardcomRes.status}`);
+    const data = await cardcomRes.json() as any;
+    if (!data.LowProfileId) throw new Error(`CardCom failed: ${data.Description || JSON.stringify(data)}`);
+
+    const url = data.Url || `https://secure.cardcom.solutions/external/LowProfile/${data.LowProfileId}`;
+    res.json({ url, amount });
   } catch (err) { next(err); }
 });
 
-// HYP subscription success callback
-subscriptionRoutes.get('/hyp-success', async (req: Request, res: Response, next: NextFunction) => {
+// CardCom subscription webhook callback
+subscriptionRoutes.post('/cardcom-webhook', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { orgId, planId, billingCycle, CCode, Id, Sign } = req.query as Record<string, string>;
+    const returnValueRaw = req.body.ReturnValue || '';
+    const lowProfileId = req.body.LowProfileId || req.body.InternalDealNumber?.toString() || '';
 
-    if (CCode !== '0' || !orgId || !planId) {
-      res.redirect('/dashboard?subscription=failed');
-      return;
-    }
+    if (!lowProfileId) { res.json({ ok: true }); return; }
 
-    // Verify signature
-    try {
-      const { verifyPaymentResponse } = await import('../services/hyp.service.js');
-      await verifyPaymentResponse(orgId, {
-        id: Id || '', ccode: CCode, amount: req.query.Amount as string || '0',
-        acode: req.query.ACode as string || '', order: req.query.Order as string || '',
-        sign: Sign || '',
-      });
-    } catch {
-      // Verification failed — still process if CCode=0 (we can verify later)
-    }
+    let returnValue: any;
+    try { returnValue = JSON.parse(returnValueRaw); } catch { res.json({ ok: true }); return; }
+
+    const { orgId, planId, billingCycle } = returnValue || {};
+    if (!orgId || !planId) { res.json({ ok: true }); return; }
+
+    // Verify payment server-to-server
+    const { verifyCardcomPayment } = await import('../services/payment-gateway.service.js');
+    const verification = await verifyCardcomPayment(lowProfileId, orgId);
+    if (!verification.verified) { res.json({ ok: false }); return; }
 
     // Activate subscription
     await subService.assignPlan(orgId, planId, billingCycle || 'monthly');
@@ -271,9 +290,21 @@ subscriptionRoutes.get('/hyp-success', async (req: Request, res: Response, next:
     const { db } = await import('../config/database.js');
     await db.update(organizations).set({ isActive: true, updatedAt: new Date() }).where(eq(organizations.id, orgId));
 
-    res.redirect('/dashboard?subscription=success');
+    // Create EZCount invoice
+    try {
+      const { createEZCountInvoice } = await import('../services/ezcount.service.js');
+      await createEZCountInvoice(orgId, {
+        transactionId: verification.transactionId,
+        description: `${planId} Plan - ${billingCycle}`,
+        amount: verification.amount,
+        currency: 'ILS',
+        ccLast4: verification.ccLast4,
+      }, 'he');
+    } catch {}
+
+    res.json({ ok: true });
   } catch {
-    res.redirect('/dashboard?subscription=error');
+    res.json({ ok: false });
   }
 });
 
